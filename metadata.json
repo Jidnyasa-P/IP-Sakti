@@ -1,0 +1,10 @@
+{
+  "name": "IP-SAKTI Sahayak",
+  "description": "AI-powered assistance for AYUSH, intellectual property, traditional knowledge and regulatory research.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
