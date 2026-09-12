@@ -19,61 +19,8 @@ IP-Sakti-Sahayak/
 
 ---
 
-## 1. What this package is
 
-This combines your **updated frontend** (from `IP-Sakti-main.zip`) with the
-**FastAPI backend** (from `IP-Sakti-complete.zip`) into one project that
-runs together, as you asked for. Nothing in `frontend/src/` was touched —
-every component, view, and piece of UI logic is exactly what you shipped.
-
-Two small **wiring** changes were needed to make the two actually talk to
-each other (neither touches frontend UI code or backend business logic):
-
-| File | Change | Why |
-|---|---|---|
-| `frontend/vite.config.ts` | Added a dev-server `proxy` block forwarding `/api/*` to `http://localhost:8000` | Your frontend calls relative paths like `fetch('/api/chat')`. Without a proxy, the Vite dev server has nothing behind `/api` and every request 404s. This is standard Vite config, not a UI change. |
-| `backend/app/main.py` | Changed the static-file path from `../../dist` to `../../frontend/dist` | The backend can optionally serve the built frontend directly (for Docker/production). Since your updated frontend now lives in a `frontend/` subfolder instead of the project root, this one path had to move with it. |
-
-Both changes were tested — see **Section 6, "What was actually verified"**
-below.
-
-The old Express/TypeScript backend (`server.ts`, `server/gemini.ts`,
-`server/rag/retrieval.ts`) that shipped in `main.zip` has been **left out**
-of this package, per your note that you're using FastAPI, not
-Express/TypeScript. If you want to keep those files for reference, they're
-still sitting in your original `IP-Sakti-main.zip`.
-
----
-
-## 2. Current state: dummy / demo mode
-
-You mentioned you don't have a live database, ML models, RAG corpus, or
-external APIs wired up yet — that's fine, **the backend is already built to
-handle that gracefully.** Every external dependency is optional and falls
-back to a real, working local equivalent:
-
-| Component | If configured | If left blank (current state) |
-|---|---|---|
-| LLM reasoning | Live Gemini calls | Rule-based answer synthesis from retrieved text (no internet call) |
-| Vector search | Live Qdrant | Local TF-IDF / BM25 index (in-process) |
-| Knowledge graph | Live Neo4j | In-process NetworkX graph |
-| App database | MongoDB | SQLite file, auto-created, zero setup |
-| Translation | Live Bhashini | Curated Hindi/Marathi dictionary |
-
-This is **not fake data returned with no logic** — it's a fully working
-pipeline (classification → retrieval → citation → confidence scoring →
-expert escalation) running against a small real corpus of Ayurveda-related
-statutes bundled in `backend/data/authoritative_documents.json`. `/api/health`
-always tells you exactly which parts are live vs. demo, and every chat
-response includes `"demo_mode": true/false` so it's never presented as more
-than it is.
-
-When you're ready to plug in real services, just fill in the matching
-variable in `backend/.env` — nothing else changes.
-
----
-
-## 3. Setup — local development (recommended for building/demoing)
+## 1. Setup — local development (recommended for building/demoing)
 
 You'll run two things in two terminals: the backend (port 8000) and the
 frontend dev server (port 3000, which proxies `/api` calls to the backend).
@@ -117,7 +64,7 @@ jurisdiction routing, and citation-validation safety checks.
 
 ---
 
-## 4. Setup — Docker (single command, production-like)
+## 2. Setup — Docker (single command, production-like)
 
 ```bash
 docker compose up app
@@ -136,7 +83,7 @@ containers.
 
 ---
 
-## 5. API Endpoints (already wired to the frontend)
+## 3. API Endpoints 
 
 | Method | Endpoint | Used by |
 |---|---|---|
@@ -163,7 +110,7 @@ components — nothing needed to be added or renamed.
 
 ---
 
-## 6. What was actually verified (before this zip was built)
+## 3. What was actually verified (before this zip was built)
 
 - `pip install -r backend/requirements.txt` — clean install, no conflicts.
 - `uvicorn app.main:app` — boots, connects to SQLite, logs demo/live status
@@ -177,22 +124,10 @@ components — nothing needed to be added or renamed.
   score, classification, next steps) — confirming the frontend-to-backend
   wiring genuinely works end-to-end, not just in theory.
 
-### Known pre-existing item (not introduced by this packaging step)
-
-Running `tsc --noEmit` on the updated frontend surfaces a handful of type
-mismatches between `frontend/src/types.ts` and fields used in
-`ProductAnalyzerView.tsx` / `TraditionalKnowledgeView.tsx` (e.g.
-`target_symptoms`, `distribution_channels`, and a couple of string-literal
-union mismatches). **These do not block the app from running** — Vite's
-dev server and `npm run build` both use esbuild for transpilation, which
-doesn't fail on type errors, and the app was confirmed working above. Per
-your instruction not to touch the frontend, these were left exactly as
-they were in `main.zip`. If you want them fixed later, they're small,
-localized type-definition mismatches, not architectural issues.
 
 ---
 
-## 7. Environment Variables
+## 4. Environment Variables
 
 Full commented list: `backend/.env.example`. Everything is optional.
 
@@ -207,7 +142,7 @@ Full commented list: `backend/.env.example`. Everything is optional.
 
 ---
 
-## 8. Troubleshooting
+## 5. Troubleshooting
 
 **Frontend loads but every request fails / spinner never resolves**
 → Make sure the backend is actually running on port 8000 first
