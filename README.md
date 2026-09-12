@@ -1,8 +1,8 @@
-# IP-SAKTI Sahayak (SIH26045)
+# IP-SAKTI Sahayak 
 
 A multilingual, RAG-based, source-cited AI assistant for Intellectual
 Property and regulatory guidance in Ayurveda, across national and
-international regimes — **Team HackVeda**, Smart India Hackathon 2026.
+international regimes.
 
 Pipeline: **Classify → Route Jurisdiction → Retrieve → Reason → Validate → Cite**
 
