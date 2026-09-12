@@ -8,15 +8,39 @@ import { TraditionalKnowledgeView } from './components/TraditionalKnowledgeView'
 import { ResearchView } from './components/ResearchView';
 import { WorkspaceView } from './components/WorkspaceView';
 import { AdminView } from './components/AdminView';
+import { ProfileView } from './components/ProfileView';
 import { CitationModal } from './components/CitationModal';
+import { LoginView } from './components/auth/LoginView';
+import { RegisterView } from './components/auth/RegisterView';
 import { Citation } from './types';
 import { Shield, ExternalLink } from 'lucide-react';
 import { LanguageProvider, useTranslation } from './context/LanguageContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { JurisdictionProvider } from './context/JurisdictionContext';
+
+function AuthGate() {
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+
+  return (
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased">
+      {authMode === 'login' ? (
+        <LoginView onSwitchToRegister={() => setAuthMode('register')} />
+      ) : (
+        <RegisterView onSwitchToLogin={() => setAuthMode('login')} />
+      )}
+    </div>
+  );
+}
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('landing');
   const { currentLanguage, setLanguage, t } = useTranslation();
   const [activeCitation, setActiveCitation] = useState<Citation | null>(null);
+  const { user, isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <AuthGate />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased selection:bg-emerald-100 selection:text-emerald-900">
@@ -26,11 +50,13 @@ function AppContent() {
         setActiveTab={setActiveTab}
         language={currentLanguage}
         setLanguage={setLanguage}
+        user={user}
       />
 
       {/* Main Viewport Container */}
       <div className="flex-1 w-full">
         {activeTab === 'landing' && <LandingView setActiveTab={setActiveTab} />}
+        {activeTab === 'profile' && <ProfileView setActiveTab={setActiveTab} />}
         {activeTab === 'chat' && (
           <ChatView
             language={currentLanguage}
@@ -146,7 +172,11 @@ function AppContent() {
 export default function App() {
   return (
     <LanguageProvider>
-      <AppContent />
+      <AuthProvider>
+        <JurisdictionProvider>
+          <AppContent />
+        </JurisdictionProvider>
+      </AuthProvider>
     </LanguageProvider>
   );
 }

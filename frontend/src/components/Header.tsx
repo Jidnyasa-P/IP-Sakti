@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { Shield, BookOpen, Compass, FlaskConical, Sparkles, FolderArchive, Settings, Globe, ChevronDown, Check } from 'lucide-react';
-import { Language, UserRole } from '../types';
+import { Shield, BookOpen, Compass, FlaskConical, Sparkles, FolderArchive, Settings, Globe, ChevronDown, Check, UserCircle } from 'lucide-react';
+import { Language, User } from '../types';
 import { useTranslation } from '../context/LanguageContext';
+import { JurisdictionToggle } from './JurisdictionToggle';
 
-export type ActiveTab = 'landing' | 'chat' | 'product' | 'ipr' | 'tk' | 'research' | 'workspace' | 'admin';
+export type ActiveTab = 'landing' | 'chat' | 'product' | 'ipr' | 'tk' | 'research' | 'workspace' | 'admin' | 'profile';
 
 interface HeaderProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   language: Language;
   setLanguage: (lang: Language) => void;
-  userRole?: UserRole;
+  user?: User | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -18,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveTab,
   language,
   setLanguage,
-  userRole = 'EXPERT'
+  user
 }) => {
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const { t } = useTranslation();
@@ -97,8 +98,13 @@ export const Header: React.FC<HeaderProps> = ({
             })}
           </nav>
 
-          {/* Right Utilities: Language Selector, Admin & User Role */}
+          {/* Right Utilities: Jurisdiction Toggle, Language Selector, Admin & User Profile */}
           <div className="flex items-center gap-2.5">
+            {/* Dual Toggle: Domestic (India) / International (Export) */}
+            <div className="hidden md:block">
+              <JurisdictionToggle />
+            </div>
+
             {/* Language Switcher */}
             <div className="relative">
               <button
@@ -159,13 +165,34 @@ export const Header: React.FC<HeaderProps> = ({
               <Settings className="w-4 h-4" />
             </button>
 
-            {/* User Role Badge */}
-            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200">
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80">
-                {t('nav.role_expert', userRole)}
-              </span>
-            </div>
+            {/* User Profile */}
+            {user && (
+              <button
+                type="button"
+                id="profile-nav-btn"
+                onClick={() => setActiveTab('profile')}
+                title={`${user.name} — ${user.role}`}
+                className={`flex items-center gap-2 pl-2 sm:pl-2.5 ml-0.5 border-l border-slate-200 transition-colors ${
+                  activeTab === 'profile' ? 'text-emerald-800' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <UserCircle className="w-5 h-5" />
+                <span className="hidden sm:flex flex-col items-start leading-tight max-w-[130px]">
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 truncate max-w-full">
+                    {user.name}
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-medium px-2 truncate max-w-full">
+                    {user.role}
+                  </span>
+                </span>
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* Mobile Dual Toggle Row */}
+        <div className="md:hidden flex items-center justify-center py-2 border-t border-slate-100">
+          <JurisdictionToggle />
         </div>
 
         {/* Mobile Sub-Navigation Bar */}

@@ -2,7 +2,18 @@
 
 export type Language = 'en' | 'hi' | 'mr';
 
-export type UserRole = 'USER' | 'EXPERT' | 'ADMIN';
+// Profile / account type. These five values are also the exact display
+// labels used throughout the UI (Register, Profile, Header).
+export type UserRole = 'Practitioner' | 'Researcher' | 'Expert' | 'Admin' | 'Organization';
+
+export const USER_ROLE_OPTIONS: UserRole[] = ['Practitioner', 'Researcher', 'Expert', 'Admin', 'Organization'];
+
+// Dual jurisdiction toggle: Domestic (India) vs International/Export.
+// Mirrors the domestic/international distinction already used by the
+// backend's jurisdiction_service.py and the ProductAnalyzerView's
+// target_market field, so this can later be passed straight through to
+// backend APIs without a data-shape mismatch.
+export type JurisdictionMode = 'India' | 'International';
 
 export interface User {
   id: string;
