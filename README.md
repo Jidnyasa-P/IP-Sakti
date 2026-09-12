@@ -1,161 +1,231 @@
-# IP-SAKTI Sahayak
+# IP-SAKTI Sahayak (SIH26045)
 
-**IP-SAKTI Sahayak** is a comprehensive full-stack legal intelligence and decision-support platform tailored for AYUSH researchers, IPR attorneys, regulatory compliance teams, and bio-innovators in India.
+A multilingual, RAG-based, source-cited AI assistant for Intellectual
+Property and regulatory guidance in Ayurveda, across national and
+international regimes — **Team HackVeda**, Smart India Hackathon 2026.
 
-The platform synthesizes Indian statutory frameworks, judicial precedents, and administrative guidelines to evaluate traditional knowledge preservation, intellectual property rights (IPR), Access and Benefit Sharing (ABS) obligations, and product manufacturing compliance.
+Pipeline: **Classify → Route Jurisdiction → Retrieve → Reason → Validate → Cite**
 
----
-
-## Key Modules & Capabilities
-
-### 1. Statutory Legal Assistant (`/api/chat`, `/api/chat/stream`)
-- Interactive AI-grounded legal assistant with strict retrieval-augmented generation (RAG).
-- Multi-source citations across 18+ indexed statutory provisions from IP India (CGPDTM), the National Biodiversity Authority (NBA), CSIR-TKDL, FSSAI, and the Ministry of AYUSH.
-- Complete support for English, Hindi (हिन्दी), and Marathi (मराठी) with verified statutory terminology.
-- Integrated resilience engine providing verified statutory synthesis even when remote API credentials are absent.
-
-### 2. Product Regulatory & IPR Intelligence (`/api/products/analyze`)
-- Statutory product classification under the Drugs and Cosmetics Act, 1940 (Sections 3(a), 3(h), Rule 158-B) and FSSAI (Ayurveda Aahar Regulations, 2022).
-- Automated patentability screening under Section 3(p) (Traditional Knowledge bar) and Section 3(e) (mere admixture without proven synergism).
-- Schedule T Good Manufacturing Practices (GMP) compliance guidance and heavy metal / microbial testing checklists.
-
-### 3. Traditional Knowledge & ABS Clearance (`/api/abs/analyze`, `/api/tk-abs/analyze`)
-- Clear assessments under the Biological Diversity Act, 2002 and the Biological Diversity (Amendment) Act, 2023.
-- Automatic routing for Form I (foreign entities / Section 3) and Form III (prior approval for IPR / Section 6).
-- State Biodiversity Board (SBB) Section 7 intimation requirements and benefit-sharing percentage calculations.
-- Exemption checks for registered AYUSH practitioners and certified cultivated medicinal plant varieties.
-
-### 4. IPR Strategy Navigator (`/api/ipr/analyze`)
-- Multi-layered IP roadmaps spanning Patents, Trademarks (Nice Class 5 and Class 3), Geographical Indications (GI), Industrial Designs (bottle shapes/packaging), Plant Varieties (PPV&FR Act, 2001), and Trade Secrets.
-- Statutory barrier identification (Sections 3(p), 3(e), 3(d), 3(j) of the Patents Act, 1970).
-
-### 5. Authoritative Statutory Repository (`/api/research/search`, `/api/rag/documents`)
-- High-speed hybrid BM25 and semantic search across authoritative compendia, gazetted acts, notifications, and TKDL guidelines.
-- Filter by topic (Patents, Biodiversity, Ayurveda Aahar, Trademarks, Designs, Plant Varieties, GMP) and governing authority.
-
-### 6. Researcher Workspace & Telemetry (`/api/workspace/*`, `/api/rag/telemetry`)
-- Local persistence of research dossiers, product analyses, and bookmarked statutory provisions.
-- System telemetry monitoring retrieval latency, confidence scoring, and query analytics.
+```
+IP-Sakti-Sahayak/
+├── frontend/           React 19 + Vite 6 + TailwindCSS 4 (the UI you already built)
+├── backend/             Python + FastAPI backend
+├── scripts/              CLI utility: batch-ingest documents into the running backend
+├── Dockerfile             Single-container build (frontend + backend, one image)
+├── docker-compose.yml     Docker orchestration (demo mode by default)
+├── .env.example           Root env file, used only by docker-compose
+└── README.md               This file
+```
 
 ---
 
-## Statutory & Regulatory Frameworks Covered
+## 1. What this package is
 
-| Statute / Regulation | Primary Authority | Scope & Relevance |
+This combines your **updated frontend** (from `IP-Sakti-main.zip`) with the
+**FastAPI backend** (from `IP-Sakti-complete.zip`) into one project that
+runs together, as you asked for. Nothing in `frontend/src/` was touched —
+every component, view, and piece of UI logic is exactly what you shipped.
+
+Two small **wiring** changes were needed to make the two actually talk to
+each other (neither touches frontend UI code or backend business logic):
+
+| File | Change | Why |
 |---|---|---|
-| **The Patents Act, 1970** | IP India (CGPDTM) | Sections 3(p), 3(e), 3(d), 3(j), Form 18A expedited examination |
-| **The Biological Diversity Act, 2002 & 2023 Amendment** | National Biodiversity Authority (NBA) & SBBs | Sections 3, 4, 6, 7; Form I, Form III; Benefit-sharing rules |
-| **The Drugs and Cosmetics Act, 1940 & Rules, 1945** | Ministry of AYUSH & State Licensing Authorities | Section 3(a), 3(h), Rule 158-B, Schedule T GMP compliance |
-| **Food Safety and Standards (Ayurveda Aahar) Regulations, 2022** | FSSAI & Ministry of AYUSH | Classical textual foods (Schedule A), logo labeling, prohibition of disease claims |
-| **Traditional Knowledge Digital Library (TKDL)** | CSIR & Ministry of AYUSH | 450,000+ classical formulations as non-patentable prior art |
-| **The Trade Marks Act, 1999** | Trade Marks Registry | Distinctive branding under Class 5 & Class 3; Section 9(1)(b) descriptive bars |
-| **The Designs Act, 2000** | Designs Office, Kolkata | Aesthetic container geometries, blister packaging, dispensers |
-| **PPV&FR Act, 2001** | Protection of Plant Varieties Authority | Novelty, Distinctiveness, Uniformity, and Stability (DUS) for medicinal plants |
+| `frontend/vite.config.ts` | Added a dev-server `proxy` block forwarding `/api/*` to `http://localhost:8000` | Your frontend calls relative paths like `fetch('/api/chat')`. Without a proxy, the Vite dev server has nothing behind `/api` and every request 404s. This is standard Vite config, not a UI change. |
+| `backend/app/main.py` | Changed the static-file path from `../../dist` to `../../frontend/dist` | The backend can optionally serve the built frontend directly (for Docker/production). Since your updated frontend now lives in a `frontend/` subfolder instead of the project root, this one path had to move with it. |
+
+Both changes were tested — see **Section 6, "What was actually verified"**
+below.
+
+The old Express/TypeScript backend (`server.ts`, `server/gemini.ts`,
+`server/rag/retrieval.ts`) that shipped in `main.zip` has been **left out**
+of this package, per your note that you're using FastAPI, not
+Express/TypeScript. If you want to keep those files for reference, they're
+still sitting in your original `IP-Sakti-main.zip`.
 
 ---
 
-## Tech Stack
+## 2. Current state: dummy / demo mode
 
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4, Lucide Icons, Motion (located in `/frontend`).
-- **Backend**: Express.js (Node.js/TypeScript), Bundled via esbuild (`dist/server.cjs`).
-- **AI & RAG Engine**: Google GenAI SDK (`@google/genai`), dual-layer legislative search engine with statutory synthesis.
-- **Styling**: Tailwind CSS v4 with responsive layouts, accessible contrast, and zero layout shift.
+You mentioned you don't have a live database, ML models, RAG corpus, or
+external APIs wired up yet — that's fine, **the backend is already built to
+handle that gracefully.** Every external dependency is optional and falls
+back to a real, working local equivalent:
 
----
+| Component | If configured | If left blank (current state) |
+|---|---|---|
+| LLM reasoning | Live Gemini calls | Rule-based answer synthesis from retrieved text (no internet call) |
+| Vector search | Live Qdrant | Local TF-IDF / BM25 index (in-process) |
+| Knowledge graph | Live Neo4j | In-process NetworkX graph |
+| App database | MongoDB | SQLite file, auto-created, zero setup |
+| Translation | Live Bhashini | Curated Hindi/Marathi dictionary |
 
-## Project Structure
+This is **not fake data returned with no logic** — it's a fully working
+pipeline (classification → retrieval → citation → confidence scoring →
+expert escalation) running against a small real corpus of Ayurveda-related
+statutes bundled in `backend/data/authoritative_documents.json`. `/api/health`
+always tells you exactly which parts are live vs. demo, and every chat
+response includes `"demo_mode": true/false` so it's never presented as more
+than it is.
 
-```
-├── frontend/             # Complete client-side application
-│   ├── src/              # React components, context, translations & UI logic
-│   ├── public/           # Static assets, icons, and logos
-│   ├── index.html        # Client HTML entry point
-│   ├── package.json      # Frontend package configuration
-│   ├── tsconfig.json     # Frontend TypeScript configuration
-│   └── vite.config.ts    # Frontend Vite configuration
-├── server/               # Backend API and RAG intelligence modules
-│   ├── data/             # Authoritative statutory documents & citations
-│   ├── rag/              # Hybrid retrieval & BM25 indexing
-│   └── gemini.ts         # Gemini AI & statutory synthesis engine
-├── server.ts             # Express server entry point & Vite middleware
-├── package.json          # Root build & execution scripts
-├── vite.config.ts        # Root Vite bundling configuration
-├── tsconfig.json         # Root TypeScript configuration
-└── metadata.json         # AI Studio platform metadata
-```
+When you're ready to plug in real services, just fill in the matching
+variable in `backend/.env` — nothing else changes.
 
 ---
 
-## Getting Started
+## 3. Setup — local development (recommended for building/demoing)
+
+You'll run two things in two terminals: the backend (port 8000) and the
+frontend dev server (port 3000, which proxies `/api` calls to the backend).
 
 ### Prerequisites
-- Node.js (v18 or higher recommended)
-- npm or bun
+- Python 3.10+ 
+- Node.js 18+ and npm
 
-### Installation
-
+### Terminal 1 — Backend
 ```bash
-# Clone the repository and navigate to the project root
-git clone <repository-url>
-cd ip-sakti-sahayak
+cd backend
+python -m venv .venv
 
-# Install dependencies
+# macOS/Linux:
+source .venv/bin/activate
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+
+pip install -r requirements.txt
+cp .env.example .env          # Windows: copy .env.example .env
+uvicorn app.main:app --reload --port 8000
+```
+Leave this running. Swagger docs: **http://localhost:8000/docs**
+
+### Terminal 2 — Frontend
+```bash
+cd frontend
 npm install
+npm run dev
 ```
+Open **http://localhost:3000** — this is your actual app. Every `/api/...`
+call it makes is transparently forwarded to the backend on port 8000.
 
-### Environment Configuration (Optional)
+### Running the backend tests
+```bash
+cd backend
+python -m pytest tests/ -v
+```
+23 tests — API shape, the full chat/RAG pipeline end-to-end, classification,
+jurisdiction routing, and citation-validation safety checks.
 
-The application is completely self-contained and functions out-of-the-box without any environment variables.
+---
 
-To optionally enable live Google Gemini API generation:
-
-1. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-2. Set your Gemini API key:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-
-*Note: If `GEMINI_API_KEY` is not provided or invalid, the platform smoothly utilizes its built-in statutory synthesis engine.*
-
-### Running the Application
+## 4. Setup — Docker (single command, production-like)
 
 ```bash
-# Start development server (Node Express + Vite on port 3000)
-npm run dev
-
-# Run TypeScript type verification
-npm run lint
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
+docker compose up app
 ```
+Open **http://localhost:8000** — one container builds the frontend and
+serves it directly from the FastAPI backend (no separate frontend server,
+no CORS to worry about).
 
-Once running, access the web interface at `http://localhost:3000`.
-
----
-
-## API Endpoints Summary
-
-- `GET /api/health` — Service health check and system timestamp
-- `POST /api/chat` — Statutory legal research queries (JSON payload)
-- `POST /api/chat/stream` — Real-time Server-Sent Events (SSE) streaming chat
-- `POST /api/products/analyze` — Comprehensive product regulatory and IPR evaluation
-- `GET /api/products` — Retrieve historical product analysis records
-- `POST /api/ipr/analyze` — Generate multi-layered IPR protection strategy
-- `POST /api/abs/analyze` & `POST /api/tk-abs/analyze` — Biodiversity Act and ABS clearance evaluation
-- `GET /api/research/search` — Search authoritative statutory corpus and legal chunks
-- `POST /api/translate` — Multilingual query and interface translation engine
-- `GET /api/rag/documents` & `GET /api/rag/telemetry` — Repository metadata and retrieval telemetry
-- `GET/POST /api/workspace/saved-research` — Dossier and bookmark management
+With live external services (Qdrant + Neo4j + MongoDB containers):
+```bash
+docker compose --profile full-stack up
+```
+Edit `.env` (copy from `.env.example`) first if you want to point at your
+own managed Qdrant/Neo4j/MongoDB/Gemini/Bhashini instead of the bundled
+containers.
 
 ---
 
-## Legal Disclaimer
+## 5. API Endpoints (already wired to the frontend)
 
-IP-SAKTI Sahayak is an informational decision-support platform designed for academic, research, and preparatory regulatory analysis. It does not constitute formal legal counsel. Formal statutory submissions, patent prosecutions, and license applications should be vetted by registered patent agents, advocates, or qualified regulatory affairs specialists.
+| Method | Endpoint | Used by |
+|---|---|---|
+| GET | `/api/health` | System status check |
+| POST | `/api/chat`, `/api/chat/stream` | Sahayak chat |
+| GET/POST/DELETE | `/api/conversations`, `/api/conversations/{id}` | Chat session management |
+| POST | `/api/conversations/{id}/feedback` | Thumbs up/down on answers |
+| POST | `/api/products/analyze`, GET `/api/products` | Product Analyzer |
+| POST | `/api/ipr/analyze` | IPR Navigator |
+| POST | `/api/abs/analyze` | Traditional Knowledge & ABS module |
+| GET | `/api/research/search`, `/api/documents/{id}` | Research repository |
+| GET/POST/DELETE | `/api/workspace/saved-research` | My Workspace |
+| GET | `/api/admin/documents`, `/api/admin/telemetry` | Admin & Telemetry view |
+| POST | `/api/admin/documents`, `/api/admin/documents/{id}/index` | Admin document upload |
+| POST | `/api/translate` | Multilingual UI strings |
+| POST | `/api/classify`, `/api/search`, `/api/validate` | Canonical SIH-spec pipeline stages (standalone) |
+| GET | `/api/sources` | Full indexed corpus listing |
+| POST | `/api/documents/ingest` | Ingest a new document (also usable via `scripts/ingest_documents.py`) |
+| POST | `/api/expert-escalation` | Manual escalation request |
+
+Every one of these already exists in `backend/app/api/routes/` and matches
+the exact `fetch(...)` calls already written in your `frontend/src/`
+components — nothing needed to be added or renamed.
+
+---
+
+## 6. What was actually verified (before this zip was built)
+
+- `pip install -r backend/requirements.txt` — clean install, no conflicts.
+- `uvicorn app.main:app` — boots, connects to SQLite, logs demo/live status
+  for every subsystem.
+- `python -m pytest tests/ -v` — **23/23 passed.**
+- `npm install && npm run build` in `frontend/` — builds cleanly to
+  `frontend/dist/`.
+- Both servers started together, and a **real request through the Vite
+  proxy** (`localhost:3000/api/chat`) reached the FastAPI backend and
+  returned a fully-formed, cited answer (statute sections, confidence
+  score, classification, next steps) — confirming the frontend-to-backend
+  wiring genuinely works end-to-end, not just in theory.
+
+### Known pre-existing item (not introduced by this packaging step)
+
+Running `tsc --noEmit` on the updated frontend surfaces a handful of type
+mismatches between `frontend/src/types.ts` and fields used in
+`ProductAnalyzerView.tsx` / `TraditionalKnowledgeView.tsx` (e.g.
+`target_symptoms`, `distribution_channels`, and a couple of string-literal
+union mismatches). **These do not block the app from running** — Vite's
+dev server and `npm run build` both use esbuild for transpilation, which
+doesn't fail on type errors, and the app was confirmed working above. Per
+your instruction not to touch the frontend, these were left exactly as
+they were in `main.zip`. If you want them fixed later, they're small,
+localized type-definition mismatches, not architectural issues.
+
+---
+
+## 7. Environment Variables
+
+Full commented list: `backend/.env.example`. Everything is optional.
+
+| Variable | Effect when set | Fallback when blank |
+|---|---|---|
+| `LLM_API_KEY`, `LLM_MODEL` | Live Gemini reasoning | Rule-based synthesis |
+| `QDRANT_URL`, `QDRANT_API_KEY` | Live Qdrant | Local TF-IDF index |
+| `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | Live Neo4j | In-process NetworkX graph |
+| `DB_BACKEND=mongodb`, `MONGODB_URI` | MongoDB | SQLite (`backend/data/ip_sakti.db`) |
+| `BHASHINI_API_KEY`, `BHASHINI_USER_ID` | Live Bhashini translation | Curated dictionary |
+| `FRONTEND_ORIGIN` | CORS allow-list | `http://localhost:3000` |
+
+---
+
+## 8. Troubleshooting
+
+**Frontend loads but every request fails / spinner never resolves**
+→ Make sure the backend is actually running on port 8000 first
+(`curl http://localhost:8000/api/health` should return JSON). The frontend
+dev server proxies to it — if the backend isn't up, the proxy has nothing
+to forward to.
+
+**CORS error in the browser console**
+→ Only happens if you access the frontend on a port other than 3000, or
+the backend on a port other than 8000. If you change either, update
+`FRONTEND_ORIGIN` in `backend/.env` and/or the proxy target in
+`frontend/vite.config.ts`.
+
+**`ModuleNotFoundError` on backend start**
+→ You're not inside the virtual environment. Re-run
+`source .venv/bin/activate` (or `.venv\Scripts\Activate.ps1` on Windows)
+before `uvicorn`.
+
+**Port already in use**
+→ Something else is bound to 8000 or 3000. Kill it, or run the backend
+with `--port 8001` and update the proxy target in `vite.config.ts` to match.
