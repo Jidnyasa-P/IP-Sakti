@@ -5,8 +5,8 @@ import { createServer as createViteServer } from 'vite';
 import { hybridRetrieve, searchIndexedDocuments, getDocumentDetails } from './server/rag/retrieval';
 import { generateGroundedResponse, analyzeProductIntelligence, evaluateIPRProtection, evaluateTKABSResearch, translateStringsWithGemini, translateTextWithGemini } from './server/gemini';
 import { AUTHORITATIVE_METADATA, AUTHORITATIVE_CHUNKS } from './server/data/authoritative_documents';
-import { Conversation, ProductAnalysisResult, RAGTelemetry, StructuredChatMessage, User } from './src/types';
-import { HINDI_STATUTORY_DICTIONARY, MARATHI_STATUTORY_DICTIONARY } from './src/context/translations';
+import { Conversation, ProductAnalysisResult, RAGTelemetry, StructuredChatMessage, User } from './frontend/src/types';
+import { HINDI_STATUTORY_DICTIONARY, MARATHI_STATUTORY_DICTIONARY } from './frontend/src/context/translations';
 
 dotenv.config();
 
@@ -699,6 +699,7 @@ app.post('/api/translate', async (req, res) => {
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
+      root: path.resolve(process.cwd(), 'frontend'),
       server: { middlewareMode: true },
       appType: 'spa',
     });

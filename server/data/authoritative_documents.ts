@@ -1,4 +1,4 @@
-import { DocumentChunk, DocumentMetadata } from '../../src/types.js';
+import { DocumentChunk, DocumentMetadata } from '../../frontend/src/types.js';
 
 export const AUTHORITATIVE_METADATA: DocumentMetadata[] = [
   {

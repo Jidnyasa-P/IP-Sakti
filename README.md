@@ -56,10 +56,33 @@ The platform synthesizes Indian statutory frameworks, judicial precedents, and a
 
 ## Tech Stack
 
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4, Lucide Icons, Motion.
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4, Lucide Icons, Motion (located in `/frontend`).
 - **Backend**: Express.js (Node.js/TypeScript), Bundled via esbuild (`dist/server.cjs`).
 - **AI & RAG Engine**: Google GenAI SDK (`@google/genai`), dual-layer legislative search engine with statutory synthesis.
 - **Styling**: Tailwind CSS v4 with responsive layouts, accessible contrast, and zero layout shift.
+
+---
+
+## Project Structure
+
+```
+├── frontend/             # Complete client-side application
+│   ├── src/              # React components, context, translations & UI logic
+│   ├── public/           # Static assets, icons, and logos
+│   ├── index.html        # Client HTML entry point
+│   ├── package.json      # Frontend package configuration
+│   ├── tsconfig.json     # Frontend TypeScript configuration
+│   └── vite.config.ts    # Frontend Vite configuration
+├── server/               # Backend API and RAG intelligence modules
+│   ├── data/             # Authoritative statutory documents & citations
+│   ├── rag/              # Hybrid retrieval & BM25 indexing
+│   └── gemini.ts         # Gemini AI & statutory synthesis engine
+├── server.ts             # Express server entry point & Vite middleware
+├── package.json          # Root build & execution scripts
+├── vite.config.ts        # Root Vite bundling configuration
+├── tsconfig.json         # Root TypeScript configuration
+└── metadata.json         # AI Studio platform metadata
+```
 
 ---
 

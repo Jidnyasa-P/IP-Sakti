@@ -1,5 +1,5 @@
 import { AUTHORITATIVE_CHUNKS, AUTHORITATIVE_METADATA } from '../data/authoritative_documents';
-import { Citation, ConfidenceLevel, ConfidenceMetric, DocumentChunk, Language } from '../../src/types';
+import { Citation, ConfidenceLevel, ConfidenceMetric, DocumentChunk, Language } from '../../frontend/src/types';
 
 export interface RAGSearchOptions {
   query: string;

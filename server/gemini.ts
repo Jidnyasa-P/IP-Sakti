@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
-import { Citation, ConfidenceMetric, DocumentChunk, IPRNavigatorQuery, IPRNavigatorResult, Language, ProductInformation, ProductAnalysisResult, TKABSQuery, TKABSResult } from '../src/types';
-import { HINDI_STATUTORY_DICTIONARY, MARATHI_STATUTORY_DICTIONARY } from '../src/context/translations';
+import { Citation, ConfidenceMetric, DocumentChunk, IPRNavigatorQuery, IPRNavigatorResult, Language, ProductInformation, ProductAnalysisResult, TKABSQuery, TKABSResult } from '../frontend/src/types';
+import { HINDI_STATUTORY_DICTIONARY, MARATHI_STATUTORY_DICTIONARY } from '../frontend/src/context/translations';
 
 let aiClient: GoogleGenAI | null = null;
 let geminiAvailable = true;
