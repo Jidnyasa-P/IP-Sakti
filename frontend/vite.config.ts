@@ -13,6 +13,14 @@ export default defineConfig(() => {
     },
     server: {
       port: 3000,
+      // Proxy all /api requests to the FastAPI backend (see ../backend/README.md).
+      // Override the target with VITE_API_BASE_URL if the backend runs elsewhere.
+      proxy: {
+        '/api': {
+          target: process.env.VITE_API_BASE_URL || 'http://localhost:8000',
+          changeOrigin: true,
+        },
+      },
     },
   };
 });
