@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { authFetch } from './auth/authStorage';
 import {
   Settings,
   Database,
@@ -39,8 +40,8 @@ export const AdminView: React.FC = () => {
     setLoading(true);
     try {
       const [docsRes, telRes] = await Promise.all([
-        fetch('/api/admin/documents'),
-        fetch('/api/admin/telemetry'),
+        authFetch('/api/admin/documents'),
+        authFetch('/api/admin/telemetry'),
       ]);
       const docsData = await docsRes.json();
       const telData = await telRes.json();
@@ -58,7 +59,7 @@ export const AdminView: React.FC = () => {
     if (!newDocTitle.trim()) return;
 
     try {
-      const res = await fetch('/api/admin/documents', {
+      const res = await authFetch('/api/admin/documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -84,7 +85,7 @@ export const AdminView: React.FC = () => {
 
   const handleReindex = async (id: string) => {
     try {
-      await fetch(`/api/admin/documents/${id}/index`, { method: 'POST' });
+      await authFetch(`/api/admin/documents/${id}/index`, { method: 'POST' });
       loadAdminData();
     } catch (e) {
       console.error('Re-indexing failed:', e);

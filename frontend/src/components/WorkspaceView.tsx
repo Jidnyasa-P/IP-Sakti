@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { authFetch } from './auth/authStorage';
 import {
   FolderArchive,
   MessageSquare,
@@ -33,9 +34,9 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
   const loadWorkspaceData = async () => {
     try {
       const [convRes, prodRes, savedRes] = await Promise.all([
-        fetch('/api/conversations'),
-        fetch('/api/products'),
-        fetch('/api/workspace/saved-research'),
+        authFetch('/api/conversations'),
+        authFetch('/api/products'),
+        authFetch('/api/workspace/saved-research'),
       ]);
       const convData = await convRes.json();
       const prodData = await prodRes.json();
@@ -51,7 +52,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
 
   const deleteSavedItem = async (id: string) => {
     try {
-      await fetch(`/api/workspace/saved-research/${id}`, { method: 'DELETE' });
+      await authFetch(`/api/workspace/saved-research/${id}`, { method: 'DELETE' });
       setSavedResearch(savedResearch.filter(s => s.id !== id));
     } catch (e) {
       console.error('Failed to delete saved item:', e);

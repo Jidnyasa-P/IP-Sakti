@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authFetch } from './auth/authStorage';
 import {
   FlaskConical,
   ArrowRight,
@@ -96,7 +97,7 @@ export const ProductAnalyzerView: React.FC<ProductAnalyzerViewProps> = ({ onOpen
   const handleAnalyze = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/products/analyze', {
+      const res = await authFetch('/api/products/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -114,7 +115,7 @@ export const ProductAnalyzerView: React.FC<ProductAnalyzerViewProps> = ({ onOpen
   const handleSaveToWorkspace = async () => {
     if (!result) return;
     try {
-      await fetch('/api/workspace/save-research', {
+      await authFetch('/api/workspace/save-research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

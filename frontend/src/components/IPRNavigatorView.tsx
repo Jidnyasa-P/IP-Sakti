@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authFetch } from './auth/authStorage';
 import {
   Compass,
   ArrowRight,
@@ -65,7 +66,7 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
             is_already_commercialized: isCommercialized,
           };
 
-          const res = await fetch('/api/ipr/analyze', {
+          const res = await authFetch('/api/ipr/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),

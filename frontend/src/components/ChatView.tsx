@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { authFetch } from './auth/authStorage';
 import {
   Sparkles,
   Send,
@@ -57,7 +58,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
 
   const fetchConversations = async () => {
     try {
-      const res = await fetch('/api/conversations');
+      const res = await authFetch('/api/conversations');
       const data: Conversation[] = await res.json();
       setConversations(data);
       if (data.length > 0 && !activeConvId) {
@@ -71,7 +72,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
 
   const loadConversation = async (id: string) => {
     try {
-      const res = await fetch(`/api/conversations/${id}`);
+      const res = await authFetch(`/api/conversations/${id}`);
       const data: Conversation = await res.json();
       setActiveConvId(id);
       setMessages(data.messages || []);
@@ -82,7 +83,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
 
   const startNewConversation = async () => {
     try {
-      const res = await fetch('/api/conversations', {
+      const res = await authFetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'New AYUSH & IP Session', language }),
@@ -99,7 +100,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
   const deleteConversation = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     try {
-      await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
+      await authFetch(`/api/conversations/${id}`, { method: 'DELETE' });
       const updated = conversations.filter(c => c.id !== id);
       setConversations(updated);
       if (activeConvId === id) {
@@ -144,7 +145,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
 
     try {
       // Use SSE streaming endpoint for live research retrieval & token rendering
-      const response = await fetch('/api/chat/stream', {
+      const response = await authFetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -198,7 +199,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
       console.warn('Streaming interrupted, recovering with synchronous chat:', err);
       // Direct request to standard POST /api/chat
       try {
-        const syncRes = await fetch('/api/chat', {
+        const syncRes = await authFetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -229,7 +230,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
 
   const handleFeedback = async (msgId: string, feedback: 'helpful' | 'unhelpful') => {
     try {
-      await fetch(`/api/conversations/${activeConvId}/feedback`, {
+      await authFetch(`/api/conversations/${activeConvId}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message_id: msgId, feedback }),

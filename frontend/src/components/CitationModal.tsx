@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { authFetch } from './auth/authStorage';
 import { X, ExternalLink, BookOpen, ShieldCheck, FileText } from 'lucide-react';
 import { Citation, DocumentMetadata, DocumentChunk } from '../types';
 
@@ -14,7 +15,7 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
   useEffect(() => {
     if (!citation) return;
     setLoading(true);
-    fetch(`/api/documents/${citation.document_id}`)
+    authFetch(`/api/documents/${citation.document_id}`)
       .then(res => res.json())
       .then(data => {
         setDocDetails(data);

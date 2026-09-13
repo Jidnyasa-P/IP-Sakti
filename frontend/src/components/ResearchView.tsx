@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { authFetch } from './auth/authStorage';
 import {
   BookOpen,
   Search,
@@ -42,7 +43,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
       if (authorityFilter !== 'ALL') params.set('authority', authorityFilter);
       if (docTypeFilter !== 'ALL') params.set('document_type', docTypeFilter);
 
-      const res = await fetch(`/api/research/search?${params.toString()}`);
+      const res = await authFetch(`/api/research/search?${params.toString()}`);
       const data = await res.json();
       setDocuments(data.documents || []);
       setMatchingChunks(data.matching_chunks || []);
@@ -65,7 +66,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
   const handleInspectDoc = async (id: string) => {
     setSelectedDocId(id);
     try {
-      const res = await fetch(`/api/documents/${id}`);
+      const res = await authFetch(`/api/documents/${id}`);
       const data = await res.json();
       setSelectedDocChunks(data.chunks || []);
     } catch (e) {
@@ -75,7 +76,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
 
   const handleSaveToWorkspace = async (doc: DocumentMetadata) => {
     try {
-      await fetch('/api/workspace/save-research', {
+      await authFetch('/api/workspace/save-research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

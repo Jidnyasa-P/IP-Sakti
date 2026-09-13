@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authFetch } from './auth/authStorage';
 import {
   Shield,
   Leaf,
@@ -70,7 +71,7 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
   const handleAnalyze = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/abs/analyze', {
+      const res = await authFetch('/api/abs/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { User, UserRole, Language } from '../types';
 import {
   getSessionUser,
+  verifySession,
   dummyRegister,
   dummyLogin,
   dummyLogout,
@@ -41,6 +42,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => getSessionUser());
   const [authLoading, setAuthLoading] = useState<boolean>(false);
+
+  // On mount, verify the cached session against the backend in the
+  // background (catches an expired/invalid/tampered token) without
+  // blocking the initial render, which still uses the synchronously
+  // cached user for a fast, flash-free load.
+  useEffect(() => {
+    let cancelled = false;
+    verifySession().then((freshUser) => {
+      if (!cancelled) setUser(freshUser);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     setAuthLoading(true);
