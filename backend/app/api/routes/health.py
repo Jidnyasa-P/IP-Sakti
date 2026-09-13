@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter
 
 from app.core.config import get_settings
-from app.database.session import engine
+from app.database.session import get_client, is_using_mock
 from app.rag.vector_store import get_vector_store, LocalVectorStore
 from app.knowledge_graph.graph_service import get_graph_service, InMemoryGraph
 
@@ -15,8 +15,7 @@ def health():
 
     db_status = "connected"
     try:
-        with engine.connect():
-            pass
+        get_client().admin.command("ping")
     except Exception:
         db_status = "unavailable"
 
@@ -30,7 +29,7 @@ def health():
         "status": "ok",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "database": db_status,
-        "database_backend": settings.db_backend,
+        "database_backend": "mongodb (in-memory DEMO MODE)" if is_using_mock() else "mongodb",
         "vector_store": vector_status,
         "knowledge_graph": graph_status,
         "llm": "available (Gemini configured)" if settings.llm_configured else "demo_mode (rule-based synthesis)",

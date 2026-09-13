@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import get_settings
 from app.core.logging import logger
 from app.database.session import init_db
-from app.api.routes import health, chat, rag_routes, products, misc_routes
+from app.api.routes import health, chat, rag_routes, products, misc_routes, auth, experts
 
 settings = get_settings()
 
@@ -21,7 +21,7 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    logger.info(f"IP-SAKTI backend starting | env={settings.app_env} | db={settings.db_backend} "
+    logger.info(f"IP-SAKTI backend starting | env={settings.app_env} | db=mongodb "
                 f"| llm_configured={settings.llm_configured} | qdrant_configured={settings.qdrant_configured} "
                 f"| neo4j_configured={settings.neo4j_configured} | bhashini_configured={settings.bhashini_configured}")
     yield
@@ -55,10 +55,12 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(health.router, tags=["health"])
+app.include_router(auth.router, tags=["auth"])
 app.include_router(chat.router, tags=["chat"])
 app.include_router(rag_routes.router, tags=["rag"])
 app.include_router(products.router, tags=["products"])
 app.include_router(misc_routes.router, tags=["misc"])
+app.include_router(experts.router, tags=["experts"])
 
 
 @app.get("/api")

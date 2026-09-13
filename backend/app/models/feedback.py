@@ -1,14 +1,14 @@
-from sqlalchemy import Column, String, DateTime
 from datetime import datetime, timezone
-from app.database.session import Base
+
+COLLECTION = "feedback"
 
 
-class Feedback(Base):
-    __tablename__ = "feedback"
-
-    id = Column(String, primary_key=True)
-    conversation_id = Column(String)
-    message_id = Column(String)
-    feedback = Column(String)  # helpful | unhelpful
-    notes = Column(String, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+def new_feedback(id: str, conversation_id: str, message_id: str, feedback: str, notes: str | None = None) -> dict:
+    return {
+        "_id": id,
+        "conversation_id": conversation_id,
+        "message_id": message_id,
+        "feedback": feedback,  # helpful | unhelpful
+        "notes": notes,
+        "created_at": datetime.now(timezone.utc),
+    }

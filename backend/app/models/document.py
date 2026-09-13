@@ -1,26 +1,42 @@
-from sqlalchemy import Column, String, DateTime, JSON, Integer
+"""Documents added at runtime via /api/documents/ingest or /api/admin/documents,
+on top of the curated authoritative corpus shipped in backend/data/."""
 from datetime import datetime, timezone
-from app.database.session import Base
+
+COLLECTION = "user_ingested_documents"
 
 
-class UserIngestedDocument(Base):
-    """Documents added at runtime via /api/documents/ingest or /api/admin/documents,
-    on top of the curated authoritative corpus shipped in backend/data/."""
-    __tablename__ = "user_ingested_documents"
-
-    id = Column(String, primary_key=True)
-    title = Column(String)
-    source = Column(String)
-    authority = Column(String)
-    url = Column(String, nullable=True)
-    document_type = Column(String, default="Guidelines")
-    jurisdiction = Column(String, default="India")
-    publication_date = Column(String, nullable=True)
-    effective_date = Column(String, nullable=True)
-    language = Column(String, default="English")
-    topic = Column(String, default="AYUSH")
-    summary = Column(String, nullable=True)
-    status = Column(String, default="Processing")
-    chunk_count = Column(Integer, default=0)
-    raw_text = Column(String, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+def new_user_ingested_document(
+    id: str,
+    title: str,
+    source: str,
+    authority: str,
+    url: str | None = None,
+    document_type: str = "Guidelines",
+    jurisdiction: str = "India",
+    publication_date: str | None = None,
+    effective_date: str | None = None,
+    language: str = "English",
+    topic: str = "AYUSH",
+    summary: str | None = None,
+    status: str = "Processing",
+    chunk_count: int = 0,
+    raw_text: str | None = None,
+) -> dict:
+    return {
+        "_id": id,
+        "title": title,
+        "source": source,
+        "authority": authority,
+        "url": url,
+        "document_type": document_type,
+        "jurisdiction": jurisdiction,
+        "publication_date": publication_date,
+        "effective_date": effective_date,
+        "language": language,
+        "topic": topic,
+        "summary": summary,
+        "status": status,
+        "chunk_count": chunk_count,
+        "raw_text": raw_text,
+        "created_at": datetime.now(timezone.utc),
+    }

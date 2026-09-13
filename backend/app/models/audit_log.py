@@ -1,21 +1,33 @@
-from sqlalchemy import Column, String, DateTime, JSON
+"""Section 23. One document per pipeline run (query -> ... -> response)."""
 from datetime import datetime, timezone
-from app.database.session import Base
+
+COLLECTION = "audit_logs"
 
 
-class AuditLog(Base):
-    """Section 23. One row per pipeline run (query -> ... -> response)."""
-    __tablename__ = "audit_logs"
-
-    id = Column(String, primary_key=True)
-    conversation_id = Column(String, nullable=True)
-    query = Column(String)
-    classification = Column(JSON, nullable=True)
-    jurisdiction = Column(JSON, nullable=True)
-    retrieved_sources = Column(JSON, default=list)
-    validation_status = Column(String, nullable=True)
-    confidence = Column(JSON, nullable=True)
-    warnings = Column(JSON, default=list)
-    model_info = Column(JSON, nullable=True)
-    latency_ms = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+def new_audit_log(
+    id: str,
+    conversation_id: str | None,
+    query: str,
+    classification: dict | None,
+    jurisdiction: dict | None,
+    retrieved_sources: list[dict],
+    validation_status: str | None,
+    confidence: dict | None,
+    warnings: list[str],
+    model_info: dict | None,
+    latency_ms: dict | None,
+) -> dict:
+    return {
+        "_id": id,
+        "conversation_id": conversation_id,
+        "query": query,
+        "classification": classification,
+        "jurisdiction": jurisdiction,
+        "retrieved_sources": retrieved_sources or [],
+        "validation_status": validation_status,
+        "confidence": confidence,
+        "warnings": warnings or [],
+        "model_info": model_info,
+        "latency_ms": latency_ms,
+        "created_at": datetime.now(timezone.utc),
+    }

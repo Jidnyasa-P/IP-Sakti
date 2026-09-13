@@ -1,19 +1,29 @@
-from sqlalchemy import Column, String, DateTime, JSON, Boolean
+"""Citation validation engine output (Section 13), persisted for audit."""
 from datetime import datetime, timezone
-from app.database.session import Base
+
+COLLECTION = "validation_results"
 
 
-class ValidationResultRecord(Base):
-    """Citation validation engine output (Section 13), persisted for audit."""
-    __tablename__ = "validation_results"
-
-    id = Column(String, primary_key=True)
-    conversation_id = Column(String, nullable=True)
-    claim = Column(String)
-    source = Column(String)
-    source_exists = Column(Boolean)
-    content_supports_claim = Column(Boolean)
-    authority_valid = Column(Boolean)
-    validation_status = Column(String)  # verified | failed | unverifiable
-    details = Column(JSON, default=dict)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+def new_validation_result(
+    id: str,
+    claim: str,
+    source: str,
+    source_exists: bool,
+    content_supports_claim: bool,
+    authority_valid: bool,
+    validation_status: str,
+    details: dict | None = None,
+    conversation_id: str | None = None,
+) -> dict:
+    return {
+        "_id": id,
+        "conversation_id": conversation_id,
+        "claim": claim,
+        "source": source,
+        "source_exists": source_exists,
+        "content_supports_claim": content_supports_claim,
+        "authority_valid": authority_valid,
+        "validation_status": validation_status,  # verified | failed | unverifiable
+        "details": details or {},
+        "created_at": datetime.now(timezone.utc),
+    }

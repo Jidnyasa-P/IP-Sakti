@@ -1,10 +1,10 @@
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.api.deps import get_current_user, require_role
 from app.database.session import get_db
-from app.models.citation import SavedResearch
+from app.models.citation import COLLECTION as SAVED_RESEARCH_COLLECTION, new_saved_research, to_dict as saved_research_to_dict
 from app.schemas.chat import SaveResearchRequest, TranslateRequest
 from app.retrieval.hybrid_retrieval import search_indexed_documents
 from app.rag.corpus import get_metadata, get_chunks
@@ -42,33 +42,37 @@ def record_telemetry(query: str, latency_ms: int, confidence_level: str, sources
 
 
 @router.get("/api/research/search")
-def research_search(query: str = "", authority: str = "", topic: str = "", document_type: str = ""):
+def research_search(query: str = "", authority: str = "", topic: str = "", document_type: str = "", current_user: dict = Depends(get_current_user)):
     results = search_indexed_documents(query, topic=topic or None, authority=authority or None, document_type=document_type or None)
     return {"results": results, "total": len(results)}
 
 
 @router.get("/api/workspace/saved-research")
-def list_saved_research(db: Session = Depends(get_db)):
-    return [
-        {"id": r.id, "user_id": r.user_id, "document_id": r.document_id, "title": r.title, "notes": r.notes, "created_at": r.created_at.isoformat()}
-        for r in db.query(SavedResearch).order_by(SavedResearch.created_at.desc()).all()
-    ]
+def list_saved_research(current_user: dict = Depends(get_current_user), db=Depends(get_db)):
+    is_admin = "Admin" in current_user.get("roles", [])
+    query = {} if is_admin else {"user_id": current_user["id"]}
+    rows = db[SAVED_RESEARCH_COLLECTION].find(query).sort("created_at", -1)
+    return [saved_research_to_dict(r) for r in rows]
 
 
 @router.post("/api/workspace/save-research")
-def save_research(body: SaveResearchRequest, db: Session = Depends(get_db)):
-    record = SavedResearch(id=f"saved-{uuid.uuid4().hex[:10]}", user_id="user-default", document_id=body.document_id, title=body.title, notes=body.notes or "")
-    db.add(record)
-    db.commit()
-    return {"id": record.id, "user_id": record.user_id, "document_id": record.document_id, "title": record.title, "notes": record.notes, "created_at": record.created_at.isoformat()}
+def save_research(body: SaveResearchRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
+    record = new_saved_research(
+        id=f"saved-{uuid.uuid4().hex[:10]}", user_id=current_user["id"],
+        document_id=body.document_id, title=body.title, notes=body.notes or "",
+    )
+    db[SAVED_RESEARCH_COLLECTION].insert_one(record)
+    return saved_research_to_dict(record)
 
 
 @router.delete("/api/workspace/saved-research/{research_id}")
-def delete_saved_research(research_id: str, db: Session = Depends(get_db)):
-    row = db.get(SavedResearch, research_id)
+def delete_saved_research(research_id: str, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
+    row = db[SAVED_RESEARCH_COLLECTION].find_one({"_id": research_id})
     if row:
-        db.delete(row)
-        db.commit()
+        is_admin = "Admin" in current_user.get("roles", [])
+        if not is_admin and row.get("user_id") != current_user["id"]:
+            raise HTTPException(status_code=403, detail="You do not have access to this saved item.")
+        db[SAVED_RESEARCH_COLLECTION].delete_one({"_id": research_id})
     return {"success": True}
 
 
@@ -83,18 +87,18 @@ def _admin_documents_payload():
 
 @router.get("/api/admin/documents")
 @router.get("/api/rag/documents")
-def admin_documents():
+def admin_documents(current_user: dict = Depends(require_role("Admin"))):
     return _admin_documents_payload()
 
 
 @router.get("/api/admin/telemetry")
 @router.get("/api/rag/telemetry")
-def admin_telemetry():
+def admin_telemetry(current_user: dict = Depends(require_role("Admin"))):
     return TELEMETRY
 
 
 @router.post("/api/admin/documents")
-def admin_add_document(body: dict):
+def admin_add_document(body: dict, current_user: dict = Depends(require_role("Admin"))):
     from app.rag.ingest import ingest_document
     payload = {
         "title": body.get("title", "Untitled Document"),
@@ -111,7 +115,7 @@ def admin_add_document(body: dict):
 
 
 @router.post("/api/admin/documents/{document_id}/index")
-def admin_reindex_document(document_id: str):
+def admin_reindex_document(document_id: str, current_user: dict = Depends(require_role("Admin"))):
     doc = next((d for d in get_metadata() if d["id"] == document_id), None)
     if not doc:
         return {"error": "Document not found."}
@@ -120,6 +124,10 @@ def admin_reindex_document(document_id: str):
 
 @router.post("/api/translate")
 async def translate(body: TranslateRequest):
+    # Intentionally public (no auth dependency): the login/register screens
+    # render before a session exists and still need UI-string translation
+    # (see frontend/src/context/LanguageContext.tsx, which is mounted
+    # outside AuthProvider's gate in App.tsx).
     provider = get_translation_provider()
     if body.text:
         translated, source = await provider.translate_text(body.text, body.target_language)

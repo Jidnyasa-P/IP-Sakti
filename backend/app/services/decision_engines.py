@@ -13,7 +13,7 @@ import time
 import uuid
 
 
-def analyze_product(product: dict, citations: list[dict]) -> dict:
+def analyze_product(product: dict, citations: list[dict], user_id: str = "user-default") -> dict:
     ingredients_raw = product.get("ingredients", "")
     if isinstance(ingredients_raw, list):
         ingredients = ", ".join(
@@ -79,7 +79,7 @@ def analyze_product(product: dict, citations: list[dict]) -> dict:
 
     result = {
         "id": f"PROD-{uuid.uuid4().hex[:10]}",
-        "user_id": "user-default",
+        "user_id": user_id,
         "product_information": product,
         "likely_category": category,
         "category_reasoning": reasoning,

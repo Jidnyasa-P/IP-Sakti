@@ -1,18 +1,25 @@
-from sqlalchemy import Column, String, DateTime, JSON, Boolean
+"""Section 18. Designed so a real expert-consultation service can later
+subscribe to new documents (e.g. via a change-stream/webhook) instead of the
+current record-only behaviour."""
 from datetime import datetime, timezone
-from app.database.session import Base
+
+COLLECTION = "expert_escalations"
 
 
-class ExpertEscalation(Base):
-    """Section 18. Designed so a real expert-consultation service can later
-    subscribe to new rows (e.g. via a queue/webhook) instead of the current
-    in-app record-only behaviour."""
-    __tablename__ = "expert_escalations"
-
-    id = Column(String, primary_key=True)
-    conversation_id = Column(String, nullable=True)
-    recommended = Column(Boolean, default=False)
-    reason = Column(String)
-    case_summary = Column(String)
-    status = Column(String, default="pending")  # pending | assigned | resolved
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+def new_expert_escalation(
+    id: str,
+    reason: str,
+    case_summary: str,
+    conversation_id: str | None = None,
+    recommended: bool = False,
+    status: str = "pending",
+) -> dict:
+    return {
+        "_id": id,
+        "conversation_id": conversation_id,
+        "recommended": recommended,
+        "reason": reason,
+        "case_summary": case_summary,
+        "status": status,  # pending | assigned | resolved
+        "created_at": datetime.now(timezone.utc),
+    }

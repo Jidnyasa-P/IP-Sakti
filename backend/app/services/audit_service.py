@@ -1,12 +1,11 @@
-"""Audit trail (Section 23). One row per query pipeline run."""
+"""Audit trail (Section 23). One document per query pipeline run."""
 import uuid
-from sqlalchemy.orm import Session
 
-from app.models.audit_log import AuditLog
+from app.models.audit_log import COLLECTION, new_audit_log
 
 
 def record_audit_log(
-    db: Session,
+    db,
     conversation_id: str | None,
     query: str,
     classification: dict | None,
@@ -17,8 +16,8 @@ def record_audit_log(
     warnings: list[str],
     model_info: dict | None,
     latency_ms: dict | None,
-) -> AuditLog:
-    log = AuditLog(
+) -> dict:
+    log = new_audit_log(
         id=f"audit-{uuid.uuid4().hex[:12]}",
         conversation_id=conversation_id,
         query=query,
@@ -31,7 +30,5 @@ def record_audit_log(
         model_info=model_info,
         latency_ms=latency_ms,
     )
-    db.add(log)
-    db.commit()
-    db.refresh(log)
+    db[COLLECTION].insert_one(log)
     return log

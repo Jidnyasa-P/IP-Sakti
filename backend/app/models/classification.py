@@ -1,18 +1,27 @@
-from sqlalchemy import Column, String, DateTime, JSON, Float
+"""Persisted output of the classification engine (Section 5), used for audit."""
 from datetime import datetime, timezone
-from app.database.session import Base
+
+COLLECTION = "classification_records"
 
 
-class ClassificationRecord(Base):
-    """Persisted output of the classification engine (Section 5), used for audit."""
-    __tablename__ = "classification_records"
-
-    id = Column(String, primary_key=True)
-    conversation_id = Column(String, nullable=True)
-    query = Column(String)
-    category = Column(String)
-    confidence = Column(Float)
-    reasoning_summary = Column(String)
-    needs_clarification = Column(String)  # "true"/"false" (kept as string for sqlite JSON simplicity)
-    clarification_questions = Column(JSON, default=list)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+def new_classification_record(
+    id: str,
+    query: str,
+    category: str,
+    confidence: float,
+    reasoning_summary: str,
+    needs_clarification: bool,
+    clarification_questions: list | None = None,
+    conversation_id: str | None = None,
+) -> dict:
+    return {
+        "_id": id,
+        "conversation_id": conversation_id,
+        "query": query,
+        "category": category,
+        "confidence": confidence,
+        "reasoning_summary": reasoning_summary,
+        "needs_clarification": bool(needs_clarification),
+        "clarification_questions": clarification_questions or [],
+        "created_at": datetime.now(timezone.utc),
+    }

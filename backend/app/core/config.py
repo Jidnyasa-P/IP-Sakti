@@ -19,9 +19,13 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:3000"
     log_level: str = "INFO"
 
-    # Database
-    db_backend: str = "sqlite"  # sqlite | mongodb
-    sqlite_path: str = "./data/ip_sakti.db"
+    # Database — MongoDB is the sole persistent application datastore.
+    # Leave MONGODB_URI blank to run against an in-process, pymongo-API-
+    # compatible in-memory store (DEMO MODE — non-persistent, resets on
+    # restart), exactly like the other optional-service fallbacks below.
+    # Set MONGODB_URI to a real MongoDB (e.g. `docker compose --profile
+    # full-stack up mongodb`, or a MongoDB Atlas connection string) for a
+    # real, persistent database.
     mongodb_uri: str = ""
     mongodb_db_name: str = "ip_sakti"
 
@@ -52,6 +56,8 @@ class Settings(BaseSettings):
 
     # Security
     jwt_secret: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
 
     @property
     def llm_configured(self) -> bool:
@@ -67,7 +73,7 @@ class Settings(BaseSettings):
 
     @property
     def mongodb_configured(self) -> bool:
-        return bool(self.mongodb_uri) and self.db_backend == "mongodb"
+        return bool(self.mongodb_uri)
 
     @property
     def bhashini_configured(self) -> bool:
