@@ -19,10 +19,12 @@ services:
     environment:
       - APP_ENV=production
       - FRONTEND_ORIGIN=http://localhost:8000
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - QDRANT_URL=${QDRANT_URL:-}
       - NEO4J_URI=${NEO4J_URI:-}
       - MONGODB_URI=${MONGODB_URI:-}
+      - MONGODB_DB_NAME=${MONGODB_DB_NAME:-ip_sakti}
       - BHASHINI_API_KEY=${BHASHINI_API_KEY:-}
       - BHASHINI_USER_ID=${BHASHINI_USER_ID:-}
     volumes:
