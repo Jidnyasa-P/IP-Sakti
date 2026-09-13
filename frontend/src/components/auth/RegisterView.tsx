@@ -20,8 +20,14 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onSwitchToLogin }) =
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [preferredLanguage, setPreferredLanguage] = useState<Language>('en');
-  const [profileType, setProfileType] = useState<UserRole>('Practitioner');
+  const [selectedRoles, setSelectedRoles] = useState<UserRole[]>(['Practitioner']);
   const [error, setError] = useState<string | null>(null);
+
+  const toggleRole = (role: UserRole) => {
+    setSelectedRoles(prev =>
+      prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,9 +45,13 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onSwitchToLogin }) =
       setError('Passwords do not match.');
       return;
     }
+    if (selectedRoles.length === 0) {
+      setError('Please select at least one profile type.');
+      return;
+    }
 
     try {
-      await register({ name, email, password, preferred_language: preferredLanguage, role: profileType });
+      await register({ name, email, password, preferred_language: preferredLanguage, roles: selectedRoles });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
     }
@@ -127,19 +137,34 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onSwitchToLogin }) =
         </div>
 
         <div>
-          <label htmlFor="register-profile-type" className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Profile type
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+            Profile type <span className="text-slate-400 font-medium normal-case">(select one or more)</span>
           </label>
-          <select
-            id="register-profile-type"
-            value={profileType}
-            onChange={(e) => setProfileType(e.target.value as UserRole)}
-            className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
-          >
-            {USER_ROLE_OPTIONS.map(opt => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
+          <div className="grid grid-cols-2 gap-2">
+            {USER_ROLE_OPTIONS.map(opt => {
+              const isChecked = selectedRoles.includes(opt);
+              return (
+                <label
+                  key={opt}
+                  htmlFor={`register-role-${opt}`}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border text-xs font-medium cursor-pointer transition-all ${
+                    isChecked
+                      ? 'border-emerald-700 bg-emerald-50/60 text-emerald-900'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    id={`register-role-${opt}`}
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggleRole(opt)}
+                    className="w-3.5 h-3.5 text-emerald-800 rounded-sm focus:ring-emerald-700"
+                  />
+                  <span>{opt}</span>
+                </label>
+              );
+            })}
+          </div>
         </div>
 
         <div>

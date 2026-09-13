@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Compass,
-  CheckCircle2,
   ArrowRight,
   Shield,
   FileText,
@@ -9,7 +8,9 @@ import {
   ExternalLink,
   ChevronRight,
   HelpCircle,
-  FolderOpen
+  FolderOpen,
+  Square,
+  CheckSquare
 } from 'lucide-react';
 import { Citation, IPRAssetType, IPRNavigatorQuery, IPRNavigatorResult } from '../types';
 import { DisclaimerBanner } from './DisclaimerBanner';
@@ -21,7 +22,7 @@ interface IPRNavigatorViewProps {
 
 export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitation }) => {
   const { t } = useTranslation();
-  const [selectedAsset, setSelectedAsset] = useState<IPRAssetType>('Manufacturing process');
+  const [selectedAssets, setSelectedAssets] = useState<IPRAssetType[]>(['Manufacturing process']);
   const [description, setDescription] = useState('');
   const [usesBiologicalResource, setUsesBiologicalResource] = useState<boolean>(true);
   const [hasTraditionalBasis, setHasTraditionalBasis] = useState<boolean>(true);
@@ -29,7 +30,7 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
   const [isCommercialized, setIsCommercialized] = useState<boolean>(false);
 
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<IPRNavigatorResult | null>(null);
+  const [results, setResults] = useState<{ assetType: IPRAssetType; label: string; result: IPRNavigatorResult }[]>([]);
 
   const assetOptions: { type: IPRAssetType; label: string; desc: string }[] = [
     { type: 'Manufacturing process', label: 'Manufacturing Process / Extraction', desc: 'Novel standardized extraction or purification methods' },
@@ -42,26 +43,40 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
     { type: 'New invention', label: 'New Technological Apparatus', desc: 'Devices for AYUSH diagnostics or therapy delivery' },
   ];
 
+  const toggleAsset = (type: IPRAssetType) => {
+    setSelectedAssets(prev =>
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
+    setResults([]);
+  };
+
   const handleEvaluate = async () => {
+    if (selectedAssets.length === 0) return;
     setLoading(true);
     try {
-      const payload: IPRNavigatorQuery = {
-        asset_type: selectedAsset,
-        description,
-        uses_biological_resource: usesBiologicalResource,
-        has_traditional_basis: hasTraditionalBasis,
-        has_synergy_data: hasSynergyData,
-        is_already_commercialized: isCommercialized,
-      };
+      const evaluations = await Promise.all(
+        selectedAssets.map(async (assetType) => {
+          const payload: IPRNavigatorQuery = {
+            asset_type: assetType,
+            description,
+            uses_biological_resource: usesBiologicalResource,
+            has_traditional_basis: hasTraditionalBasis,
+            has_synergy_data: hasSynergyData,
+            is_already_commercialized: isCommercialized,
+          };
 
-      const res = await fetch('/api/ipr/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+          const res = await fetch('/api/ipr/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
 
-      const data: IPRNavigatorResult = await res.json();
-      setResult(data);
+          const data: IPRNavigatorResult = await res.json();
+          const label = assetOptions.find(o => o.type === assetType)?.label || assetType;
+          return { assetType, label, result: data };
+        })
+      );
+      setResults(evaluations);
     } catch (e) {
       console.error('IPR analysis failed:', e);
     } finally {
@@ -91,19 +106,18 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
         <div className="lg:col-span-5 space-y-6">
           <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-5">
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-              1. What are you trying to protect?
+              1. What are you trying to protect? <span className="text-slate-400 normal-case font-medium">(select all that apply)</span>
             </h3>
 
             <div className="space-y-2">
               {assetOptions.map((opt) => {
-                const isSelected = selectedAsset === opt.type;
+                const isSelected = selectedAssets.includes(opt.type);
                 return (
                   <div
                     key={opt.type}
-                    onClick={() => {
-                      setSelectedAsset(opt.type);
-                      setResult(null);
-                    }}
+                    onClick={() => toggleAsset(opt.type)}
+                    role="checkbox"
+                    aria-checked={isSelected}
                     className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
                       isSelected
                         ? 'border-emerald-800 bg-emerald-50/50 ring-1 ring-emerald-800'
@@ -111,12 +125,18 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className={`text-xs font-semibold ${isSelected ? 'text-emerald-950' : 'text-slate-800'}`}>
-                        {opt.label}
-                      </span>
-                      {isSelected && <CheckCircle2 className="w-4 h-4 text-emerald-700" />}
+                      <div className="flex items-center gap-2">
+                        {isSelected ? (
+                          <CheckSquare className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                        )}
+                        <span className={`text-xs font-semibold ${isSelected ? 'text-emerald-950' : 'text-slate-800'}`}>
+                          {opt.label}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{opt.desc}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5 pl-6">{opt.desc}</p>
                   </div>
                 );
               })}
@@ -149,7 +169,7 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                   />
                 </label>
 
-                {(selectedAsset === 'New formulation' || selectedAsset === 'Manufacturing process') && (
+                {(selectedAssets.includes('New formulation') || selectedAssets.includes('Manufacturing process')) && (
                   <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 bg-slate-50/50 cursor-pointer">
                     <div>
                       <span className="text-slate-700 font-medium block">Has Empirical Synergism Data?</span>
@@ -192,7 +212,7 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                 type="button"
                 id="evaluate-ipr-pathway-btn"
                 onClick={handleEvaluate}
-                disabled={loading}
+                disabled={loading || selectedAssets.length === 0}
                 className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-2"
               >
                 {loading ? (
@@ -200,7 +220,7 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                 ) : (
                   <>
                     <Compass className="w-4 h-4 text-amber-300" />
-                    <span>Evaluate IPR Pathways</span>
+                    <span>Evaluate IPR Pathways{selectedAssets.length > 1 ? ` (${selectedAssets.length} selected)` : ''}</span>
                   </>
                 )}
               </button>
@@ -210,128 +230,141 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
 
         {/* Right Column: Dynamic Pathway Recommendations */}
         <div className="lg:col-span-7 space-y-6">
-          {!result ? (
+          {results.length === 0 ? (
             <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center space-y-4">
               <div className="w-12 h-12 rounded-xl bg-slate-50 text-slate-400 mx-auto flex items-center justify-center">
                 <Compass className="w-6 h-6" />
               </div>
               <h3 className="text-base font-semibold text-slate-800">
-                Select an asset type to inspect statutory pathways
+                Select one or more asset types to inspect statutory pathways
               </h3>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
                 The navigator will evaluate whether your innovation qualifies for a Process Patent, Trademark (Class 5/3), Industrial Design, or PPV&FR certificate while highlighting Section 3(p) risks.
               </p>
             </div>
           ) : (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Primary Protection Pathway */}
-              <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
-                <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
-                  Recommended Primary Protection
-                </span>
-                <h2 className="text-xl font-serif font-bold text-slate-900">
-                  {result.primary_protection}
-                </h2>
-                <p className="text-xs text-slate-700 leading-relaxed font-serif">
-                  {result.why_relevant}
-                </p>
+            <div className="space-y-10 animate-in fade-in duration-200">
+              {results.map(({ assetType, label, result }) => (
+                <div key={assetType} className="space-y-6">
+                  {results.length > 1 && (
+                    <div className="flex items-center gap-2 pb-1 border-b border-slate-200">
+                      <CheckSquare className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+                      <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
+                        Results for: {label}
+                      </h4>
+                    </div>
+                  )}
 
-                <div className="pt-2 flex flex-wrap gap-2">
-                  <span className="text-xs font-medium text-slate-500 py-1">Complementary layers:</span>
-                  {result.potential_protection.map((prot, idx) => (
-                    <span
-                      key={idx}
-                      className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-200"
-                    >
-                      {prot}
+                  {/* Primary Protection Pathway */}
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+                    <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
+                      Recommended Primary Protection
                     </span>
-                  ))}
-                </div>
-              </div>
+                    <h2 className="text-xl font-serif font-bold text-slate-900">
+                      {result.primary_protection}
+                    </h2>
+                    <p className="text-xs text-slate-700 leading-relaxed font-serif">
+                      {result.why_relevant}
+                    </p>
 
-              {/* Statutory Considerations (Section 3p, 3e, NBA) */}
-              <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <AlertCircle className="w-4 h-4 text-amber-700" />
-                  Statutory Constraints & Section 3(p) Checks
-                </h3>
-                <ul className="space-y-2 text-xs text-slate-700">
-                  {result.important_considerations.map((c, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-amber-700 font-bold mt-0.5">•</span>
-                      <span>{c}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Governing Authority & Required Filings */}
-              <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
-                <div>
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase">
-                    Competent Statutory Authority
-                  </span>
-                  <p className="text-xs font-semibold text-slate-900 mt-0.5">
-                    {result.relevant_authority}
-                  </p>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 space-y-2">
-                  <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
-                    Documents & Forms to Prepare
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {result.documents_to_prepare.map((doc, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-xs text-slate-800 flex items-center gap-2"
-                      >
-                        <FileText className="w-4 h-4 text-emerald-700 shrink-0" />
-                        <span className="line-clamp-2">{doc}</span>
-                      </div>
-                    ))}
+                    <div className="pt-2 flex flex-wrap gap-2">
+                      <span className="text-xs font-medium text-slate-500 py-1">Complementary layers:</span>
+                      {result.potential_protection.map((prot, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-200"
+                        >
+                          {prot}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                <div className="pt-3 border-t border-slate-100 space-y-2">
-                  <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
-                    Recommended Actionable Steps
-                  </span>
-                  <ol className="space-y-1.5 text-xs text-slate-700">
-                    {result.possible_next_steps.map((step, idx) => (
-                      <li key={idx} className="leading-relaxed">
-                        {step}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              </div>
-
-              {/* Citations */}
-              {result.sources && result.sources.length > 0 && (
-                <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
-                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Authoritative Citations
-                  </h4>
-                  <div className="space-y-2">
-                    {result.sources.map((s) => (
-                      <div
-                        key={s.chunk_id}
-                        onClick={() => onOpenCitation(s)}
-                        className="p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-emerald-50/50 hover:border-emerald-300 transition-colors cursor-pointer group"
-                      >
-                        <div className="flex items-center justify-between text-xs font-semibold text-slate-800 group-hover:text-emerald-900 mb-1">
-                          <span>[{s.index}] {s.section} — {s.title}</span>
-                          <span className="text-[10px] text-slate-500">{s.authority}</span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 line-clamp-1 italic">
-                          "{s.excerpt}"
-                        </p>
-                      </div>
-                    ))}
+                  {/* Statutory Considerations (Section 3p, 3e, NBA) */}
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4 text-amber-700" />
+                      Statutory Constraints & Section 3(p) Checks
+                    </h3>
+                    <ul className="space-y-2 text-xs text-slate-700">
+                      {result.important_considerations.map((c, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-amber-700 font-bold mt-0.5">•</span>
+                          <span>{c}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
+
+                  {/* Governing Authority & Required Filings */}
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+                    <div>
+                      <span className="text-[11px] font-semibold text-slate-400 uppercase">
+                        Competent Statutory Authority
+                      </span>
+                      <p className="text-xs font-semibold text-slate-900 mt-0.5">
+                        {result.relevant_authority}
+                      </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 space-y-2">
+                      <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
+                        Documents & Forms to Prepare
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {result.documents_to_prepare.map((doc, idx) => (
+                          <div
+                            key={idx}
+                            className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-xs text-slate-800 flex items-center gap-2"
+                          >
+                            <FileText className="w-4 h-4 text-emerald-700 shrink-0" />
+                            <span className="line-clamp-2">{doc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 space-y-2">
+                      <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
+                        Recommended Actionable Steps
+                      </span>
+                      <ol className="space-y-1.5 text-xs text-slate-700">
+                        {result.possible_next_steps.map((step, idx) => (
+                          <li key={idx} className="leading-relaxed">
+                            {step}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  </div>
+
+                  {/* Citations */}
+                  {result.sources && result.sources.length > 0 && (
+                    <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        Authoritative Citations
+                      </h4>
+                      <div className="space-y-2">
+                        {result.sources.map((s) => (
+                          <div
+                            key={s.chunk_id}
+                            onClick={() => onOpenCitation(s)}
+                            className="p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-emerald-50/50 hover:border-emerald-300 transition-colors cursor-pointer group"
+                          >
+                            <div className="flex items-center justify-between text-xs font-semibold text-slate-800 group-hover:text-emerald-900 mb-1">
+                              <span>[{s.index}] {s.section} — {s.title}</span>
+                              <span className="text-[10px] text-slate-500">{s.authority}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 line-clamp-1 italic">
+                              "{s.excerpt}"
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
 
               <DisclaimerBanner compact />
             </div>

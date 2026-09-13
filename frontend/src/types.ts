@@ -3,10 +3,20 @@
 export type Language = 'en' | 'hi' | 'mr';
 
 // Profile / account type. These five values are also the exact display
-// labels used throughout the UI (Register, Profile, Header).
-export type UserRole = 'Practitioner' | 'Researcher' | 'Expert' | 'Admin' | 'Organization';
+// labels used throughout the UI (Register, Profile, Header) and are the
+// options offered at signup.
+export type UserRole = 'Practitioner' | 'Researcher' | 'Expert' | 'Admin' | 'Organization' | 'Startup';
 
 export const USER_ROLE_OPTIONS: UserRole[] = ['Practitioner', 'Researcher', 'Expert', 'Admin', 'Organization'];
+
+// Roles that are NOT offered at signup, but can be added later via
+// "+ Add Role" (Profile). Kept separate so they never appear to a user
+// unless they explicitly add them.
+export const ADDITIONAL_ROLE_OPTIONS: UserRole[] = ['Startup'];
+
+// Full catalog of every role that can ever be added, used to populate the
+// "+ Add Role" selector (filtered to exclude roles the user already has).
+export const ALL_ROLE_OPTIONS: UserRole[] = [...USER_ROLE_OPTIONS, ...ADDITIONAL_ROLE_OPTIONS];
 
 // Dual jurisdiction toggle: Domestic (India) vs International/Export.
 // Mirrors the domestic/international distinction already used by the
@@ -19,7 +29,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: UserRole; // currently ACTIVE role — kept for backward compatibility with existing code (Header, ProfileView, etc.)
+  roles: UserRole[]; // ALL roles this user has (signup role + any added via "+ Add Role"). Always includes `role`.
   preferred_language: Language;
   created_at: string;
 }

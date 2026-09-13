@@ -10,6 +10,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSwitchToRegister }) => {
   const { login, authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [acknowledged, setAcknowledged] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,6 +19,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSwitchToRegister }) => {
 
     if (!email.trim() || !password) {
       setError('Please enter both email and password.');
+      return;
+    }
+    if (!acknowledged) {
+      setError('Please acknowledge the statutory advisory notice before signing in.');
       return;
     }
 
@@ -76,10 +81,26 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSwitchToRegister }) => {
           />
         </div>
 
+        <label
+          htmlFor="login-disclaimer-ack"
+          className="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50/60 border border-amber-900/20 cursor-pointer"
+        >
+          <input
+            id="login-disclaimer-ack"
+            type="checkbox"
+            checked={acknowledged}
+            onChange={(e) => setAcknowledged(e.target.checked)}
+            className="w-4 h-4 mt-0.5 text-emerald-800 rounded-sm focus:ring-emerald-700 flex-shrink-0"
+          />
+          <span className="text-xs text-amber-900 leading-relaxed">
+            I understand that IP-SAKTI Sahayak provides AI-assisted research and decision support only, and does not constitute formal legal counsel or a binding regulatory determination.
+          </span>
+        </label>
+
         <button
           type="submit"
           id="login-submit-btn"
-          disabled={authLoading}
+          disabled={authLoading || !acknowledged}
           className="w-full px-4 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium text-sm transition-all shadow-md flex items-center justify-center gap-2"
         >
           {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}

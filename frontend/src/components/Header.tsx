@@ -45,28 +45,22 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo & Brand */}
+          {/* Logo & Brand: IP-SAKTI Sahayak */}
           <div
             id="brand-logo-btn"
             onClick={() => setActiveTab('landing')}
-            className="flex items-center gap-3 cursor-pointer group select-none"
+            className="flex items-center gap-3 cursor-pointer group select-none min-w-0 flex-shrink-0"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 flex items-center justify-center text-amber-300 shadow-md group-hover:scale-105 transition-transform">
-              {/* Subtle AYUSH & IP Emblem */}
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 flex items-center justify-center text-amber-300 shadow-md group-hover:scale-105 transition-transform flex-shrink-0">
               <Shield className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-serif font-bold text-lg tracking-tight text-slate-900">
-                  {t('brand.name', 'IP-SAKTI')}
-                </span>
-                <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300/60 uppercase tracking-wide">
-                  {t('brand.badge', 'Sahayak')}
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-500 font-medium tracking-tight">
-                {t('brand.subtitle', 'AYUSH & IP Research Decision Support')}
-              </p>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-serif font-bold text-lg tracking-tight text-slate-900 truncate">
+                {t('brand.name', 'IP-SAKTI')}
+              </span>
+              <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300/60 uppercase tracking-wide whitespace-nowrap">
+                {t('brand.badge', 'Sahayak')}
+              </span>
             </div>
           </div>
 

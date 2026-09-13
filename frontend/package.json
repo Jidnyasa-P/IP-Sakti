@@ -19,9 +19,14 @@
     "vite": "^6.2.3"
   },
   "devDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.63.2",
+    "@rollup/wasm-node": "^4.63.2",
     "@types/node": "^22.14.0",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "typescript": "~5.8.2"
+  },
+  "overrides": {
+    "rollup": "npm:@rollup/wasm-node@4.63.2"
   }
 }

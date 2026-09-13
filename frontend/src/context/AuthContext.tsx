@@ -1,20 +1,27 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { User, UserRole, Language } from '../types';
-import { getSessionUser, dummyRegister, dummyLogin, dummyLogout } from '../components/auth/authStorage';
+import {
+  getSessionUser,
+  dummyRegister,
+  dummyLogin,
+  dummyLogout,
+  dummyAddRole,
+  dummySetActiveRole,
+} from '../components/auth/authStorage';
 
 // ---------------------------------------------------------------------------
 // AuthContext — currently backed by dummy/local storage (see authStorage.ts).
 // The public shape of this context (user, isAuthenticated, login, register,
-// logout) is designed to stay the same once real backend auth is wired in —
-// only the implementations inside login()/register()/logout() below should
-// need to change to call the real /api/auth/* endpoints.
+// logout, addRole, setActiveRole) is designed to stay the same once real
+// backend auth is wired in — only the implementations below should need to
+// change to call the real /api/auth/* endpoints.
 // ---------------------------------------------------------------------------
 
 interface RegisterParams {
   name: string;
   email: string;
   password: string;
-  role: UserRole;
+  roles: UserRole[];
   preferred_language?: Language;
 }
 
@@ -25,6 +32,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (params: RegisterParams) => Promise<void>;
   logout: () => void;
+  addRole: (role: UserRole) => Promise<void>;
+  setActiveRole: (role: UserRole) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,7 +60,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         email: params.email,
         password: params.password,
         preferred_language: params.preferred_language,
-        role: params.role,
+        roles: params.roles,
       });
       setUser(newUser);
     } finally {
@@ -64,6 +73,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(null);
   }, []);
 
+  const addRole = useCallback(async (role: UserRole) => {
+    if (!user) return;
+    const updated = await dummyAddRole(user.id, role);
+    setUser(updated);
+  }, [user]);
+
+  const setActiveRole = useCallback(async (role: UserRole) => {
+    if (!user) return;
+    const updated = await dummySetActiveRole(user.id, role);
+    setUser(updated);
+  }, [user]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -73,6 +94,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         register,
         logout,
+        addRole,
+        setActiveRole,
       }}
     >
       {children}

@@ -16,10 +16,24 @@ interface StoredUser extends User {
   password: string; // NEVER do this with a real backend — dummy/local only.
 }
 
+// Backward compatibility: accounts created before multi-role support only
+// have a single `role` field and no `roles` array. Fill it in on read so
+// nothing breaks for existing dummy/local sessions.
+function migrateUser(u: StoredUser): StoredUser {
+  if (!u.roles || !Array.isArray(u.roles) || u.roles.length === 0) {
+    return { ...u, roles: [u.role] };
+  }
+  if (!u.roles.includes(u.role)) {
+    return { ...u, roles: [...u.roles, u.role] };
+  }
+  return u;
+}
+
 function readUsers(): StoredUser[] {
   try {
     const raw = localStorage.getItem(USERS_KEY);
-    return raw ? (JSON.parse(raw) as StoredUser[]) : [];
+    const users = raw ? (JSON.parse(raw) as StoredUser[]) : [];
+    return users.map(migrateUser);
   } catch {
     return [];
   }
@@ -54,7 +68,7 @@ export async function dummyRegister(params: {
   email: string;
   password: string;
   preferred_language?: Language;
-  role: UserRole;
+  roles: UserRole[];
 }): Promise<User> {
   const email = params.email.trim().toLowerCase();
   const users = readUsers();
@@ -63,11 +77,14 @@ export async function dummyRegister(params: {
     throw new Error('An account with this email already exists.');
   }
 
+  const roles = params.roles.length > 0 ? params.roles : ['Practitioner' as UserRole];
+
   const newUser: StoredUser = {
     id: `user-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     name: params.name.trim(),
     email,
-    role: params.role,
+    role: roles[0], // active role defaults to the first role selected at signup
+    roles,
     preferred_language: params.preferred_language || 'en',
     created_at: new Date().toISOString(),
     password: params.password,
@@ -88,6 +105,7 @@ export async function dummyLogin(email: string, password: string): Promise<User>
     throw new Error('Invalid email or password.');
   }
 
+  writeUsers(users); // persist any migration applied during readUsers()
   localStorage.setItem(SESSION_KEY, match.id);
   return toPublicUser(match);
 }
@@ -98,4 +116,39 @@ export function dummyLogout(): void {
   } catch {
     // ignore
   }
+}
+
+// Add a new role to a user's role list (idempotent — no-op if already present).
+export async function dummyAddRole(userId: string, role: UserRole): Promise<User> {
+  const users = readUsers();
+  const idx = users.findIndex(u => u.id === userId);
+  if (idx === -1) {
+    throw new Error('User not found.');
+  }
+
+  const existing = users[idx];
+  if (!existing.roles.includes(role)) {
+    users[idx] = { ...existing, roles: [...existing.roles, role] };
+  }
+
+  writeUsers(users);
+  return toPublicUser(users[idx]);
+}
+
+// Switch which of the user's existing roles is currently active.
+export async function dummySetActiveRole(userId: string, role: UserRole): Promise<User> {
+  const users = readUsers();
+  const idx = users.findIndex(u => u.id === userId);
+  if (idx === -1) {
+    throw new Error('User not found.');
+  }
+
+  const existing = users[idx];
+  if (!existing.roles.includes(role)) {
+    throw new Error('This role is not available for this account.');
+  }
+
+  users[idx] = { ...existing, role };
+  writeUsers(users);
+  return toPublicUser(users[idx]);
 }
