@@ -14,10 +14,20 @@ backend/data/*.db
 backend/data/vector_index.json
 backend/data/knowledge_graph.json
 
+# --- Standalone RAG engine ---
+ip_sakti_rag/.venv/
+ip_sakti_rag/venv/
+ip_sakti_rag/**/__pycache__/
+ip_sakti_rag/.pytest_cache/
+ip_sakti_rag/data/processed/*
+ip_sakti_rag/data/qdrant_local/*
+
 # --- Env files (never commit real secrets) ---
 .env
 backend/.env
 frontend/.env
+ip_sakti_rag/.env
+
 
 # --- OS / editor ---
 .DS_Store

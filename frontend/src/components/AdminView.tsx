@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { authFetch } from './auth/authStorage';
+import { useAuth } from '../context/AuthContext';
 import {
   Settings,
   Database,
@@ -19,6 +20,7 @@ import { DocumentMetadata, RAGTelemetry } from '../types';
 import { DisclaimerBanner } from './DisclaimerBanner';
 
 export const AdminView: React.FC = () => {
+  const { user } = useAuth();
   const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
   const [telemetry, setTelemetry] = useState<RAGTelemetry | null>(null);
   const [loading, setLoading] = useState(false);
@@ -33,8 +35,10 @@ export const AdminView: React.FC = () => {
   const [newDocSummary, setNewDocSummary] = useState('');
 
   useEffect(() => {
-    loadAdminData();
-  }, []);
+    if (user?.roles.includes('Admin')) {
+      loadAdminData();
+    }
+  }, [user]);
 
   const loadAdminData = async () => {
     setLoading(true);
@@ -91,6 +95,25 @@ export const AdminView: React.FC = () => {
       console.error('Re-indexing failed:', e);
     }
   };
+
+  if (!user?.roles.includes('Admin')) {
+    return (
+      <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 py-16">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-xs p-8 text-center">
+          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
+            <Shield className="w-6 h-6" />
+          </div>
+          <h1 className="text-2xl font-serif font-bold text-slate-900">Admin access required</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            The Knowledge Base and Telemetry pages are available only to accounts with the Admin role.
+          </p>
+          <p className="mt-4 text-xs text-slate-500">
+            Current profile: <span className="font-semibold text-slate-700">{user.role || 'Unknown'}</span>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
