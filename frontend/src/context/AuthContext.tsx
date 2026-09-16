@@ -17,6 +17,7 @@ export interface AuthContextType {
   currentUser: User | null;
   isLoggedIn: boolean;
   isLoading: boolean;
+  authLoading: boolean;
   login: (email: string, password?: string, expertCertificate?: ExpertCertificate) => Promise<{ success: boolean; user?: User; error?: string }>;
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
@@ -330,6 +331,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         currentUser,
         isLoggedIn: currentUser !== null,
         isLoading,
+        authLoading: isLoading,
         login,
         register,
         logout,

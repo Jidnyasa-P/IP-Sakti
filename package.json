@@ -4,11 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "preview": "vite preview",
-    "lint": "tsc --noEmit",
-    "start": "node dist/server.cjs"
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
+    "lint": "frontend\\node_modules\\.bin\\tsc.cmd --noEmit -p frontend\\tsconfig.json"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

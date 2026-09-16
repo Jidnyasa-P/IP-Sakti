@@ -73,6 +73,8 @@ export type UserRole =
   | 'EXPERT'
   | 'ADMIN';
 
+export type JurisdictionMode = 'India' | 'International';
+
 export const ALL_ROLES: UserRole[] = [
   'Practitioner',
   'Researcher',
@@ -80,6 +82,8 @@ export const ALL_ROLES: UserRole[] = [
   'Admin',
   'Organization'
 ];
+
+export const USER_ROLE_OPTIONS = ALL_ROLES;
 
 export interface RoleMetaInfo {
   id: UserRole;
