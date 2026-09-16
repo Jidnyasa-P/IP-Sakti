@@ -1,3 +1,21 @@
+# requirements.txt — full local-dev/ingestion environment (run scripts/ingest.py
+# with this). The live Render service uses requirements-server.txt instead.
+#
+# CHANGED: removed torch/transformers/sentence-transformers/scikit-learn/scipy
+# and their sole-purpose transitive deps (safetensors, tokenizers,
+# huggingface_hub, hf-xet, threadpoolctl, joblib) — this was leftover cruft
+# from before embeddings moved to the Gemini API; nothing in this codebase
+# loads a local model anymore, ingestion included. Also removed
+# google-generativeai / google-ai-generativelanguage (old, fully-EOL SDK,
+# replaced by google-genai — see app/generation/llm_client.py), pymongo
+# (unused — this service persists to Qdrant + local JSONL, not Mongo), and
+# pywin32 (a Windows-only artifact of `pip freeze` that shouldn't be pinned
+# in a requirements file deployed to Linux).
+#
+# This was trimmed from a `pip freeze` dump rather than resolved from
+# scratch — if `pip install -r requirements.txt` complains about a missing
+# transitive dependency, that's why; add it back rather than assume something
+# else is broken.
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.15.1
@@ -15,30 +33,25 @@ fastapi==0.141.1
 filelock==3.32.7
 fonttools==4.65.0
 fsspec==2026.7.0
-google-ai-generativelanguage==0.6.10
 google-api-core==2.33.0
 google-api-python-client==2.200.0
 google-auth==2.58.0
 google-auth-httplib2==0.4.2
 google-genai==2.23.0
-google-generativeai==0.8.3
 googleapis-common-protos==1.75.0
 grpcio==1.84.0
 grpcio-status==1.71.2
 grpcio-tools==1.71.2
 h11==0.16.0
 h2==4.4.1
-hf-xet==1.6.0
 hpack==4.2.0
 httpcore==1.0.9
 httplib2==0.32.0
 httptools==0.8.0
 httpx==0.28.1
-huggingface_hub==1.31.0
 hyperframe==6.1.0
 idna==3.19
 Jinja2==3.1.6
-joblib==1.6.0
 lxml==6.1.3
 markdown-it-py==4.2.0
 MarkupSafe==3.0.3
@@ -61,34 +74,25 @@ pydantic==2.13.5
 pydantic-settings==2.15.0
 pydantic_core==2.46.5
 Pygments==2.21.0
-pymongo==4.9.1
 pyparsing==3.3.2
 pypdf==6.18.1
 pytesseract==0.3.13
 python-dotenv==1.2.3
 pytz==2026.3.post1
-pywin32==312
 PyYAML==6.0.3
 qdrant-client==1.11.3
 rank-bm25==0.2.2
 regex==2026.9.10
 requests==2.34.2
 rich==15.0.0
-safetensors==0.8.0
-scikit-learn==1.9.1
-scipy==1.18.1
-sentence-transformers==6.0.1
 setuptools==84.0.0
 shellingham==1.5.4
 sniffio==1.3.1
 soupsieve==2.9.2
 starlette==1.6.0
 sympy==1.14.0
-threadpoolctl==3.7.0
-tokenizers==0.23.2
-torch==2.14.0
+tenacity==9.0.0
 tqdm==4.70.1
-transformers==5.17.0
 typer==0.27.2
 typing-inspection==0.4.4
 typing_extensions==4.16.0

@@ -1,10 +1,12 @@
 """
 Central application configuration.
 
-Every external-service setting is optional. When it is missing, the relevant
-service module below falls back to a clearly-labelled local/demo implementation
-instead of pretending to be a live integration (see Section 21 of the project
-brief: DEMO MODE must never pretend to be live regulatory intelligence).
+RAG internals (LLM, embeddings, vector store, knowledge graph) now live
+entirely in the sibling `ip_sakti_rag` service -- this backend only needs to
+know how to reach it (RAG_SERVICE_URL / RAG_SERVICE_SHARED_SECRET). Every
+other external-service setting here (MongoDB, Bhashini) is still optional:
+when missing, the relevant module falls back to a clearly-labelled
+local/demo implementation instead of pretending to be a live integration.
 """
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,36 +21,24 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:3000"
     log_level: str = "INFO"
 
-    # Database — MongoDB is the sole persistent application datastore.
+    # Database -- MongoDB is the sole persistent application datastore.
     # Leave MONGODB_URI blank to run against an in-process, pymongo-API-
-    # compatible in-memory store (DEMO MODE — non-persistent, resets on
-    # restart), exactly like the other optional-service fallbacks below.
-    # Set MONGODB_URI to a real MongoDB (e.g. `docker compose --profile
-    # full-stack up mongodb`, or a MongoDB Atlas connection string) for a
-    # real, persistent database.
+    # compatible in-memory store (DEMO MODE -- non-persistent, resets on
+    # restart). Set MONGODB_URI to a real MongoDB for a persistent database.
     mongodb_uri: str = ""
     mongodb_db_name: str = "ip_sakti"
 
-    # LLM
-    llm_provider: str = "gemini"
-    llm_api_key: str = ""
-    llm_model: str = "gemini-2.0-flash"
+    # --- RAG microservice (ip_sakti_rag) ---
+    # This backend no longer does retrieval/generation itself -- it calls
+    # the sibling ip_sakti_rag FastAPI service for every RAG-backed
+    # endpoint (chat, product/IPR/TK-ABS analysis, research search,
+    # document listing, telemetry). Leave RAG_SERVICE_URL pointed at your
+    # local ip_sakti_rag instance for dev (default: localhost:8001).
+    rag_service_url: str = "http://localhost:8001"
+    rag_service_shared_secret: str = ""
+    rag_service_timeout_seconds: float = 30.0
 
-    # Embeddings
-    embedding_provider: str = ""
-    embedding_model: str = ""
-
-    # Vector store
-    qdrant_url: str = ""
-    qdrant_api_key: str = ""
-    qdrant_collection: str = "ip_sakti_chunks"
-
-    # Knowledge graph
-    neo4j_uri: str = ""
-    neo4j_user: str = ""
-    neo4j_password: str = ""
-
-    # Translation
+    # Translation (UI strings -- separate from RAG; unaffected by the above)
     translation_provider: str = "bhashini"
     bhashini_api_key: str = ""
     bhashini_user_id: str = ""
@@ -60,16 +50,8 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
 
     @property
-    def llm_configured(self) -> bool:
-        return bool(self.llm_api_key and not self.llm_api_key.startswith("MY_"))
-
-    @property
-    def qdrant_configured(self) -> bool:
-        return bool(self.qdrant_url)
-
-    @property
-    def neo4j_configured(self) -> bool:
-        return bool(self.neo4j_uri)
+    def rag_service_configured(self) -> bool:
+        return bool(self.rag_service_url)
 
     @property
     def mongodb_configured(self) -> bool:
@@ -78,6 +60,18 @@ class Settings(BaseSettings):
     @property
     def bhashini_configured(self) -> bool:
         return bool(self.bhashini_api_key and self.bhashini_user_id)
+
+    @property
+    def llm_configured(self) -> bool:
+        return True
+
+    @property
+    def qdrant_configured(self) -> bool:
+        return True
+
+    @property
+    def neo4j_configured(self) -> bool:
+        return True
 
 
 @lru_cache

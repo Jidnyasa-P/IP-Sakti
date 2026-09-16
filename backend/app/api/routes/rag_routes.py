@@ -2,79 +2,42 @@ import uuid
 from dataclasses import asdict
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.deps import get_current_user, require_role
+from app.api.deps import get_current_user
 from app.database.session import get_db
-from app.schemas.chat import ClassifyRequest, SearchRequest, ValidateRequest, ExpertEscalationRequest
-from app.schemas.domain import DocumentIngestRequest
-from app.services import classification_service, expert_escalation_service
-from app.rag.vector_store import get_vector_store
-from app.retrieval.hybrid_retrieval import get_document_details
-from app.validation.citation_validation import validate_citation
-from app.rag.ingest import ingest_document
-from app.rag.corpus import get_metadata
+from app.schemas.chat import SearchRequest, ExpertEscalationRequest
+from app.services import expert_escalation_service
 from app.models.expert_escalation import COLLECTION as EXPERT_ESCALATIONS_COLLECTION, new_expert_escalation
-from app.models.classification import COLLECTION as CLASSIFICATION_COLLECTION, new_classification_record
-from app.models.validation_result import COLLECTION as VALIDATION_RESULTS_COLLECTION, new_validation_result
+import app.rag_client as rag_client
 
 router = APIRouter()
 
 
-@router.post("/api/classify")
-def classify(body: ClassifyRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    result = classification_service.classify(body.text)
-    record = new_classification_record(
-        id=f"cls-{uuid.uuid4().hex[:10]}",
-        query=body.text,
-        category=result.category,
-        confidence=result.confidence,
-        reasoning_summary=result.reasoning_summary,
-        needs_clarification=result.needs_clarification,
-        clarification_questions=result.clarification_questions,
-    )
-    db[CLASSIFICATION_COLLECTION].insert_one(record)
-    return asdict(result)
-
-
 @router.post("/api/search")
-def search(body: SearchRequest, current_user: dict = Depends(get_current_user)):
-    store = get_vector_store()
-    results = store.query(body.query, top_k=body.top_k)
-    return {"query": body.query, "results": results}
-
-
-@router.post("/api/validate")
-def validate(body: ValidateRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    outcome = validate_citation(body.claim, body.chunk_id)
-    db[VALIDATION_RESULTS_COLLECTION].insert_one(new_validation_result(
-        id=f"val-{uuid.uuid4().hex[:10]}",
-        claim=outcome.claim,
-        source=outcome.source,
-        source_exists=outcome.source_exists,
-        content_supports_claim=outcome.content_supports_claim,
-        authority_valid=outcome.authority_valid,
-        validation_status=outcome.validation_status,
-        details={"warnings": outcome.warnings},
-    ))
-    return asdict(outcome)
+async def search(body: SearchRequest, current_user: dict = Depends(get_current_user)):
+    results = await rag_client.search_documents(query=body.query)
+    return {"query": body.query, "results": results[: body.top_k]}
 
 
 @router.get("/api/sources")
-def sources(current_user: dict = Depends(get_current_user)):
-    return {"sources": get_metadata()}
+async def sources(current_user: dict = Depends(get_current_user)):
+    return {"sources": await rag_client.list_documents()}
 
 
 @router.get("/api/documents/{document_id}")
-def document_details(document_id: str, current_user: dict = Depends(get_current_user)):
-    details = get_document_details(document_id)
-    if not details["metadata"]:
+async def document_details(document_id: str, current_user: dict = Depends(get_current_user)):
+    details = await rag_client.get_document(document_id)
+    if not details:
         raise HTTPException(status_code=404, detail="Document not found.")
     return details
 
 
-@router.post("/api/documents/ingest")
-def documents_ingest(body: DocumentIngestRequest, current_user: dict = Depends(require_role("Admin"))):
-    metadata = ingest_document(body.model_dump())
-    return {"success": True, "document": metadata}
+# NOTE: there is no live document-ingest endpoint anymore. ip_sakti_rag
+# builds its corpus offline via `python scripts/ingest.py` (see
+# ip_sakti_rag/README.md) rather than through a runtime API -- so
+# POST /api/documents/ingest (previously backed by app/rag/ingest.py, now
+# deleted) has no equivalent here. To add a document, drop its source file
+# into ip_sakti_rag/data/documents/ and re-run the ingestion script; the
+# running ip_sakti_rag service needs a restart to pick up the new index.
 
 
 @router.post("/api/expert-escalation")
