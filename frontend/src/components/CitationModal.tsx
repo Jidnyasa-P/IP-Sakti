@@ -100,7 +100,7 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
               <p className="text-sm text-slate-600 leading-relaxed">
                 {docDetails.metadata.summary}
               </p>
-              <div className="grid grid-cols-2 gap-3 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200/80">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200/80">
                 <div>
                   <span className="text-slate-400 block">Jurisdiction:</span>
                   <span className="font-medium text-slate-800">{docDetails.metadata.jurisdiction}</span>

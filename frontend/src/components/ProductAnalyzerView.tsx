@@ -11,11 +11,13 @@ import {
   Bookmark,
   Sparkles,
   ExternalLink,
-  Info
+  Info,
+  Download
 } from 'lucide-react';
 import { Citation, ProductAnalysisResult, ProductInformation } from '../types';
 import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
+import { generatePDFReport } from '../utils/pdfExport';
 
 interface ProductAnalyzerViewProps {
   onOpenCitation: (citation: Citation) => void;
@@ -131,8 +133,62 @@ export const ProductAnalyzerView: React.FC<ProductAnalyzerViewProps> = ({ onOpen
     }
   };
 
+  const handleExportPDF = () => {
+    if (!result) return;
+
+    generatePDFReport({
+      title: 'IP-SAKTI Sahayak — Product Analysis Dossier',
+      subtitle: result.product_information.product_name,
+      fileName: `${result.product_information.product_name.replace(/[^a-z0-9]+/gi, '_')}_analysis.pdf`,
+      sections: [
+        {
+          heading: 'Statutory Classification',
+          keyValues: [{ label: 'Likely Category', value: result.likely_category }],
+          paragraphs: [result.category_reasoning],
+        },
+        {
+          heading: 'Regulatory Considerations & Compliance',
+          paragraphs: result.regulatory_considerations.flatMap(rc => [
+            `${rc.title}: ${rc.description}`,
+            `Governing Statute: ${rc.governing_statute}`,
+          ]),
+        },
+        {
+          heading: 'Intellectual Property Rights (IPR) Evaluation',
+          paragraphs: [
+            `Section 3(p) & 3(e) Patent Hurdles: ${result.ipr_considerations.patent_assessment}`,
+            result.ipr_considerations.section_3e_admixture_bar,
+            `Trademark Protection (Class 5/Class 3): ${result.ipr_considerations.trademark_recommendation}`,
+            `Industrial Design: ${result.ipr_considerations.industrial_design}`,
+            `Trade Secret Potential: ${result.ipr_considerations.trade_secret_potential}`,
+          ],
+        },
+        {
+          heading: 'Traditional Knowledge & ABS Flags',
+          keyValues: [{ label: 'TK Prior Art Risk', value: result.traditional_knowledge_abs_flags.tk_prior_art_risk }],
+          paragraphs: [
+            result.traditional_knowledge_abs_flags.tk_details,
+            `NBA / SBB Statutory Filing: ${result.traditional_knowledge_abs_flags.nba_abs_requirements}`,
+          ],
+        },
+        {
+          heading: 'Recommended Action Plan',
+          list: result.recommended_next_steps.map(s => s.replace(/^\d+\.\s*/, '')),
+          listStyle: 'number',
+        },
+        ...(result.evidence && result.evidence.length > 0
+          ? [{
+              heading: `Authoritative Statutory Citations (${result.evidence.length})`,
+              list: result.evidence.map(ev => `[${ev.index}] ${ev.section} (${ev.authority}) — "${ev.excerpt}"`),
+              listStyle: 'bullet' as const,
+            }]
+          : []),
+      ],
+    });
+  };
+
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="w-full max-w-[84rem] mx-auto px-4 sm:px-6 lg:px-10 py-8 space-y-8">
       {/* Title & Description */}
       <div className="space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-200/80 text-xs font-semibold">
@@ -524,6 +580,16 @@ export const ProductAnalyzerView: React.FC<ProductAnalyzerViewProps> = ({ onOpen
                 >
                   <Bookmark className="w-3.5 h-3.5" />
                   <span>{savedSuccess ? 'Saved to Workspace!' : 'Save Dossier'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="export-product-analysis-pdf-btn"
+                  onClick={handleExportPDF}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
                 </button>
 
                 <button

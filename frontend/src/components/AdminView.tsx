@@ -116,7 +116,7 @@ export const AdminView: React.FC = () => {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="w-full max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-10 py-8 space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
@@ -305,7 +305,7 @@ export const AdminView: React.FC = () => {
       {/* Add Document Ingestion Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 space-y-5 animate-in fade-in">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 space-y-5 animate-in fade-in">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base font-serif">
                 Ingest New Authoritative Document
@@ -331,7 +331,7 @@ export const AdminView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="font-semibold text-slate-700">Authority</label>
                   <input

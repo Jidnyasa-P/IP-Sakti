@@ -43,7 +43,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ setActiveTab }) => {
   ];
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-10 md:py-16 space-y-12">
+    <div className="w-full max-w-[88rem] mx-auto px-4 sm:px-6 lg:px-10 py-10 md:py-16 space-y-12">
       {/* Hero Section */}
       <section className="text-center max-w-3xl mx-auto space-y-6">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-900 text-xs font-semibold tracking-wide">

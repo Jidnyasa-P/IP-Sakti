@@ -99,7 +99,7 @@ function AppContent() {
 
       {/* Persistent Official Portals Footer */}
       <footer className="w-full bg-white border-t border-slate-200 py-6 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div className="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-10 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-md bg-emerald-800 text-amber-300 flex items-center justify-center">
               <Shield className="w-3.5 h-3.5" />

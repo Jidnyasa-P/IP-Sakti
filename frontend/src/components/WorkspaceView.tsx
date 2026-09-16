@@ -75,7 +75,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="w-full max-w-[88rem] mx-auto px-4 sm:px-6 lg:px-10 py-8 space-y-8">
       {/* Workspace Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
@@ -102,11 +102,11 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
       </div>
 
       {/* Workspace Navigation Tabs */}
-      <div className="flex border-b border-slate-200 gap-6 text-sm font-medium">
+      <div className="flex overflow-x-auto no-scrollbar border-b border-slate-200 gap-6 text-sm font-medium">
         <button
           type="button"
           onClick={() => setActiveSubTab('conversations')}
-          className={`pb-3 border-b-2 transition-colors flex items-center gap-2 ${
+          className={`pb-3 border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 ${
             activeSubTab === 'conversations'
               ? 'border-emerald-700 text-slate-900 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -119,7 +119,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
         <button
           type="button"
           onClick={() => setActiveSubTab('products')}
-          className={`pb-3 border-b-2 transition-colors flex items-center gap-2 ${
+          className={`pb-3 border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 ${
             activeSubTab === 'products'
               ? 'border-emerald-700 text-slate-900 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -132,7 +132,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
         <button
           type="button"
           onClick={() => setActiveSubTab('bookmarks')}
-          className={`pb-3 border-b-2 transition-colors flex items-center gap-2 ${
+          className={`pb-3 border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 ${
             activeSubTab === 'bookmarks'
               ? 'border-emerald-700 text-slate-900 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'

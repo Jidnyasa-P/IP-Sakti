@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Shield, BookOpen, Compass, FlaskConical, Sparkles, FolderArchive, Settings, Globe, ChevronDown, Check, UserCircle } from 'lucide-react';
 import { Language, User } from '../types';
 import { useTranslation } from '../context/LanguageContext';
-import { JurisdictionToggle } from './JurisdictionToggle';
 
 export type ActiveTab = 'landing' | 'chat' | 'product' | 'ipr' | 'tk' | 'research' | 'workspace' | 'admin' | 'profile';
 
@@ -43,19 +42,19 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+      <div className="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-10">
+        <div className="flex items-center justify-between h-20">
           {/* Logo & Brand: IP-SAKTI Sahayak */}
           <div
             id="brand-logo-btn"
             onClick={() => setActiveTab('landing')}
             className="flex items-center gap-3 cursor-pointer group select-none min-w-0 flex-shrink-0"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 flex items-center justify-center text-amber-300 shadow-md group-hover:scale-105 transition-transform flex-shrink-0">
-              <Shield className="w-5 h-5" />
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 flex items-center justify-center text-amber-300 shadow-md group-hover:scale-105 transition-transform flex-shrink-0">
+              <Shield className="w-[1.375rem] h-[1.375rem]" />
             </div>
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="font-serif font-bold text-lg tracking-tight text-slate-900 truncate">
+              <span className="font-serif font-bold text-xl tracking-tight text-slate-900 truncate">
                 {t('brand.name', 'IP-SAKTI')}
               </span>
               <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300/60 uppercase tracking-wide whitespace-nowrap">
@@ -65,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center space-x-1">
+          <nav className="hidden lg:flex items-center space-x-1.5">
             {navItems.map(item => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -74,13 +73,13 @@ export const Header: React.FC<HeaderProps> = ({
                   key={item.id}
                   id={`nav-${item.id}-btn`}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                     isActive
                       ? 'bg-slate-900 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-amber-300' : 'text-slate-500'}`} />
+                  <Icon className={`w-[1.125rem] h-[1.125rem] ${isActive ? 'text-amber-300' : 'text-slate-500'}`} />
                   <span>{item.label}</span>
                   {item.badge && (
                     <span className={`text-[10px] px-1 rounded font-semibold ${isActive ? 'bg-slate-800 text-amber-200' : 'bg-slate-100 text-slate-600'}`}>
@@ -92,13 +91,8 @@ export const Header: React.FC<HeaderProps> = ({
             })}
           </nav>
 
-          {/* Right Utilities: Jurisdiction Toggle, Language Selector, Admin & User Profile */}
+          {/* Right Utilities: Language Selector, Admin & User Profile */}
           <div className="flex items-center gap-2.5">
-            {/* Dual Toggle: Domestic (India) / International (Export) */}
-            <div className="hidden md:block">
-              <JurisdictionToggle />
-            </div>
-
             {/* Language Switcher */}
             <div className="relative">
               <button
@@ -184,13 +178,8 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Mobile Dual Toggle Row */}
-        <div className="md:hidden flex items-center justify-center py-2 border-t border-slate-100">
-          <JurisdictionToggle />
-        </div>
-
         {/* Mobile Sub-Navigation Bar */}
-        <div className="lg:hidden flex items-center justify-between overflow-x-auto py-2 border-t border-slate-100 no-scrollbar gap-1">
+        <div className="lg:hidden flex items-center justify-between overflow-x-auto py-2.5 border-t border-slate-100 no-scrollbar gap-1.5">
           {navItems.map(item => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -198,13 +187,13 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
                   isActive
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className="w-4 h-4" />
                 <span>{item.label}</span>
               </button>
             );
