@@ -1,9 +1,4 @@
-"""
-Gemini API embeddings with rate-limit protection and resume-safe batching.
-
-Uses gemini-embedding-001 with 768-dimensional output.
-"""
-
+"""Gemini embeddings with a conservative free-tier rate limiter."""
 from __future__ import annotations
 
 import time
@@ -11,20 +6,21 @@ from collections import deque
 
 from google import genai
 from google.genai import types
-from app.config import settings
 
+from app.config import settings
 
 EMBED_MODEL = "gemini-embedding-001"
 EMBED_DIM = 768
 
-# Gemini free tier allows 100 embedding requests/contents per minute.
-# Keep a safety margin so we don't hit the limit.
-_BATCH_SIZE = 80
-_MAX_EMBEDDINGS_PER_WINDOW = 90
+# Keep API batches small because legal chunks contain substantially
+# more tokens than simple test strings.
+_BATCH_SIZE = 10
+
+# Conservative request/content limiter.
+_MAX_EMBEDDINGS_PER_WINDOW = 60
 _WINDOW_SECONDS = 60.0
 
 _request_times: deque[float] = deque()
-
 _client: genai.Client | None = None
 
 
@@ -44,23 +40,16 @@ def _get_client() -> genai.Client:
 
 
 def _wait_for_rate_limit(num_embeddings: int) -> None:
-    """
-    Prevent exceeding the Gemini free-tier embedding request/content limit.
-
-    We track the number of embedding contents sent during the previous
-    60-second window and wait before sending another batch if necessary.
-    """
-
     while True:
         now = time.monotonic()
 
-        # Remove timestamps outside the current 60-second window.
-        while _request_times and now - _request_times[0] >= _WINDOW_SECONDS:
+        while (
+            _request_times
+            and now - _request_times[0] >= _WINDOW_SECONDS
+        ):
             _request_times.popleft()
 
-        used = len(_request_times)
-
-        if used + num_embeddings <= _MAX_EMBEDDINGS_PER_WINDOW:
+        if len(_request_times) + num_embeddings <= _MAX_EMBEDDINGS_PER_WINDOW:
             return
 
         wait_for = _WINDOW_SECONDS - (now - _request_times[0])
@@ -84,14 +73,14 @@ def _embed_batch(
     texts: list[str],
     task_type: str,
 ) -> list[list[float]]:
-
     if not texts:
         return []
 
     _wait_for_rate_limit(len(texts))
 
     print(
-        f"[embed] Gemini batch 1-{len(texts)} / {len(texts)}"
+        f"[embed] Gemini batch: "
+        f"{len(texts)} embeddings"
     )
 
     try:
@@ -105,32 +94,34 @@ def _embed_batch(
         )
 
     except Exception as exc:
-        # Do not blindly retry quota errors.
-        # The ingestion layer already saves progress after every
-        # successful batch, so the command can safely be run again.
-        if "429" in str(exc) or "RESOURCE_EXHAUSTED" in str(exc):
+        message = str(exc)
+
+        if "429" in message or "RESOURCE_EXHAUSTED" in message:
             raise RuntimeError(
                 "Gemini embedding quota/rate limit reached. "
-                "Wait for the quota window to reset and run "
+                "The current batch was not saved. "
+                "Wait for the quota to reset or use a project with "
+                "available Gemini Embedding quota, then run "
                 "`python scripts/ingest.py` again. "
                 "Previously completed batches are preserved."
             ) from exc
 
         raise
 
+    embeddings = [embedding.values for embedding in result.embeddings]
+
+    if len(embeddings) != len(texts):
+        raise RuntimeError(
+            f"Gemini returned {len(embeddings)} embeddings for "
+            f"{len(texts)} input texts."
+        )
+
     _record_embeddings(len(texts))
 
-    return [embedding.values for embedding in result.embeddings]
+    return embeddings
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
-    """
-    Embed documents in controlled batches.
-
-    The ingestion system saves each completed batch, so this function
-    only needs to successfully process the supplied texts.
-    """
-
     if not texts:
         return []
 
@@ -139,21 +130,27 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     for i in range(0, len(texts), _BATCH_SIZE):
         batch = texts[i : i + _BATCH_SIZE]
 
-        vectors = _embed_batch(
-            batch,
-            task_type="RETRIEVAL_DOCUMENT",
+        print(
+            f"[embed] Processing embeddings "
+            f"{i + 1}-{i + len(batch)} / {len(texts)}"
         )
 
-        out.extend(vectors)
+        out.extend(
+            _embed_batch(
+                batch,
+                task_type="RETRIEVAL_DOCUMENT",
+            )
+        )
+
+        # Small pause between batches to avoid sending many
+        # embedding requests back-to-back.
+        if i + _BATCH_SIZE < len(texts):
+            time.sleep(2)
 
     return out
 
 
 def embed_query(text: str) -> list[float]:
-    """
-    Embed a user search query.
-    """
-
     return _embed_batch(
         [text],
         task_type="RETRIEVAL_QUERY",

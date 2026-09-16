@@ -1,48 +1,23 @@
-"""
-Incremental and resume-safe legal-corpus ingestion.
+"""Incremental ingestion: extract -> chunk -> embed -> immediately persist.
 
-Pipeline:
-  documents -> extraction -> legal-aware chunks -> Gemini embeddings -> Qdrant
-  -> processed JSONL for BM25.
-
-Unchanged documents are never re-embedded. Changed documents are embedded in
-small batches and progress is persisted after every successful batch, so a
-quota error, network failure, or interrupted process can resume later.
+Each document is processed independently and each embedding batch is written to
+Qdrant before the next batch is requested. Progress is stored on disk so a Gemini
+quota failure or process restart resumes from the last successfully persisted batch.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
 from app.config import settings
-from app.embeddings import EMBED_DIM, _BATCH_SIZE, embed_texts
+from app.embeddings import embed_texts, get_embedding_dimension
 from app.ingestion.chunker import legal_aware_chunk
 from app.ingestion.extract import extract_text
 from app.ingestion.metadata import load_manifest, save_processed_documents
 from app.schemas import DocumentChunk, DocumentMetadata
 
 
-def _sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for block in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(block)
-    return h.hexdigest()
-
-
-def _load_json(path: Path) -> dict:
-    if not path.exists():
-        return {}
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-
-
-def _save_json(path: Path, data: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
+PROGRESS_FILE = settings.processed_dir / "ingestion_progress.json"
 
 
 def build_chunks_for_document(file_path: Path, meta: DocumentMetadata) -> list[DocumentChunk]:
@@ -57,6 +32,8 @@ def build_chunks_for_document(file_path: Path, meta: DocumentMetadata) -> list[D
     }.get(meta.document_type, "Section")
     raw_chunks = legal_aware_chunk(text, bare_label=bare_label)
 
+    # Deterministic IDs are essential: rerunning the same PDF overwrites the
+    # same Qdrant points instead of creating a second copy.
     return [
         DocumentChunk(
             chunk_id=f"{meta.id}-CHUNK-{i:04d}",
@@ -79,29 +56,58 @@ def build_chunks_for_document(file_path: Path, meta: DocumentMetadata) -> list[D
     ]
 
 
-def _load_processed_chunks() -> list[DocumentChunk]:
+def _load_progress() -> dict[str, int]:
+    if not PROGRESS_FILE.exists():
+        return {}
+    try:
+        data = json.loads(PROGRESS_FILE.read_text(encoding="utf-8"))
+        return {str(k): int(v) for k, v in data.items()}
+    except (json.JSONDecodeError, TypeError, ValueError):
+        print("[ingest] WARNING: invalid ingestion_progress.json; starting progress tracking again.")
+        return {}
+
+
+def _save_progress(progress: dict[str, int]) -> None:
+    PROGRESS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = PROGRESS_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(progress, indent=2), encoding="utf-8")
+    tmp.replace(PROGRESS_FILE)
+
+
+def _load_processed_chunks() -> dict[str, dict]:
     path = settings.processed_chunks_file
     if not path.exists():
-        return []
-    chunks: list[DocumentChunk] = []
+        return {}
+    result: dict[str, dict] = {}
     with path.open(encoding="utf-8") as f:
         for line in f:
             line = line.strip()
-            if line:
-                chunks.append(DocumentChunk(**json.loads(line)))
-    return chunks
+            if not line:
+                continue
+            try:
+                item = json.loads(line)
+                if item.get("chunk_id"):
+                    result[item["chunk_id"]] = item
+            except json.JSONDecodeError:
+                continue
+    return result
 
 
-def _persist_processed(
-    docs: list[DocumentMetadata],
-    chunks_by_doc: dict[str, list[DocumentChunk]],
-) -> None:
-    all_chunks = [c for doc in docs for c in chunks_by_doc.get(doc.id, [])]
-    settings.processed_dir.mkdir(parents=True, exist_ok=True)
-    with settings.processed_chunks_file.open("w", encoding="utf-8") as f:
-        for c in all_chunks:
-            f.write(c.model_dump_json() + "\n")
-    save_processed_documents(docs, settings.processed_documents_file)
+def _save_processed_chunks(chunks_by_id: dict[str, dict]) -> None:
+    path = settings.processed_chunks_file
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        for item in chunks_by_id.values():
+            f.write(json.dumps(item, ensure_ascii=False) + "\n")
+    tmp.replace(path)
+
+
+def _remove_document_chunks(chunks_by_id: dict[str, dict], document_id: str) -> None:
+    for chunk_id in [
+        cid for cid, item in chunks_by_id.items() if item.get("document_id") == document_id
+    ]:
+        del chunks_by_id[chunk_id]
 
 
 def run_ingestion(force: bool = False) -> tuple[list[DocumentMetadata], list[DocumentChunk]]:
@@ -109,125 +115,78 @@ def run_ingestion(force: bool = False) -> tuple[list[DocumentMetadata], list[Doc
 
     docs_dir = settings.documents_dir
     docs_dir.mkdir(parents=True, exist_ok=True)
+    settings.processed_dir.mkdir(parents=True, exist_ok=True)
+
     manifest = load_manifest(docs_dir)
-    previous_state = _load_json(settings.ingestion_state_file)
-    previous_chunks = _load_processed_chunks()
-    progress_path = settings.processed_dir / "embedding_progress.json"
-    progress = _load_json(progress_path)
+    progress = _load_progress()
+    processed_chunks = _load_processed_chunks()
+    index = VectorIndex(vector_size=get_embedding_dimension())
 
-    chunks_by_doc: dict[str, list[DocumentChunk]] = {}
-    for chunk in previous_chunks:
-        chunks_by_doc.setdefault(chunk.document_id, []).append(chunk)
-
-    index = VectorIndex(vector_size=EMBED_DIM)
     all_docs: list[DocumentMetadata] = []
-    new_state: dict[str, dict] = {}
+    all_chunks: list[DocumentChunk] = []
 
     for filename, meta in manifest.items():
         file_path = docs_dir / filename
         if not file_path.exists():
-            print(f"[ingest] WARNING: missing file: {filename} — skipping.")
-            continue
-
-        digest = _sha256(file_path)
-        old = previous_state.get(meta.id, {})
-        unchanged = (
-            not force
-            and old.get("filename") == filename
-            and old.get("sha256") == digest
-            and old.get("version") == meta.version
-            and bool(chunks_by_doc.get(meta.id))
-            and meta.id not in progress
-        )
-
-        if unchanged:
-            chunks = chunks_by_doc[meta.id]
-            meta.chunk_count = len(chunks)
-            meta.status = "Indexed"
-            all_docs.append(meta)
-            new_state[meta.id] = {
-                "filename": filename,
-                "sha256": digest,
-                "version": meta.version,
-                "chunk_count": len(chunks),
-            }
-            print(f"[ingest] SKIP unchanged: {filename}")
+            print(f"[ingest] WARNING: manifest references '{filename}' but the file is missing — skipping.")
             continue
 
         print(f"[ingest] Processing/resuming: {filename} -> {meta.id}")
         chunks = build_chunks_for_document(file_path, meta)
         meta.chunk_count = len(chunks)
-        meta.status = "Indexing"
 
-        old_progress = progress.get(meta.id, {})
-        can_resume = (
-            not force
-            and old_progress.get("filename") == filename
-            and old_progress.get("sha256") == digest
-            and old_progress.get("version") == meta.version
-        )
+        completed = 0 if force else min(progress.get(meta.id, 0), len(chunks))
+        if force:
+            _remove_document_chunks(processed_chunks, meta.id)
+            progress.pop(meta.id, None)
+            _save_processed_chunks(processed_chunks)
 
-        if not can_resume:
-            if index.collection_exists():
-                index.delete_document(meta.id)
-            old_progress = {
-                "filename": filename,
-                "sha256": digest,
-                "version": meta.version,
-                "completed_chunk_ids": [],
-            }
-            progress[meta.id] = old_progress
-            _save_json(progress_path, progress)
-            completed_ids: set[str] = set()
-        else:
-            completed_ids = set(old_progress.get("completed_chunk_ids", []))
-            print(f"[ingest] Resuming after {len(completed_ids)} completed chunks.")
+        if completed:
+            print(f"[ingest] Resuming after {completed} completed chunks.")
 
-        pending = [c for c in chunks if c.chunk_id not in completed_ids]
+        meta.status = "Processing" if completed < len(chunks) else "Indexed"
+        all_docs.append(meta)
 
-        for start in range(0, len(pending), _BATCH_SIZE):
-            batch = pending[start : start + _BATCH_SIZE]
+        while completed < len(chunks):
+            batch_end = min(completed + 80, len(chunks))
+            batch = chunks[completed:batch_end]
             print(
                 f"[ingest] Embedding {len(batch)} chunks "
-                f"({start + 1}-{min(start + len(batch), len(pending))} / {len(pending)} pending)"
+                f"({completed + 1}-{batch_end} / {len(chunks)} pending)"
             )
+
+            # 1. Generate vectors. Nothing is marked complete yet.
             vectors = embed_texts([c.chunk_text for c in batch])
             if len(vectors) != len(batch):
-                raise RuntimeError("Embedding count does not match chunk count; progress not advanced.")
+                raise RuntimeError(
+                    f"Embedding count mismatch for {meta.id}: "
+                    f"got {len(vectors)} vectors for {len(batch)} chunks."
+                )
 
+            # 2. Persist this batch immediately to Qdrant.
             index.upsert(batch, vectors)
 
-            completed_ids.update(c.chunk_id for c in batch)
-            old_progress["completed_chunk_ids"] = sorted(completed_ids)
-            _save_json(progress_path, progress)
-            print(f"[ingest] Saved progress: {len(completed_ids)}/{len(chunks)} chunks.")
+            # 3. Persist this batch to the BM25 source file immediately.
+            for chunk in batch:
+                processed_chunks[chunk.chunk_id] = chunk.model_dump()
+            _save_processed_chunks(processed_chunks)
 
-        # The document is fully indexed only after every batch succeeded.
+            # 4. Only now advance the progress marker.
+            completed = batch_end
+            progress[meta.id] = completed
+            _save_progress(progress)
+            print(f"[ingest] Saved progress: {completed}/{len(chunks)} chunks.")
+
         meta.status = "Indexed"
-        chunks_by_doc[meta.id] = chunks
-        all_docs.append(meta)
-        new_state[meta.id] = {
-            "filename": filename,
-            "sha256": digest,
-            "version": meta.version,
-            "chunk_count": len(chunks),
-        }
 
-        progress.pop(meta.id, None)
-        _save_json(progress_path, progress)
-        _persist_processed(all_docs, chunks_by_doc)
+        # Save document metadata after this PDF is completely indexed.
+        save_processed_documents(all_docs, settings.processed_documents_file)
+        print(f"[ingest] Completed: {filename} ({len(chunks)} chunks).")
 
-    # Remove documents no longer present in the manifest.
-    active_ids = {d.id for d in all_docs}
-    for old_id in set(chunks_by_doc) - active_ids:
-        if index.collection_exists():
-            index.delete_document(old_id)
-        chunks_by_doc.pop(old_id, None)
-        new_state.pop(old_id, None)
+        all_chunks.extend(chunks)
 
-    _persist_processed(all_docs, chunks_by_doc)
-    _save_json(settings.ingestion_state_file, new_state)
-
-    all_chunks = [c for doc in all_docs for c in chunks_by_doc.get(doc.id, [])]
-    print(f"[ingest] Done. {len(all_docs)} documents, {len(all_chunks)} chunks.")
+    # Re-save the complete metadata list at the end as well.
+    save_processed_documents(all_docs, settings.processed_documents_file)
+    total_chunks = len(processed_chunks)
+    print(f"[ingest] Done. {len(all_docs)} documents processed; {total_chunks} persisted chunks available.")
     return all_docs, all_chunks
