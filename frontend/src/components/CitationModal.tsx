@@ -33,32 +33,32 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
   const officialUrl = citation.url || sectionLinkInfo.url;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
       <div
         id="citation-inspector-modal"
         className="relative w-full max-w-2xl max-h-[85vh] bg-white rounded-xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 bg-slate-50">
           <div className="flex items-center gap-2">
             <span className="flex items-center justify-center w-6 h-6 rounded-md bg-emerald-700 text-white font-semibold text-xs">
               [{citation.index}]
             </span>
-            <h3 className="font-semibold text-slate-900 text-base line-clamp-1">
+            <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-1">
               {citation.title}
             </h3>
           </div>
           <button
             id="close-citation-modal-btn"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5">
           {/* Metadata chips & Official Link Action */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2 text-xs">
@@ -91,12 +91,12 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
           </div>
 
           {/* Cited Passage */}
-          <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3.5 sm:p-4">
             <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
               <FileText className="w-4 h-4 text-emerald-700" />
               Retrieved Statutory Passage
             </div>
-            <div className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap font-serif">
+            <div className="text-slate-800 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-serif">
               "{citation.excerpt}"
             </div>
           </div>
@@ -113,10 +113,10 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
                 <BookOpen className="w-4 h-4 text-slate-500" />
                 Document Metadata & Statutory Context
               </h4>
-              <p className="text-sm text-slate-600 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                 {docDetails.metadata.summary}
               </p>
-              <div className="grid grid-cols-2 gap-3 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200/80">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200/80">
                 <div>
                   <span className="text-slate-400 block">Jurisdiction:</span>
                   <span className="font-medium text-slate-800">{docDetails.metadata.jurisdiction}</span>
@@ -139,14 +139,14 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+        <div className="px-4 sm:px-6 py-3 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
           <span className="flex items-center gap-1">
             <ShieldCheck className="w-4 h-4 text-emerald-700" />
             Verified Authoritative Repository Chunk
           </span>
           <button
             onClick={onClose}
-            className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md font-medium transition-colors"
+            className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md font-medium transition-colors ml-auto sm:ml-0"
           >
             Dismiss
           </button>

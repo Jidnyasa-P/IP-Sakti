@@ -196,10 +196,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-slate-50 py-6 sm:py-10 px-3 sm:px-6">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-[calc(100vh-4rem)] bg-slate-50 py-4 sm:py-8 md:py-10 px-3 sm:px-6">
+      <div className="max-w-4xl mx-auto space-y-5 sm:space-y-6">
         {/* Top Navigation & Breadcrumbs */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
             id="profile-back-btn"
@@ -236,7 +236,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
         {/* Main Profile Header Card */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
           {/* Subtle Institutional Surface Header */}
-          <div className="bg-slate-100/70 border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-slate-100/70 border-b border-slate-200 px-4 sm:px-6 py-3.5 sm:py-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <span className="text-[11px] font-semibold tracking-wider uppercase text-slate-500">
                 Statutory Researcher Identity
@@ -286,8 +286,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
           </div>
 
           {/* Profile Identity & Photo Row */}
-          <div className="p-6 sm:p-8">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 pb-6 border-b border-slate-100">
+          <div className="p-4 sm:p-6 md:p-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 pb-6 border-b border-slate-100">
               {/* Profile Photo with Camera / Edit Overlay */}
               <div className="relative group shrink-0">
                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-br from-emerald-800 to-teal-950 border-2 border-white shadow-md flex items-center justify-center overflow-hidden text-amber-200 font-bold text-3xl select-none">

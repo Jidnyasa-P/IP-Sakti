@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, FlaskConical, Compass, BookOpen, ArrowRight, ShieldCheck, LogIn, UserPlus, CheckCircle2 } from 'lucide-react';
+import { Sparkles, FlaskConical, Compass, BookOpen, ArrowRight, ShieldCheck, LogIn, UserPlus, CheckCircle2, HelpCircle } from 'lucide-react';
 import { ActiveTab } from './Header';
 import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
@@ -7,9 +7,10 @@ import { useAuth } from '../context/AuthContext';
 
 interface LandingViewProps {
   setActiveTab: (tab: ActiveTab) => void;
+  onOpenWalkthrough?: () => void;
 }
 
-export const LandingView: React.FC<LandingViewProps> = ({ setActiveTab }) => {
+export const LandingView: React.FC<LandingViewProps> = ({ setActiveTab, onOpenWalkthrough }) => {
   const { t } = useTranslation();
   const { currentUser, isLoggedIn } = useAuth();
 
@@ -107,6 +108,18 @@ export const LandingView: React.FC<LandingViewProps> = ({ setActiveTab }) => {
                 <FlaskConical className="w-4 h-4 text-emerald-800" />
                 <span>{t('landing.btn_analyze', 'Analyze a Product')}</span>
               </button>
+
+              {onOpenWalkthrough && (
+                <button
+                  type="button"
+                  id="hero-walkthrough-btn"
+                  onClick={onOpenWalkthrough}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-300 font-medium text-xs sm:text-sm transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <HelpCircle className="w-4 h-4 text-emerald-800" />
+                  <span>How to Use / Walkthrough</span>
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -130,6 +143,18 @@ export const LandingView: React.FC<LandingViewProps> = ({ setActiveTab }) => {
                 <UserPlus className="w-4 h-4 text-emerald-800" />
                 <span>Create New Profile</span>
               </button>
+
+              {onOpenWalkthrough && (
+                <button
+                  type="button"
+                  id="hero-walkthrough-btn-guest"
+                  onClick={onOpenWalkthrough}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-300 font-medium text-xs sm:text-sm transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <HelpCircle className="w-4 h-4 text-emerald-800" />
+                  <span>How to Use / Guide</span>
+                </button>
+              )}
             </>
           )}
         </div>

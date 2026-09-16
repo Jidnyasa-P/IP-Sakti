@@ -179,8 +179,8 @@ export const AdminView: React.FC = () => {
       )}
 
       {/* Authoritative Documents Table */}
-      <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
-        <div className="flex items-center justify-between">
+      <div className="p-4 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-base font-bold text-slate-900 font-serif">
             Authoritative Legal Repositories ({documents.length})
           </h3>
@@ -243,7 +243,7 @@ export const AdminView: React.FC = () => {
 
       {/* Recent RAG Logs Table */}
       {telemetry && telemetry.recent_logs && telemetry.recent_logs.length > 0 && (
-        <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+        <div className="p-4 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
           <h3 className="text-base font-bold text-slate-900 font-serif">
             Recent Grounded Query Logs
           </h3>
@@ -286,8 +286,8 @@ export const AdminView: React.FC = () => {
 
       {/* Add Document Ingestion Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 space-y-5 animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 sm:p-6 space-y-4 sm:space-y-5 animate-in fade-in max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base font-serif">
                 Ingest New Authoritative Document
@@ -313,7 +313,7 @@ export const AdminView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="font-semibold text-slate-700">Authority</label>
                   <input

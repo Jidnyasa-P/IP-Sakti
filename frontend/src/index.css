@@ -2,9 +2,29 @@
 
 @variant dark (&:is(.dark, .dark *));
 
-/* Smooth transition for theme change */
+/* Scaled Typography System (115% intended scale) */
 html {
+  font-size: 115%; /* 1rem = 18.4px (115% of standard 16px root font size) */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Scale arbitrary pixel utilities proportionally to preserve typographic hierarchy at 115% */
+[class*="text-[9px]"] {
+  font-size: calc(9px * 1.15) !important; /* Scaled from 9px -> 10.35px */
+}
+[class*="text-[10px]"] {
+  font-size: calc(10px * 1.15) !important; /* Scaled from 10px -> 11.5px */
+}
+[class*="text-[11px]"] {
+  font-size: calc(11px * 1.15) !important; /* Scaled from 11px -> 12.65px */
+}
+[class*="text-[12px]"] {
+  font-size: calc(12px * 1.15) !important; /* Scaled from 12px -> 13.8px */
+}
+[class*="text-[13px]"] {
+  font-size: calc(13px * 1.15) !important; /* Scaled from 13px -> 14.95px */
 }
 
 /* ==========================================================================

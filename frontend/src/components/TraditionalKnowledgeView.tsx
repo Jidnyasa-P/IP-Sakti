@@ -152,7 +152,7 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
       </div>
 
       {/* Query Form */}
-      <div className="p-6 sm:p-8 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-6">
+      <div id="tk-abs-form-card" className="p-4 sm:p-6 md:p-8 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-6">
         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-3 flex items-center gap-2">
           <Leaf className="w-4 h-4 text-emerald-700" />
           Biological Resource & Traditional Knowledge Parameters
@@ -270,7 +270,7 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
               </h2>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 id="export-tk-pdf-btn"
@@ -293,7 +293,7 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
           </div>
 
           {/* Section 1: Traditional Knowledge Overview */}
-          <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+          <div className="p-4 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
             <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
               Traditional Knowledge Overview
             </span>
@@ -306,7 +306,7 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
           </div>
 
           {/* Section 2: ABS Considerations & National Biodiversity Authority */}
-          <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+          <div className="p-4 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
               <Shield className="w-4 h-4 text-emerald-700" />
               Access & Benefit Sharing (ABS) Statutory Mandates
@@ -352,7 +352,7 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
           </div>
 
           {/* Section 3: Potential IP Implications */}
-          <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+          <div className="p-4 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
               IP Implications & Patent Strategy
             </h3>
@@ -367,7 +367,7 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
           </div>
 
           {/* Section 4: Recommended Next Steps */}
-          <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+          <div className="p-4 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
               Compliance & Action Roadmap
             </h3>
@@ -382,7 +382,7 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
 
           {/* Section 5: Sources - 1 Option per section to open working link */}
           {result.sources && result.sources.length > 0 && (
-            <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+            <div className="p-4 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
               <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                 Authoritative Legal Provisions
               </h4>

@@ -94,8 +94,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ setActiveTab, targetTabAft
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 bg-slate-50 transition-colors">
-      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8 space-y-6 transition-colors">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-3 sm:p-6 bg-slate-50 transition-colors">
+      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 md:p-8 space-y-5 sm:space-y-6 transition-colors">
         {/* Header Branding */}
         <div className="text-center space-y-2">
           <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 mx-auto flex items-center justify-center shadow-xs">
@@ -275,7 +275,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ setActiveTab, targetTabAft
               className="w-full p-2.5 rounded-xl bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-300/80 text-left transition-colors flex items-center justify-between group cursor-pointer"
             >
               <div className="min-w-0">
-                <div className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                <div className="text-xs font-bold text-emerald-950 flex flex-wrap items-center gap-1.5">
                   <span>⚖️ Dr. Aarav Sharma</span>
                   <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-emerald-700 text-white">Expert (Legal Advisor)</span>
                   <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-amber-200 text-amber-950 border border-amber-300">Proof Included</span>
@@ -284,10 +284,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ setActiveTab, targetTabAft
                   aarav.sharma@ayush-research.in • Verified Patent Agent IN/PA/3842 attached
                 </div>
               </div>
-              <ArrowRight className="w-3.5 h-3.5 text-emerald-700 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              <ArrowRight className="w-3.5 h-3.5 text-emerald-700 group-hover:translate-x-0.5 transition-transform shrink-0 ml-2" />
             </button>
 
-            <div className="grid grid-cols-2 gap-1.5 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
               <button
                 type="button"
                 onClick={() => handleQuickLogin('radhika.sen@ayurveda-clinic.in', 'Practitioner')}

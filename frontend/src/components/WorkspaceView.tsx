@@ -102,6 +102,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
 
         <button
           type="button"
+          id="workspace-export-dossier-btn"
           onClick={exportDossierJSON}
           className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-xl shadow-2xs flex items-center gap-1.5 transition-colors"
         >
@@ -111,7 +112,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
       </div>
 
       {/* Workspace Navigation Tabs */}
-      <div className="flex border-b border-slate-200 gap-6 text-sm font-medium">
+      <div id="workspace-subtabs-container" className="flex border-b border-slate-200 gap-4 sm:gap-6 text-xs sm:text-sm font-medium overflow-x-auto whitespace-nowrap pb-px">
         <button
           type="button"
           onClick={() => setActiveSubTab('conversations')}

@@ -28,6 +28,8 @@ import { VoiceInputButton } from './VoiceInputButton';
 import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
 import { getSectionLink } from '../utils/sectionLinks';
+import { evaluateQueryJurisdiction, JurisdictionCheckResult } from '../utils/jurisdictionValidation';
+import { evaluateQueryRelevance, QueryRelevanceResult } from '../utils/queryRelevance';
 
 interface ChatViewProps {
   language: Language;
@@ -293,6 +295,15 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [searchHistory, setSearchHistory] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
+  const [jurisdictionWarning, setJurisdictionWarning] = useState<{
+    query: string;
+    matchedKeywords: string[];
+    explanation: string;
+  } | null>(null);
+  const [relevanceWarning, setRelevanceWarning] = useState<{
+    query: string;
+    reason: string;
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -379,11 +390,22 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
     setMessages(targetConv?.messages || []);
     setStreamingText('');
     setInputValue('');
+    setJurisdictionWarning(null);
 
     try {
       localStorage.setItem(savedKey, targetId);
       localStorage.setItem(LOCAL_STORAGE_ACTIVE_KEY, targetId);
     } catch (e) {}
+  };
+
+  // Helper to immediately switch to Indian jurisdiction and automatically execute query
+  const handleSwitchToIndiaAndSend = (pendingQuery: string) => {
+    setJurisdictionWarning(null);
+    handleToggleJurisdiction(false);
+    // Send in next tick after jurisdiction state and conversation swap have processed
+    setTimeout(() => {
+      handleSend(pendingQuery, { forceSend: true });
+    }, 50);
   };
 
   // Sync with backend on mount
@@ -552,10 +574,41 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
   }, [messages, streamingText]);
 
   // Send query with streaming response and robust session storage
-  const handleSend = async (queryText?: string) => {
+  const handleSend = async (queryText?: string, options?: { forceSend?: boolean }) => {
     const textToSend = queryText || inputValue;
     if (!textToSend.trim() || loading) return;
 
+    // 1. RULE: Relevance Validation Check
+    // Prevent clearly unrelated questions (e.g., general programming, pure math, entertainment, general shopping)
+    // from being submitted to the specialized IP-SAKTI Sahayak research engine.
+    if (!options?.forceSend) {
+      const relevanceCheck = evaluateQueryRelevance(textToSend);
+      if (!relevanceCheck.isRelevant) {
+        setRelevanceWarning({
+          query: textToSend,
+          reason: relevanceCheck.reason || 'Query is outside the scope of IP-SAKTI Sahayak.'
+        });
+        return;
+      }
+    }
+
+    // 2. RULE: When International mode is selected, it must NOT answer an India/state-specific query as international.
+    // Detect India-specific queries when in International mode and prompt user to switch to India/Domestic mode.
+    if (isInternational && !options?.forceSend) {
+      const check = evaluateQueryJurisdiction(textToSend);
+      if (check.isIndiaSpecific) {
+        setJurisdictionWarning({
+          query: textToSend,
+          matchedKeywords: check.matchedKeywords,
+          explanation: check.explanation,
+        });
+        return;
+      }
+    }
+
+    // Clear any active warnings on valid submission
+    setRelevanceWarning(null);
+    setJurisdictionWarning(null);
     setInputValue('');
     setLoading(true);
     setStreamingText('');
@@ -1487,8 +1540,158 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
         </div>
 
         {/* Input Bar Section */}
-        <div className="p-3 sm:p-4 border-t border-slate-200 bg-white space-y-2">
+        <div className="p-3 sm:p-4 border-t border-slate-200 bg-white space-y-2.5">
+          {/* Query Relevance Scope Warning Banner */}
+          {relevanceWarning && (
+            <div
+              id="query-relevance-warning-banner"
+              className="rounded-xl border border-sky-300 bg-sky-50/95 p-3 sm:p-3.5 shadow-sm text-slate-800 animate-in fade-in slide-in-from-bottom-2 duration-200"
+            >
+              <div className="flex items-start gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-sky-100 border border-sky-300 flex items-center justify-center text-sky-800 shrink-0 mt-0.5">
+                  <Info className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-xs font-bold text-sky-950 flex items-center gap-1.5">
+                      <span>Out of Research Scope</span>
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setRelevanceWarning(null)}
+                      className="text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer transition-colors"
+                      title="Dismiss notice"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-slate-700 leading-relaxed font-normal">
+                    {relevanceWarning.reason}
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[10px] uppercase font-semibold tracking-wider text-sky-900 mr-1">
+                      Intended Research Scope:
+                    </span>
+                    <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-md bg-white text-sky-900 border border-sky-200 font-medium">
+                      🌿 Ayurveda & AYUSH
+                    </span>
+                    <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-md bg-white text-sky-900 border border-sky-200 font-medium">
+                      📜 Traditional Knowledge & TKDL
+                    </span>
+                    <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-md bg-white text-sky-900 border border-sky-200 font-medium">
+                      ⚖️ Patents & IP Rights
+                    </span>
+                    <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-md bg-white text-sky-900 border border-sky-200 font-medium">
+                      🧬 Biodiversity & ABS (NBA)
+                    </span>
+                    <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-md bg-white text-sky-900 border border-sky-200 font-medium">
+                      📋 Schedule T GMP & Licensing
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1.5">
+                    <button
+                      type="button"
+                      id="btn-edit-relevance-query"
+                      onClick={() => {
+                        setInputValue(relevanceWarning.query);
+                        setRelevanceWarning(null);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg border border-sky-300 bg-white hover:bg-sky-50 text-sky-900 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                    >
+                      Refine Query for IP-SAKTI
+                    </button>
+                    <button
+                      type="button"
+                      id="btn-dismiss-relevance"
+                      onClick={() => setRelevanceWarning(null)}
+                      className="px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 text-xs font-medium transition-colors cursor-pointer"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Jurisdiction Mismatch Alert Banner */}
+          {jurisdictionWarning && (
+            <div
+              id="jurisdiction-mode-mismatch-banner"
+              className="rounded-xl border border-amber-300 bg-amber-50/95 p-3 sm:p-3.5 shadow-sm text-slate-800 animate-in fade-in slide-in-from-bottom-2 duration-200"
+            >
+              <div className="flex items-start gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 shrink-0 mt-0.5">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                      <span>India / Domestic Query Detected in International Mode</span>
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setJurisdictionWarning(null)}
+                      className="text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer transition-colors"
+                      title="Dismiss warning"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-slate-700 leading-relaxed font-normal">
+                    {jurisdictionWarning.explanation} International Mode synthesizes global treaties (PCT, USPTO, EPO, WIPO 2024 Treaty, Nagoya Protocol) and will not correctly process India-specific statutory or state laws.
+                  </p>
+
+                  {jurisdictionWarning.matchedKeywords.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                      <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-500 mr-1">
+                        Detected:
+                      </span>
+                      {jurisdictionWarning.matchedKeywords.map((tag, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-medium"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1.5">
+                    <button
+                      type="button"
+                      id="btn-switch-to-india-mode"
+                      onClick={() => handleSwitchToIndiaAndSend(jurisdictionWarning.query)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <span>🇮🇳 Switch to India / Domestic Mode & Submit</span>
+                      <CornerDownRight className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      type="button"
+                      id="btn-dismiss-jurisdiction-warning"
+                      onClick={() => {
+                        setInputValue(jurisdictionWarning.query);
+                        setJurisdictionWarning(null);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
+                    >
+                      Edit Query
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <form
+            id="sahayak-chat-form-container"
             onSubmit={(e) => {
               e.preventDefault();
               handleSend();

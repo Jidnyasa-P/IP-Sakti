@@ -19,7 +19,8 @@ import {
   Scale,
   Search,
   Sun,
-  Moon
+  Moon,
+  HelpCircle
 } from 'lucide-react';
 import { Language, UserRole, normalizeRole, SUPPORTED_LANGUAGES, LANGUAGES_MAP } from '../types';
 import { useTranslation } from '../context/LanguageContext';
@@ -35,6 +36,8 @@ interface HeaderProps {
   language: Language;
   setLanguage: (lang: Language) => void;
   userRole?: UserRole;
+  onOpenWalkthrough?: () => void;
+  isTourActive?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -42,7 +45,9 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveTab,
   language,
   setLanguage,
-  userRole = 'EXPERT'
+  userRole = 'EXPERT',
+  onOpenWalkthrough,
+  isTourActive = false
 }) => {
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [langSearchTerm, setLangSearchTerm] = useState('');
@@ -97,23 +102,23 @@ export const Header: React.FC<HeaderProps> = ({
     <>
       {/* Primary Top Header */}
       <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs transition-all">
-        <div className="w-full px-3 sm:px-5 lg:px-6">
-          <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
+        <div className="w-full px-3 sm:px-4 lg:px-4 xl:px-6">
+          <div className="flex flex-wrap items-center justify-between min-h-[3.5rem] sm:min-h-[4rem] h-auto py-1 sm:py-1.5 gap-y-1.5 gap-x-2">
             {/* Logo & Brand */}
             <div
               id="brand-logo-btn"
               onClick={() => handleNavClick(isExpert ? 'expert' : 'landing')}
-              className="flex items-center gap-2 sm:gap-3 cursor-pointer group select-none min-w-0 shrink-0"
+              className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none min-w-0 shrink-0 order-1"
             >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 flex items-center justify-center text-amber-300 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
-                <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
+              <div className="w-8 h-8 sm:w-9 sm:h-9 min-w-[2rem] sm:min-w-[2.25rem] aspect-square rounded-lg sm:rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 flex items-center justify-center text-amber-300 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                <Shield className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-serif font-semibold text-lg sm:text-xl tracking-tight text-slate-900 leading-none truncate">
+              <div className="min-w-0 flex items-center">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="font-serif font-semibold text-base sm:text-lg xl:text-xl tracking-tight text-slate-900 leading-none whitespace-nowrap">
                     {t('brand.name', 'IP-SAKTI')}
                   </span>
-                  <span className="hidden sm:inline-block text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300 uppercase tracking-wider shrink-0">
+                  <span className="hidden xl:inline-block text-[11px] font-semibold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300 uppercase tracking-wider shrink-0 whitespace-nowrap leading-tight">
                     {isExpert ? 'Legal Advisor Console' : t('brand.badge', 'Sahayak')}
                   </span>
                 </div>
@@ -121,8 +126,8 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Desktop Navigation Tabs */}
-            {isLoggedIn && (
-              <nav className="hidden lg:flex items-center space-x-1 xl:space-x-1.5">
+            {(isLoggedIn || isTourActive) && (
+              <nav className="hidden lg:flex flex-wrap items-center justify-center gap-1 xl:gap-1.5 order-3 2xl:order-2 w-full 2xl:w-auto mt-0.5 2xl:mt-0 pt-1.5 2xl:pt-0 border-t 2xl:border-t-0 border-slate-100 dark:border-slate-800 shrink-0">
                 {navItems.map(item => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
@@ -131,16 +136,16 @@ export const Header: React.FC<HeaderProps> = ({
                       key={item.id}
                       id={`nav-${item.id}-btn`}
                       onClick={() => handleNavClick(item.id)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                      className={`flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1.5 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-all shrink-0 ${
                         isActive
                           ? 'bg-slate-900 text-white shadow-2xs'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                       }`}
                     >
-                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-amber-300' : 'text-slate-500'}`} />
+                      <Icon className={`w-3.5 h-3.5 xl:w-4 xl:h-4 shrink-0 ${isActive ? 'text-amber-300' : 'text-slate-500'}`} />
                       <span className="whitespace-nowrap">{item.label}</span>
                       {item.badge && (
-                        <span className={`text-[10px] px-1.5 py-0.2 rounded font-medium uppercase tracking-wider ${isActive ? 'bg-slate-800 text-amber-200 border border-amber-400/30' : 'bg-emerald-100 text-emerald-800'}`}>
+                        <span className={`hidden xl:inline-block text-[10px] px-1.5 py-0.2 rounded font-medium uppercase tracking-wider ${isActive ? 'bg-slate-800 text-amber-200 border border-amber-400/30' : 'bg-emerald-100 text-emerald-800'}`}>
                           {item.badge}
                         </span>
                       )}
@@ -151,27 +156,28 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             {/* Right Utilities: Language, Admin, Role Badge & Mobile Menu Button */}
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 order-2 2xl:order-3">
               {/* Language Switcher */}
               <div className="relative">
                 <button
                   type="button"
                   id="language-selector-btn"
                   onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-                  className={`flex items-center gap-1 sm:gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 xl:px-3 xl:py-1.5 rounded-lg border text-xs font-medium transition-all shrink-0 ${
                     language !== 'en'
                       ? 'border-emerald-300 bg-emerald-50/80 text-emerald-900 font-semibold shadow-2xs'
                       : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                   }`}
                   title="Switch Language / भाषा बदलें"
                 >
-                  <Globe className={`w-4 h-4 sm:w-4.5 sm:h-4.5 ${language !== 'en' ? 'text-emerald-700' : 'text-slate-500'}`} />
-                  <span className="font-semibold">{currentLang.native}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:inline-block" />
+                  <Globe className={`w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 ${language !== 'en' ? 'text-emerald-700' : 'text-slate-500'}`} />
+                  <span className="font-semibold hidden xl:inline">{currentLang.native}</span>
+                  <span className="font-semibold inline xl:hidden uppercase">{currentLang.code}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden xl:inline-block shrink-0" />
                 </button>
 
                 {langDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-1">
+                  <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-1">
                     <div className="px-3 pb-2 border-b border-slate-100">
                       <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
                         22 Eighth Schedule Languages / भाषा
@@ -227,7 +233,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={toggleTheme}
                 aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
                 title={isDark ? 'Switch to Light Mode / लाइट मोड चालू करें' : 'Switch to Dark Mode / डार्क मोड चालू करें'}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer shadow-2xs select-none ${
+                className={`flex items-center gap-1.5 px-2 py-1.5 xl:px-2.5 xl:py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer shadow-2xs select-none shrink-0 ${
                   isDark
                     ? 'border-amber-400/40 bg-slate-800 text-amber-300 hover:bg-slate-750 hover:border-amber-400 focus:ring-2 focus:ring-amber-400/50'
                     : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-300 focus:ring-2 focus:ring-emerald-600/30'
@@ -236,15 +242,29 @@ export const Header: React.FC<HeaderProps> = ({
                 {isDark ? (
                   <>
                     <Sun className="w-4 h-4 text-amber-400 shrink-0 transition-transform duration-300 hover:rotate-45" />
-                    <span className="hidden sm:inline font-semibold">Light</span>
+                    <span className="hidden 2xl:inline font-semibold">Light</span>
                   </>
                 ) : (
                   <>
                     <Moon className="w-4 h-4 text-slate-600 shrink-0 transition-transform duration-300 hover:-rotate-12" />
-                    <span className="hidden sm:inline font-semibold">Dark</span>
+                    <span className="hidden 2xl:inline font-semibold">Dark</span>
                   </>
                 )}
               </button>
+
+              {/* How to Use / Walkthrough Button (Desktop/Tablet) */}
+              {onOpenWalkthrough && (
+                <button
+                  type="button"
+                  id="header-walkthrough-btn"
+                  onClick={onOpenWalkthrough}
+                  title="How to Use IP-SAKTI Sahayak / उपयोग मार्गदर्शिका"
+                  className="flex items-center gap-1.5 px-2 py-1.5 xl:px-2.5 xl:py-1.5 rounded-lg border border-emerald-300/80 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-950 font-medium text-xs transition-all cursor-pointer shadow-2xs shrink-0 select-none"
+                >
+                  <HelpCircle className="w-4 h-4 text-emerald-800 shrink-0" />
+                  <span className="hidden xl:inline font-semibold whitespace-nowrap">How to Use</span>
+                </button>
+              )}
 
               {/* Admin Button (Desktop/Tablet) - Hidden for Expert */}
               {isLoggedIn && !isExpert && currentUser?.role === 'ADMIN' && (
@@ -253,54 +273,54 @@ export const Header: React.FC<HeaderProps> = ({
                   id="admin-nav-btn"
                   onClick={() => handleNavClick('admin')}
                   title={t('nav.admin', 'Admin & Telemetry')}
-                  className={`p-2 sm:p-2.5 rounded-xl transition-colors border ${
+                  className={`p-1.5 xl:p-2 rounded-xl transition-colors border shrink-0 ${
                     activeTab === 'admin'
                       ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-slate-200'
                   }`}
                 >
-                  <Settings className="w-4.5 h-4.5" />
+                  <Settings className="w-4 h-4 xl:w-4.5 xl:h-4.5" />
                 </button>
               )}
 
               {/* User Profile / Auth Button (Desktop) */}
               {isLoggedIn && currentUser ? (
-                <div className="hidden md:flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                <div className="hidden md:flex items-center gap-1.5 pl-1.5 xl:pl-2 border-l border-slate-200 shrink-0">
                   <button
                     type="button"
                     id="user-profile-header-btn"
                     onClick={() => handleNavClick('profile')}
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-all ${
+                    className={`flex items-center gap-1.5 xl:gap-2 px-2 xl:px-2.5 py-1.5 rounded-xl border transition-all shrink-0 ${
                       activeTab === 'profile'
                         ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-semibold ring-1 ring-emerald-700 shadow-2xs'
                         : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                     }`}
                     title="View Account Profile"
                   >
-                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 flex items-center justify-center font-bold text-xs overflow-hidden">
+                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 flex items-center justify-center font-bold text-xs overflow-hidden shrink-0">
                       {currentUser.photo_url ? (
                         <img src={currentUser.photo_url} alt={currentUser.name} className="w-full h-full object-cover" />
                       ) : (
                         <span>{currentUser.name.charAt(0).toUpperCase()}</span>
                       )}
                     </div>
-                    <div className="text-left text-xs leading-tight">
-                      <div className="font-semibold text-slate-900 truncate max-w-[110px]">
+                    <div className="text-left text-xs leading-tight min-w-0">
+                      <div className="font-semibold text-slate-900 truncate max-w-[65px] lg:max-w-[85px] xl:max-w-[110px]">
                         {currentUser.name}
                       </div>
                     </div>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200">
+                    <span className="hidden 2xl:inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200 shrink-0">
                       {normalizeRole(currentUser.role)}
                     </span>
                   </button>
                 </div>
               ) : (
-                <div className="hidden md:flex items-center gap-2 pl-2 border-l border-slate-200">
+                <div className="hidden md:flex items-center gap-1.5 xl:gap-2 pl-1.5 xl:pl-2 border-l border-slate-200 shrink-0">
                   <button
                     type="button"
                     id="header-login-btn"
                     onClick={() => handleNavClick('login')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                    className={`flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shrink-0 ${
                       activeTab === 'login'
                         ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
                         : 'border-slate-300 hover:bg-slate-100 text-slate-700'
@@ -313,7 +333,7 @@ export const Header: React.FC<HeaderProps> = ({
                     type="button"
                     id="header-register-btn"
                     onClick={() => handleNavClick('register')}
-                    className={`flex items-center gap-1 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                    className={`flex items-center gap-1 px-2.5 xl:px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shrink-0 ${
                       activeTab === 'register'
                         ? 'bg-emerald-800 text-white border-emerald-800 shadow-2xs'
                         : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100'
@@ -324,12 +344,12 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               )}
 
-              {/* Prominent Mobile Hamburger Menu Button (Guaranteed visible on mobile) */}
+              {/* Prominent Mobile Hamburger Menu Button (Guaranteed visible on mobile and compact screens) */}
               <button
                 type="button"
                 id="mobile-menu-toggle-btn"
                 onClick={() => setMobileMenuOpen(true)}
-                className="lg:hidden p-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center justify-center shadow-xs"
+                className="lg:hidden p-2 sm:p-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center justify-center shadow-xs shrink-0"
                 aria-label="Open Navigation Menu"
               >
                 <Menu className="w-5 h-5" />
@@ -351,19 +371,19 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Drawer Content */}
           <div
             id="mobile-nav-drawer"
-            className="fixed inset-y-0 right-0 w-[85%] max-w-sm bg-white shadow-2xl z-50 flex flex-col p-5 overflow-y-auto animate-in slide-in-from-right duration-200"
+            className="fixed inset-y-0 right-0 w-[85%] max-w-xs sm:max-w-sm bg-white shadow-2xl z-50 flex flex-col p-4 sm:p-5 overflow-y-auto animate-in slide-in-from-right duration-200"
           >
             {/* Drawer Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-800 text-amber-300 flex items-center justify-center">
-                  <Shield className="w-4.5 h-4.5" />
+                <div className="w-8 h-8 min-w-[2rem] aspect-square rounded-lg bg-emerald-800 text-amber-300 flex items-center justify-center shrink-0 shadow-2xs">
+                  <Shield className="w-4.5 h-4.5 shrink-0" />
                 </div>
-                <div>
-                  <span className="font-serif font-bold text-lg text-slate-900">
+                <div className="flex items-center">
+                  <span className="font-serif font-bold text-lg text-slate-900 leading-none">
                     IP-SAKTI
                   </span>
-                  <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                  <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 shrink-0">
                     Sahayak
                   </span>
                 </div>
@@ -474,6 +494,27 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <Home className="w-5 h-5" />
                   <span>Overview & Portal Home</span>
+                </button>
+              )}
+
+              {/* How to Use Walkthrough Option */}
+              {onOpenWalkthrough && (
+                <button
+                  type="button"
+                  id="drawer-walkthrough-btn"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenWalkthrough();
+                  }}
+                  className="w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold text-emerald-950 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <HelpCircle className="w-5 h-5 text-emerald-700" />
+                    <span>How to Use / Guide</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md font-bold uppercase bg-emerald-200/70 text-emerald-900">
+                    Walkthrough
+                  </span>
                 </button>
               )}
 
@@ -620,72 +661,72 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Persistent Mobile Bottom Navigation Bar (Guarantees instant 1-tap navigation on all mobile phones) */}
       <nav
         id="mobile-bottom-nav"
-        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 py-1.5 px-2 flex justify-around items-center shadow-lg"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 py-1 px-1 sm:px-2 flex justify-around items-center shadow-lg"
         aria-label="Mobile Bottom Navigation"
       >
         <button
           type="button"
           onClick={() => handleNavClick('landing')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-lg min-w-[54px] transition-colors ${
+          className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-lg transition-colors ${
             activeTab === 'landing' ? 'text-emerald-800 font-bold' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Home className="w-5 h-5" />
-          <span className="text-[10px] mt-0.5">Home</span>
+          <Home className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0" />
+          <span className="text-[10px] mt-0.5 truncate w-full text-center">Home</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleNavClick('chat')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-lg min-w-[54px] transition-colors ${
+          className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-lg transition-colors ${
             activeTab === 'chat' ? 'text-emerald-800 font-bold' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Sparkles className="w-5 h-5" />
-          <span className="text-[10px] mt-0.5">Sahayak</span>
+          <Sparkles className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0" />
+          <span className="text-[10px] mt-0.5 truncate w-full text-center">Sahayak</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleNavClick('product')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-lg min-w-[54px] transition-colors ${
+          className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-lg transition-colors ${
             activeTab === 'product' ? 'text-emerald-800 font-bold' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <FlaskConical className="w-5 h-5" />
-          <span className="text-[10px] mt-0.5">Analyzer</span>
+          <FlaskConical className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0" />
+          <span className="text-[10px] mt-0.5 truncate w-full text-center">Analyzer</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleNavClick('ipr')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-lg min-w-[54px] transition-colors ${
+          className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-lg transition-colors ${
             activeTab === 'ipr' ? 'text-emerald-800 font-bold' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Compass className="w-5 h-5" />
-          <span className="text-[10px] mt-0.5">IPR</span>
+          <Compass className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0" />
+          <span className="text-[10px] mt-0.5 truncate w-full text-center">IPR</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleNavClick('tk')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-lg min-w-[54px] transition-colors ${
+          className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-lg transition-colors ${
             activeTab === 'tk' ? 'text-emerald-800 font-bold' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Shield className="w-5 h-5" />
-          <span className="text-[10px] mt-0.5">TK & ABS</span>
+          <Shield className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0" />
+          <span className="text-[10px] mt-0.5 truncate w-full text-center">TK & ABS</span>
         </button>
 
         <button
           type="button"
           onClick={() => setMobileMenuOpen(true)}
-          className="flex flex-col items-center justify-center py-1 px-2 rounded-lg min-w-[54px] text-slate-500 hover:text-slate-800"
+          className="flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-lg text-slate-500 hover:text-slate-800"
           aria-label="More navigation options"
         >
-          <Menu className="w-5 h-5" />
-          <span className="text-[10px] mt-0.5">More</span>
+          <Menu className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0" />
+          <span className="text-[10px] mt-0.5 truncate w-full text-center">More</span>
         </button>
       </nav>
     </>

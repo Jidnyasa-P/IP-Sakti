@@ -424,7 +424,7 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
         
         {/* Left Column: Asset Selection (Multi-select) & Dynamic Criteria */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-5">
+          <div id="ipr-asset-selection-card" className="p-4 sm:p-5 md:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-5">
             
             {/* Step 1: Multi-Select Asset Options */}
             <div className="space-y-3">
@@ -675,7 +675,7 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
               
               {/* Pagination Top Stepper Navigation Tabs */}
               <div className="bg-white border border-slate-200 rounded-2xl p-2.5 shadow-xs">
-                <div className="flex items-center justify-between px-2 pb-2 mb-1.5 border-b border-slate-100 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2 mb-1.5 border-b border-slate-100 text-xs">
                   <div className="flex items-center gap-2">
                     <span className="font-serif font-bold text-slate-900">
                       IPR Analysis Breakdown
@@ -1063,7 +1063,7 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                 )}
 
                 {/* Bottom Stepper Navigation Bar (Prev / Page Indicators / Next) */}
-                <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+                <div className="p-3 sm:p-4 md:p-5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2.5">
                   
                   {/* Previous Button */}
                   <button

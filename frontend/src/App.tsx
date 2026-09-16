@@ -13,6 +13,7 @@ import { RegisterView } from './components/RegisterView';
 import { ProfileView } from './components/ProfileView';
 import { ExpertAdvisoryView } from './components/ExpertAdvisoryView';
 import { CitationModal } from './components/CitationModal';
+import { GuidedTour } from './components/GuidedTour';
 import { Citation, normalizeRole } from './types';
 import { Shield, ExternalLink } from 'lucide-react';
 import { LanguageProvider, useTranslation } from './context/LanguageContext';
@@ -20,46 +21,86 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ExpertAdvisoryProvider } from './context/ExpertAdvisoryContext';
 import { ThemeProvider } from './context/ThemeContext';
 
+const TOUR_STORAGE_KEY = 'ipsakti_guided_tour_status';
+
 function AppContent() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('landing');
   const { currentLanguage, setLanguage, t } = useTranslation();
   const [activeCitation, setActiveCitation] = useState<Citation | null>(null);
   const { isLoggedIn, currentUser } = useAuth();
 
+  // First-time visitor guided tour auto-discovery state
+  const [isTourActive, setIsTourActive] = useState<boolean>(() => {
+    try {
+      const status = localStorage.getItem(TOUR_STORAGE_KEY);
+      return !status; // Launches tour for first-time users
+    } catch {
+      return false;
+    }
+  });
+
+  const handleStartTour = () => {
+    setIsTourActive(true);
+  };
+
+  const handleCompleteTour = () => {
+    try {
+      localStorage.setItem(TOUR_STORAGE_KEY, 'completed');
+    } catch (e) {
+      console.warn('Failed to save tour status:', e);
+    }
+    setIsTourActive(false);
+    if (!isLoggedIn) {
+      setActiveTab('landing');
+    }
+  };
+
+  const handleSkipTour = () => {
+    try {
+      localStorage.setItem(TOUR_STORAGE_KEY, 'skipped');
+    } catch (e) {
+      console.warn('Failed to save tour status:', e);
+    }
+    setIsTourActive(false);
+    if (!isLoggedIn) {
+      setActiveTab('landing');
+    }
+  };
+
   const isExpert = isLoggedIn && currentUser && normalizeRole(currentUser.role) === 'Expert';
 
-  // Strict restriction: Ensure Expert is always routed to the expert advisory workspace
+  // Strict restriction: Ensure Expert is always routed to the expert advisory workspace (when tour not active)
   useEffect(() => {
-    if (isExpert && activeTab !== 'expert' && activeTab !== 'profile') {
+    if (isExpert && !isTourActive && activeTab !== 'expert' && activeTab !== 'profile') {
       setActiveTab('expert');
     }
-  }, [isExpert, activeTab]);
+  }, [isExpert, isTourActive, activeTab]);
 
   // Helper to render current active view
   const renderCurrentView = () => {
-    // Public views always accessible when logged out
-    if (!isLoggedIn) {
+    // Public views always accessible when logged out, unless guided tour is active
+    if (!isLoggedIn && !isTourActive) {
       if (activeTab === 'login') {
         return <LoginView setActiveTab={setActiveTab} targetTabAfterLogin="chat" />;
       }
       if (activeTab === 'register') {
         return <RegisterView setActiveTab={setActiveTab} />;
       }
-      return <LandingView setActiveTab={setActiveTab} />;
+      return <LandingView setActiveTab={setActiveTab} onOpenWalkthrough={handleStartTour} />;
     }
 
     // Role-specific enforcement: Legal Expert only sees flagged low-confidence queries
-    if (isExpert) {
+    if (isExpert && !isTourActive) {
       if (activeTab === 'profile') {
         return <ProfileView setActiveTab={setActiveTab} />;
       }
       return <ExpertAdvisoryView onOpenCitation={(cite) => setActiveCitation(cite)} />;
     }
 
-    // Standard authenticated views for Practitioners, Researchers, Organizations & Admins
+    // Standard views for Practitioners, Researchers, Organizations & Admins
     switch (activeTab) {
       case 'landing':
-        return <LandingView setActiveTab={setActiveTab} />;
+        return <LandingView setActiveTab={setActiveTab} onOpenWalkthrough={handleStartTour} />;
       case 'chat':
         return (
           <ChatView
@@ -112,10 +153,12 @@ function AppContent() {
         setActiveTab={setActiveTab}
         language={currentLanguage}
         setLanguage={setLanguage}
+        onOpenWalkthrough={handleStartTour}
+        isTourActive={isTourActive}
       />
 
       {/* Main Viewport Container */}
-      <div className="flex-1 w-full pb-16 lg:pb-0">
+      <div className="flex-1 w-full pb-20 lg:pb-0">
         {renderCurrentView()}
       </div>
 
@@ -123,6 +166,15 @@ function AppContent() {
       <CitationModal
         citation={activeCitation}
         onClose={() => setActiveCitation(null)}
+      />
+
+      {/* Interactive In-Product Guided Tour */}
+      <GuidedTour
+        isOpen={isTourActive}
+        activeTab={activeTab}
+        onNavigateTab={(tab) => setActiveTab(tab)}
+        onComplete={handleCompleteTour}
+        onSkip={handleSkipTour}
       />
 
       {/* Persistent Official Portals Footer */}

@@ -112,7 +112,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
       </div>
 
       {/* Search Bar & Filter Controls */}
-      <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+      <div id="research-search-card" className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
         <form onSubmit={handleSearchSubmit} className="flex gap-2">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -128,14 +128,14 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
           <button
             type="submit"
             id="research-search-btn"
-            className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors flex items-center gap-1.5"
+            className="px-4 sm:px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shrink-0"
           >
             <span>Search</span>
           </button>
         </form>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100 text-xs">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 pt-2 border-t border-slate-100 text-xs">
           <div className="flex items-center gap-1.5 text-slate-500 font-semibold">
             <Filter className="w-3.5 h-3.5" />
             <span>Filters:</span>
@@ -144,7 +144,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
           <select
             value={topicFilter}
             onChange={(e) => setTopicFilter(e.target.value)}
-            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-hidden"
+            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-hidden max-w-full"
           >
             <option value="ALL">All Topics</option>
             <option value="IPR">IPR & Patents</option>
@@ -157,7 +157,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
           <select
             value={authorityFilter}
             onChange={(e) => setAuthorityFilter(e.target.value)}
-            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-hidden"
+            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-hidden max-w-full"
           >
             <option value="ALL">All Authorities</option>
             <option value="IP India">IP India (CGPDTM)</option>
@@ -171,7 +171,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
           <select
             value={docTypeFilter}
             onChange={(e) => setDocTypeFilter(e.target.value)}
-            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-hidden"
+            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-hidden max-w-full"
           >
             <option value="ALL">All Document Types</option>
             <option value="Act">Statutory Acts</option>
@@ -190,7 +190,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
                 setAuthorityFilter('ALL');
                 setDocTypeFilter('ALL');
               }}
-              className="text-xs text-emerald-800 hover:underline font-semibold ml-auto"
+              className="text-xs text-emerald-800 hover:underline font-semibold sm:ml-auto"
             >
               Reset Filters
             </button>
@@ -215,7 +215,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
               <div
                 key={doc.id}
                 id={`doc-card-${doc.id}`}
-                className={`p-5 rounded-2xl bg-white border transition-all ${
+                className={`p-4 sm:p-5 rounded-2xl bg-white border transition-all ${
                   isSelected
                     ? 'border-emerald-700 shadow-md ring-1 ring-emerald-700'
                     : 'border-slate-200 hover:border-slate-300 shadow-xs'
@@ -294,7 +294,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
 
         {/* Document Passages Inspector Panel */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs sticky top-20">
+          <div className="p-4 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs lg:sticky lg:top-20">
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-2">
               <FileText className="w-4 h-4 text-emerald-700" />
               Indexed Statutory Sections

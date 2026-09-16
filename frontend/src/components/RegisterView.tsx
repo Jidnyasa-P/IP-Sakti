@@ -118,8 +118,8 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 bg-slate-50">
-      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8 space-y-6">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-3 sm:p-6 bg-slate-50">
+      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 md:p-8 space-y-5 sm:space-y-6">
         {/* Header Branding */}
         <div className="text-center space-y-2">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 mx-auto flex items-center justify-center shadow-xs">
@@ -404,7 +404,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
         </form>
 
         {/* Footer Navigation */}
-        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-center sm:text-left">
           <button
             type="button"
             onClick={() => setActiveTab('landing')}

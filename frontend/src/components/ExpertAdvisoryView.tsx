@@ -258,9 +258,9 @@ export const ExpertAdvisoryView: React.FC<ExpertAdvisoryViewProps> = ({ onOpenCi
         </div>
 
         {/* Queue Filters & Search */}
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           {/* Status Tabs */}
-          <div className="flex items-center gap-1 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
             <button
               type="button"
               onClick={() => setFilterStatus('all')}
@@ -299,7 +299,7 @@ export const ExpertAdvisoryView: React.FC<ExpertAdvisoryViewProps> = ({ onOpenCi
           </div>
 
           {/* Role Filter and Search */}
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full md:w-auto">
             <div className="flex items-center gap-1 text-xs text-slate-500">
               <Filter className="w-3.5 h-3.5 text-slate-400" />
               <span>Role:</span>
