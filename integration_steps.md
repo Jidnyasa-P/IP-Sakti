@@ -100,6 +100,8 @@ over your project root to apply the changes.
 1. Start `ip_sakti_rag` on :8001, then `backend` on :8000.
 2. `curl http://localhost:8000/api/health` → `"rag_service": "connected (ok)"`.
 3. Kill `ip_sakti_rag`, hit `/api/chat` on the backend → should return a
+
+
    clean `502` with `"RAG service is unreachable..."`, not a stack trace.
 4. Restart `ip_sakti_rag`, send a real chat message, confirm citations come
    back with real document titles (from `ip_sakti_rag/data/documents/*.pdf`,
