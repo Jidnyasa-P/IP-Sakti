@@ -7,9 +7,12 @@ frontend has already been designed/tested against, but implemented properly
 in Python with a slightly larger keyword set.
 
 Kept dependency-free (no heavy langdetect model) so it works on any free-tier
-host without extra downloads. If you already run Anuvadini/BHASHINI language
-ID, swap `detect_language` for a call into that service — the interface below
-is intentionally the seam for that (see TranslationProvider stub at bottom).
+host without extra downloads.
+
+CHANGED: TranslationProvider.translate() is now wired to
+app/translation/bhashini_client.py when TRANSLATION_PROVIDER=bhashini.
+Still a no-op when TRANSLATION_PROVIDER=none (default) or when translating
+en->en.
 """
 from __future__ import annotations
 
@@ -79,18 +82,19 @@ def detect_intent(query: str) -> str:
 
 class TranslationProvider:
     """
-    Modular seam for Anuvadini / BHASHINI integration. Left as a no-op by
-    default (`TRANSLATION_PROVIDER=none`). Wire a real client in here without
-    touching the rest of the pipeline.
+    Modular seam for BHASHINI integration. No-op by default
+    (`TRANSLATION_PROVIDER=none`). Set `TRANSLATION_PROVIDER=bhashini` plus
+    `BHASHINI_API_KEY`/`BHASHINI_USER_ID` in .env to activate.
     """
 
     def __init__(self, provider: str = "none"):
         self.provider = provider
 
-    def translate(self, text: str, target_lang: str) -> str:
-        if self.provider == "none":
+    def translate(self, text: str, target_lang: str, source_lang: str = "en") -> str:
+        if self.provider == "none" or source_lang == target_lang:
             return text
-        raise NotImplementedError(
-            f"Translation provider '{self.provider}' is not wired up yet. "
-            "Implement the API call here (Anuvadini / BHASHINI)."
-        )
+        if self.provider == "bhashini":
+            from app.translation.bhashini_client import bhashini_translate
+
+            return bhashini_translate(text, source_lang=source_lang, target_lang=target_lang)
+        raise NotImplementedError(f"Translation provider '{self.provider}' is not wired up.")

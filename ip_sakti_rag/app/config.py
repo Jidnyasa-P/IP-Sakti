@@ -1,6 +1,14 @@
 """
 Centralised, env-driven configuration.
 Nothing here is hard-coded secrets — everything sensitive comes from `.env`.
+
+CHANGED: removed `embedding_model` (was a sentence-transformers model path —
+embeddings now come from the Gemini API via LLM_API_KEY, see
+app/embeddings.py) and `reranker_enabled`/`reranker_model` (reranking is now
+Reciprocal Rank Fusion, a pure algorithm with no model/setting to configure —
+see app/retrieval/hybrid.py). If your existing .env still has
+EMBEDDING_MODEL / RERANKER_ENABLED / RERANKER_MODEL lines, they're now
+harmless no-ops (extra="ignore" below) — fine to leave or remove.
 """
 from __future__ import annotations
 
@@ -14,22 +22,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # LLM
+    # LLM + embeddings (both via Gemini, same key)
     LLM_API_KEY: str | None = None
     LLM_MODEL: str = "gemini-2.0-flash"
-
-    # Embeddings
-    embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
     # Qdrant
     qdrant_local_path: str = "./data/qdrant_local"
     qdrant_collection: str = "ip_sakti_chunks"
     qdrant_url: str | None = None
     qdrant_api_key: str | None = None
-
-    # Reranker
-    reranker_enabled: bool = False
-    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
     # TKDL (placeholder — see app/retrieval/tkdl_connector.py)
     tkdl_enabled: bool = False
@@ -41,8 +42,6 @@ class Settings(BaseSettings):
     neo4j_password: str | None = None
 
     # Retrieval tuning
-    semantic_weight: float = 0.65
-    keyword_weight: float = 0.35
     top_k: int = 5
 
     # Safety thresholds
@@ -52,8 +51,14 @@ class Settings(BaseSettings):
     min_chunks_for_high_confidence: int = 3
     abstain_below_score: float = 0.15
 
-    # Translation
-    translation_provider: str = "none"
+    # Translation (Bhashini) — see app/translation/bhashini_client.py
+    translation_provider: str = "none"  # none | bhashini
+    bhashini_api_key: str | None = None
+    bhashini_user_id: str | None = None
+
+    # Shared secret: only the Node backend should be able to call this
+    # service's endpoints once it's deployed publicly on Render.
+    rag_service_shared_secret: str | None = None
 
     @property
     def documents_dir(self) -> Path:

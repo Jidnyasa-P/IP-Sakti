@@ -3,6 +3,10 @@ End-to-end ingestion: files in data/documents/ -> extracted text -> legal-aware
 chunks -> DocumentChunk objects with metadata -> embeddings -> Qdrant upsert
 -> persisted chunks.jsonl (used to rebuild the BM25 index fast at server start,
 without re-embedding).
+
+CHANGED: embeddings now come from app.embeddings (Gemini API,
+gemini-embedding-001) instead of a locally-loaded sentence-transformers
+model — see app/embeddings.py for why.
 """
 from __future__ import annotations
 
@@ -11,27 +15,11 @@ import uuid
 from pathlib import Path
 
 from app.config import settings
+from app.embeddings import embed_texts
 from app.ingestion.chunker import legal_aware_chunk
 from app.ingestion.extract import extract_text
 from app.ingestion.metadata import load_manifest, save_processed_documents
 from app.schemas import DocumentChunk, DocumentMetadata
-
-_embedder = None
-
-
-def get_embedder():
-    global _embedder
-    if _embedder is None:
-        from sentence_transformers import SentenceTransformer
-
-        _embedder = SentenceTransformer(settings.embedding_model)
-    return _embedder
-
-
-def embed_texts(texts: list[str]) -> list[list[float]]:
-    model = get_embedder()
-    vectors = model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
-    return [v.tolist() for v in vectors]
 
 
 def build_chunks_for_document(file_path: Path, meta: DocumentMetadata) -> list[DocumentChunk]:
@@ -98,10 +86,10 @@ def run_ingestion() -> tuple[list[DocumentMetadata], list[DocumentChunk]]:
         print("[ingest] No chunks produced. Check data/documents/manifest.json and file paths.")
         return all_docs, all_chunks
 
-    print(f"[ingest] Embedding {len(all_chunks)} chunks with '{settings.embedding_model}'...")
+    print(f"[ingest] Embedding {len(all_chunks)} chunks with 'gemini-embedding-001' (768-dim)...")
     vectors = embed_texts([c.chunk_text for c in all_chunks])
 
-    print("[ingest] Upserting into Qdrant...")
+    print("[ingest] Upserting into Qdrant (batched)...")
     index = VectorIndex(vector_size=len(vectors[0]))
     index.upsert(all_chunks, vectors)
 
