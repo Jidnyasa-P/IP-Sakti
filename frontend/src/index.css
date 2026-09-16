@@ -1,12 +1,1 @@
 @import "tailwindcss";
-
-/* Hides the scrollbar on horizontally-scrollable mobile nav/tab strips
-   while keeping them scrollable (used by Header's mobile sub-nav and
-   WorkspaceView's tab strip). */
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}

@@ -30,21 +30,6 @@ interface ChatViewProps {
   onOpenCitation: (citation: Citation) => void;
 }
 
-// Frontend-only display-order fix: conversations loaded from the backend are
-// re-sorted by timestamp before rendering so a user's query always appears
-// above its assistant answer, regardless of the order the backend returns
-// them in. Ties (identical timestamp) fall back to user-before-assistant.
-function sortMessagesForDisplay(msgs: StructuredChatMessage[]): StructuredChatMessage[] {
-  return [...msgs].sort((a, b) => {
-    const ta = new Date(a.created_at).getTime();
-    const tb = new Date(b.created_at).getTime();
-    if (ta !== tb) return ta - tb;
-    if (a.role === 'user' && b.role !== 'user') return -1;
-    if (b.role === 'user' && a.role !== 'user') return 1;
-    return 0;
-  });
-}
-
 export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) => {
   const { t } = useTranslation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -55,10 +40,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
   const [streamingText, setStreamingText] = useState('');
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [searchHistory, setSearchHistory] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return window.innerWidth >= 1024; // open by default only on desktop (lg breakpoint)
-  });
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -81,7 +63,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
       setConversations(data);
       if (data.length > 0 && !activeConvId) {
         setActiveConvId(data[0].id);
-        setMessages(sortMessagesForDisplay(data[0].messages || []));
+        setMessages(data[0].messages || []);
       }
     } catch (e) {
       console.error('Failed to load conversations:', e);
@@ -93,7 +75,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
       const res = await authFetch(`/api/conversations/${id}`);
       const data: Conversation = await res.json();
       setActiveConvId(id);
-      setMessages(sortMessagesForDisplay(data.messages || []));
+      setMessages(data.messages || []);
     } catch (e) {
       console.error('Failed to load conversation:', e);
     }
@@ -310,20 +292,12 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
   );
 
   return (
-    <div className="relative flex h-[calc(100vh-7.6rem)] lg:h-[calc(100vh-5.25rem)] w-full max-w-[96rem] mx-auto overflow-hidden bg-slate-50 lg:border-x border-slate-200">
-      {/* Mobile Sidebar Backdrop */}
-      {sidebarOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-slate-900/40 z-20"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
+    <div className="flex h-[calc(100vh-4.25rem)] w-full max-w-7xl mx-auto overflow-hidden bg-slate-50 border-x border-slate-200">
       {/* Sidebar / Conversation History */}
       <aside
         id="chat-history-sidebar"
-        className={`fixed lg:static top-[7.6rem] lg:top-auto bottom-0 lg:bottom-auto left-0 lg:left-auto z-30 lg:z-auto max-w-[85vw] ${
-          sidebarOpen ? 'translate-x-0 w-72 sm:w-80' : '-translate-x-full lg:translate-x-0 w-72 sm:w-80 lg:w-0'
+        className={`${
+          sidebarOpen ? 'w-72 sm:w-80' : 'w-0'
         } shrink-0 bg-white border-r border-slate-200 transition-all duration-300 flex flex-col overflow-hidden`}
       >
         {/* Sidebar Header */}

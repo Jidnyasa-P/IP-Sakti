@@ -9,13 +9,11 @@ import {
   Sparkles,
   ArrowRight,
   BookOpen,
-  Info,
-  Download
+  Info
 } from 'lucide-react';
 import { Citation, TKABSQuery, TKABSResult } from '../types';
 import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
-import { generatePDFReport } from '../utils/pdfExport';
 
 interface TraditionalKnowledgeViewProps {
   onOpenCitation: (citation: Citation) => void;
@@ -87,55 +85,8 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
     }
   };
 
-  const handleExportPDF = () => {
-    if (!result) return;
-
-    generatePDFReport({
-      title: 'IP-SAKTI Sahayak — Traditional Knowledge & ABS Report',
-      subtitle: formData.biological_resource,
-      fileName: `${formData.biological_resource.replace(/[^a-z0-9]+/gi, '_')}_tk_abs_report.pdf`,
-      sections: [
-        {
-          heading: 'Traditional Knowledge Overview',
-          paragraphs: [
-            result.traditional_knowledge_overview,
-            `Prior Art Status: ${result.prior_art_tk_considerations}`,
-          ],
-        },
-        {
-          heading: 'Access & Benefit Sharing (ABS) Statutory Mandates',
-          keyValues: [
-            { label: 'NBA Approval Required', value: result.abs_considerations.nba_approval_needed ? 'Yes (Form I or Form III)' : 'No' },
-            { label: 'SBB Intimation Required', value: result.abs_considerations.sbb_notification_needed ? 'Yes (State Board)' : 'No' },
-            { label: 'Benefit Sharing / Levy Matrix', value: result.abs_considerations.benefit_sharing_rate },
-            { label: '2023 Amendment Exemptions', value: result.abs_considerations.exemptions_applicable },
-          ],
-          list: result.abs_considerations.statutory_sections,
-          listStyle: 'bullet',
-        },
-        {
-          heading: 'IP Implications & Patent Strategy',
-          list: result.potential_ip_implications,
-          listStyle: 'bullet',
-        },
-        {
-          heading: 'Compliance & Action Roadmap',
-          list: result.recommended_next_steps,
-          listStyle: 'number',
-        },
-        ...(result.sources && result.sources.length > 0
-          ? [{
-              heading: 'Authoritative Legal Provisions',
-              list: result.sources.map(s => `[${s.index}] ${s.section} — ${s.title} (${s.authority}) — "${s.excerpt}"`),
-              listStyle: 'bullet' as const,
-            }]
-          : []),
-      ],
-    });
-  };
-
   return (
-    <div className="w-full max-w-[84rem] mx-auto px-4 sm:px-6 lg:px-10 py-8 space-y-8">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
       {/* Title & Introduction */}
       <div className="space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-200/80 text-xs font-semibold">
@@ -292,19 +243,6 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
       {/* Results Display */}
       {result && (
         <div className="space-y-6 animate-in fade-in duration-300">
-          {/* Result Header Actions */}
-          <div className="flex items-center justify-end border-b border-slate-200 pb-4">
-            <button
-              type="button"
-              id="export-tk-abs-pdf-btn"
-              onClick={handleExportPDF}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download PDF</span>
-            </button>
-          </div>
-
           {/* Section 1: Traditional Knowledge Overview */}
           <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
             <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">

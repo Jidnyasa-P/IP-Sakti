@@ -68,7 +68,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
   })();
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-8 space-y-6">
+    <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
       <div className="space-y-1">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-200/80 text-xs font-semibold">
           <UserCircle className="w-3.5 h-3.5 text-emerald-700" />
