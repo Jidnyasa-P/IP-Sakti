@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { authFetch } from './auth/authStorage';
-import { useAuth } from '../context/AuthContext';
 import {
   Settings,
   Database,
@@ -20,7 +18,6 @@ import { DocumentMetadata, RAGTelemetry } from '../types';
 import { DisclaimerBanner } from './DisclaimerBanner';
 
 export const AdminView: React.FC = () => {
-  const { user } = useAuth();
   const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
   const [telemetry, setTelemetry] = useState<RAGTelemetry | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,24 +32,28 @@ export const AdminView: React.FC = () => {
   const [newDocSummary, setNewDocSummary] = useState('');
 
   useEffect(() => {
-    if (user?.roles.includes('Admin')) {
-      loadAdminData();
-    }
-  }, [user]);
+    loadAdminData();
+  }, []);
 
   const loadAdminData = async () => {
     setLoading(true);
     try {
       const [docsRes, telRes] = await Promise.all([
-        authFetch('/api/admin/documents'),
-        authFetch('/api/admin/telemetry'),
+        fetch('/api/admin/documents').catch(() => null),
+        fetch('/api/admin/telemetry').catch(() => null),
       ]);
-      const docsData = await docsRes.json();
-      const telData = await telRes.json();
-      setDocuments(docsData.documents || []);
-      setTelemetry(telData);
+
+      if (docsRes && docsRes.ok && docsRes.headers.get('content-type')?.includes('application/json')) {
+        const docsData = await docsRes.json();
+        setDocuments(Array.isArray(docsData) ? docsData : (docsData.documents || []));
+      }
+
+      if (telRes && telRes.ok && telRes.headers.get('content-type')?.includes('application/json')) {
+        const telData = await telRes.json();
+        setTelemetry(telData);
+      }
     } catch (e) {
-      console.error('Failed to load admin data:', e);
+      console.warn('Failed to load admin data:', e);
     } finally {
       setLoading(false);
     }
@@ -63,7 +64,7 @@ export const AdminView: React.FC = () => {
     if (!newDocTitle.trim()) return;
 
     try {
-      const res = await authFetch('/api/admin/documents', {
+      const res = await fetch('/api/admin/documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -89,34 +90,15 @@ export const AdminView: React.FC = () => {
 
   const handleReindex = async (id: string) => {
     try {
-      await authFetch(`/api/admin/documents/${id}/index`, { method: 'POST' });
+      await fetch(`/api/admin/documents/${id}/index`, { method: 'POST' });
       loadAdminData();
     } catch (e) {
       console.error('Re-indexing failed:', e);
     }
   };
 
-  if (!user?.roles.includes('Admin')) {
-    return (
-      <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 py-16">
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-xs p-8 text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
-            <Shield className="w-6 h-6" />
-          </div>
-          <h1 className="text-2xl font-serif font-bold text-slate-900">Admin access required</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            The Knowledge Base and Telemetry pages are available only to accounts with the Admin role.
-          </p>
-          <p className="mt-4 text-xs text-slate-500">
-            Current profile: <span className="font-semibold text-slate-700">{user.role || 'Unknown'}</span>
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="w-full px-3 sm:px-5 lg:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">

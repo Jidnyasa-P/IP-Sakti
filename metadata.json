@@ -1,7 +1,10 @@
 {
-  "name": "IP-SAKTI Sahayak",
-  "description": "AYUSH, Intellectual Property & Traditional Knowledge AI Assistant providing statutory guidance grounded in Indian IP law, Biological Diversity Act, and TKDL.",
-  "requestFramePermissions": [],
+  "name": "newRemix IP-SAKTI Sahayak",
+  "description": "AI-powered intellectual property, AYUSH, traditional knowledge, and regulatory research assistant.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]

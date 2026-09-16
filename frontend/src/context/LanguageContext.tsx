@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Language } from '../types';
-import { BASE_DICTIONARY, HINDI_STATUTORY_DICTIONARY, MARATHI_STATUTORY_DICTIONARY } from './translations';
+import { Language, SUPPORTED_LANGUAGES } from '../types';
+import { BASE_DICTIONARY, getInstantDictionary } from './translations';
 
 interface LanguageContextType {
   currentLanguage: Language;
@@ -18,9 +18,9 @@ const CACHE_PREFIX = 'ipsakti_trans_';
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentLanguage, setCurrentLanguageState] = useState<Language>(() => {
     try {
-      const saved = localStorage.getItem('ipsakti_pref_language');
-      if (saved === 'hi' || saved === 'mr' || saved === 'en') {
-        return saved as Language;
+      const saved = localStorage.getItem('ipsakti_pref_language') as Language;
+      if (saved && SUPPORTED_LANGUAGES.some(l => l.code === saved)) {
+        return saved;
       }
     } catch {}
     return 'en';
@@ -28,9 +28,10 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const [activeDictionary, setActiveDictionary] = useState<Record<string, string>>(() => {
     try {
-      const saved = localStorage.getItem('ipsakti_pref_language');
-      if (saved === 'hi') return HINDI_STATUTORY_DICTIONARY;
-      if (saved === 'mr') return MARATHI_STATUTORY_DICTIONARY;
+      const saved = localStorage.getItem('ipsakti_pref_language') as Language;
+      if (saved && saved !== 'en' && SUPPORTED_LANGUAGES.some(l => l.code === saved)) {
+        return getInstantDictionary(saved);
+      }
     } catch {}
     return BASE_DICTIONARY;
   });
@@ -46,7 +47,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
 
     // Immediately load verified statutory dictionary for zero lag
-    const instantDictionary = lang === 'hi' ? HINDI_STATUTORY_DICTIONARY : MARATHI_STATUTORY_DICTIONARY;
+    const instantDictionary = getInstantDictionary(lang);
     setActiveDictionary(instantDictionary);
     setTranslationSource('statutory-dictionary');
 
@@ -124,7 +125,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       localStorage.setItem('ipsakti_pref_language', lang);
     } catch {}
-    const initialDict = lang === 'hi' ? HINDI_STATUTORY_DICTIONARY : lang === 'mr' ? MARATHI_STATUTORY_DICTIONARY : BASE_DICTIONARY;
+    const initialDict = getInstantDictionary(lang);
     setActiveDictionary(initialDict);
     await fetchTranslations(lang);
   };
@@ -134,7 +135,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (currentLanguage === 'en') {
         return BASE_DICTIONARY[key] || defaultText || key;
       }
-      const targetDict = currentLanguage === 'hi' ? HINDI_STATUTORY_DICTIONARY : MARATHI_STATUTORY_DICTIONARY;
+      const targetDict = getInstantDictionary(currentLanguage);
       const val = activeDictionary[key];
       const baseVal = BASE_DICTIONARY[key];
 

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { authFetch } from './auth/authStorage';
 import {
   FlaskConical,
   ArrowRight,
@@ -11,11 +10,14 @@ import {
   Bookmark,
   Sparkles,
   ExternalLink,
-  Info
+  Info,
+  FileDown
 } from 'lucide-react';
 import { Citation, ProductAnalysisResult, ProductInformation } from '../types';
 import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
+import { exportProductAnalysisToPDF } from '../utils/pdfGenerator';
+import { getSectionLink } from '../utils/sectionLinks';
 
 interface ProductAnalyzerViewProps {
   onOpenCitation: (citation: Citation) => void;
@@ -28,6 +30,19 @@ export const ProductAnalyzerView: React.FC<ProductAnalyzerViewProps> = ({ onOpen
   const [loading, setLoading] = useState<boolean>(false);
   const [result, setResult] = useState<ProductAnalysisResult | null>(null);
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
+  const [isExportingPDF, setIsExportingPDF] = useState<boolean>(false);
+
+  const handleExportPDF = () => {
+    if (!result) return;
+    setIsExportingPDF(true);
+    try {
+      exportProductAnalysisToPDF(result);
+    } catch (err) {
+      console.error('Failed to export product analysis PDF:', err);
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
 
   const [formData, setFormData] = useState<ProductInformation>({
     product_name: '',
@@ -73,7 +88,7 @@ export const ProductAnalyzerView: React.FC<ProductAnalyzerViewProps> = ({ onOpen
         intended_use: 'Rasayana rejuvenation, immunity modulation, respiratory vitality',
         claims: 'Traditional classical Ayurvedic Rasayana formulation conforming strictly to Charaka Samhita',
         target_symptoms: 'General debility, low immunity, seasonal respiratory infections',
-        target_market: 'Domestic',
+        target_market: 'Domestic (India)',
         distribution_channels: 'Pharmacies, direct distribution, supermarkets'
       });
     } else if (presetNumber === 3) {
@@ -97,7 +112,7 @@ export const ProductAnalyzerView: React.FC<ProductAnalyzerViewProps> = ({ onOpen
   const handleAnalyze = async () => {
     setLoading(true);
     try {
-      const res = await authFetch('/api/products/analyze', {
+      const res = await fetch('/api/products/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -115,7 +130,7 @@ export const ProductAnalyzerView: React.FC<ProductAnalyzerViewProps> = ({ onOpen
   const handleSaveToWorkspace = async () => {
     if (!result) return;
     try {
-      await authFetch('/api/workspace/save-research', {
+      await fetch('/api/workspace/save-research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -132,7 +147,7 @@ export const ProductAnalyzerView: React.FC<ProductAnalyzerViewProps> = ({ onOpen
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="w-full px-3 sm:px-5 lg:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
       {/* Title & Description */}
       <div className="space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-200/80 text-xs font-semibold">
@@ -516,7 +531,18 @@ export const ProductAnalyzerView: React.FC<ProductAnalyzerViewProps> = ({ onOpen
                 </h2>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  id="export-product-pdf-btn"
+                  onClick={handleExportPDF}
+                  disabled={isExportingPDF}
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                >
+                  <FileDown className="w-4 h-4 text-amber-300" />
+                  <span>{isExportingPDF ? 'Generating PDF...' : 'Extract as PDF'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={handleSaveToWorkspace}
@@ -643,28 +669,46 @@ export const ProductAnalyzerView: React.FC<ProductAnalyzerViewProps> = ({ onOpen
               </ol>
             </div>
 
-            {/* Structured Card 6: Authoritative Evidence */}
+            {/* Structured Card 6: Authoritative Evidence - 1 Option per section to open working link */}
             {result.evidence && result.evidence.length > 0 && (
               <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
                   Authoritative Statutory Citations ({result.evidence.length})
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {result.evidence.map((ev) => (
-                    <div
-                      key={ev.chunk_id}
-                      onClick={() => onOpenCitation(ev)}
-                      className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-emerald-50/50 hover:border-emerald-300 transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-center justify-between text-xs font-semibold text-slate-900 group-hover:text-emerald-900 mb-1">
-                        <span>[{ev.index}] {ev.section}</span>
-                        <span className="text-[10px] text-slate-500">{ev.authority}</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 line-clamp-2 italic">
-                        "{ev.excerpt}"
-                      </p>
-                    </div>
-                  ))}
+                  {result.evidence.map((ev) => {
+                    const linkInfo = getSectionLink(ev.section, ev.document_id);
+                    const evUrl = ev.url || linkInfo.url;
+                    return (
+                      <a
+                        key={ev.chunk_id}
+                        href={evUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        title={`Open official statutory text: ${ev.section} (${linkInfo.authority})`}
+                        className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group flex flex-col justify-between space-y-2 shadow-2xs hover:shadow-xs"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between text-xs font-bold text-slate-900 group-hover:text-emerald-950 mb-1">
+                            <span>[{ev.index}] {ev.section}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium border border-slate-200/70">
+                              {ev.authority.split(',')[0]}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-600 line-clamp-2 italic font-serif leading-relaxed">
+                            "{ev.excerpt}"
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
+                          <span className="text-[10px] text-slate-400 font-medium">Official Reference</span>
+                          <span className="inline-flex items-center gap-1 font-semibold text-xs text-emerald-800 group-hover:text-emerald-950 group-hover:underline">
+                            <span>Open Official Section</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-emerald-700 transition-transform group-hover:translate-x-0.5" />
+                          </span>
+                        </div>
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
             )}

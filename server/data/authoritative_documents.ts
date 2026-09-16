@@ -33,6 +33,7 @@ export interface DocumentChunk {
   publication_date: string;
   effective_date: string;
   topic: string;
+  summary?: string;
   chunk_text: string;
   keywords: string[];
 }

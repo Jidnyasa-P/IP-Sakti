@@ -1,38 +1,170 @@
 // Core TypeScript types for IP-SAKTI Sahayak
 
-export type Language = 'en' | 'hi' | 'mr';
+export type Language =
+  | 'en'
+  | 'as'  // Assamese
+  | 'bn'  // Bengali
+  | 'brx' // Bodo
+  | 'doi' // Dogri
+  | 'gu'  // Gujarati
+  | 'hi'  // Hindi
+  | 'kn'  // Kannada
+  | 'ks'  // Kashmiri
+  | 'kok' // Konkani
+  | 'mai' // Maithili
+  | 'ml'  // Malayalam
+  | 'mni' // Manipuri
+  | 'mr'  // Marathi
+  | 'ne'  // Nepali
+  | 'or'  // Odia
+  | 'pa'  // Punjabi
+  | 'sa'  // Sanskrit
+  | 'sat' // Santali
+  | 'sd'  // Sindhi
+  | 'ta'  // Tamil
+  | 'te'  // Telugu
+  | 'ur'; // Urdu
 
-// Profile / account type. These five values are also the exact display
-// labels used throughout the UI (Register, Profile, Header) and are the
-// options offered at signup.
-export type UserRole = 'Practitioner' | 'Researcher' | 'Expert' | 'Admin' | 'Organization' | 'Startup';
+export interface LanguageInfo {
+  code: Language;
+  label: string;
+  native: string;
+  speechCode: string;
+}
 
-export const USER_ROLE_OPTIONS: UserRole[] = ['Practitioner', 'Researcher', 'Expert', 'Admin', 'Organization'];
+export const SUPPORTED_LANGUAGES: LanguageInfo[] = [
+  { code: 'en', label: 'English', native: 'English', speechCode: 'en-IN' },
+  { code: 'as', label: 'Assamese', native: 'অসমীয়া', speechCode: 'as-IN' },
+  { code: 'bn', label: 'Bengali', native: 'বাংলা', speechCode: 'bn-IN' },
+  { code: 'brx', label: 'Bodo', native: 'बड़ो', speechCode: 'brx-IN' },
+  { code: 'doi', label: 'Dogri', native: 'डोगरी', speechCode: 'doi-IN' },
+  { code: 'gu', label: 'Gujarati', native: 'ગુજરાતી', speechCode: 'gu-IN' },
+  { code: 'hi', label: 'Hindi', native: 'हिन्दी', speechCode: 'hi-IN' },
+  { code: 'kn', label: 'Kannada', native: 'ಕನ್ನಡ', speechCode: 'kn-IN' },
+  { code: 'ks', label: 'Kashmiri', native: 'कश्मीरी (كٲشُر)', speechCode: 'ks-IN' },
+  { code: 'kok', label: 'Konkani', native: 'कोंकणी', speechCode: 'kok-IN' },
+  { code: 'mai', label: 'Maithili', native: 'मैथिली', speechCode: 'mai-IN' },
+  { code: 'ml', label: 'Malayalam', native: 'മലയാളം', speechCode: 'ml-IN' },
+  { code: 'mni', label: 'Manipuri', native: 'মৈতৈলোন্', speechCode: 'mni-IN' },
+  { code: 'mr', label: 'Marathi', native: 'मराठी', speechCode: 'mr-IN' },
+  { code: 'ne', label: 'Nepali', native: 'नेपाली', speechCode: 'ne-NP' },
+  { code: 'or', label: 'Odia', native: 'ଓଡ଼ିଆ', speechCode: 'or-IN' },
+  { code: 'pa', label: 'Punjabi', native: 'ਪੰਜਾਬੀ', speechCode: 'pa-IN' },
+  { code: 'sa', label: 'Sanskrit', native: 'संस्कृतम्', speechCode: 'sa-IN' },
+  { code: 'sat', label: 'Santali', native: 'ᱥᱟᱱᱛᱟᱲᱤ', speechCode: 'sat-IN' },
+  { code: 'sd', label: 'Sindhi', native: 'सिंधी (سنڌي)', speechCode: 'sd-IN' },
+  { code: 'ta', label: 'Tamil', native: 'தமிழ்', speechCode: 'ta-IN' },
+  { code: 'te', label: 'Telugu', native: 'తెలుగు', speechCode: 'te-IN' },
+  { code: 'ur', label: 'Urdu', native: 'اردو', speechCode: 'ur-IN' },
+];
 
-// Roles that are NOT offered at signup, but can be added later via
-// "+ Add Role" (Profile). Kept separate so they never appear to a user
-// unless they explicitly add them.
-export const ADDITIONAL_ROLE_OPTIONS: UserRole[] = ['Startup'];
+export const LANGUAGES_MAP: Record<Language, LanguageInfo> = SUPPORTED_LANGUAGES.reduce(
+  (acc, item) => ({ ...acc, [item.code]: item }),
+  {} as Record<Language, LanguageInfo>
+);
 
-// Full catalog of every role that can ever be added, used to populate the
-// "+ Add Role" selector (filtered to exclude roles the user already has).
-export const ALL_ROLE_OPTIONS: UserRole[] = [...USER_ROLE_OPTIONS, ...ADDITIONAL_ROLE_OPTIONS];
+export type UserRole =
+  | 'Practitioner'
+  | 'Researcher'
+  | 'Expert'
+  | 'Admin'
+  | 'Organization'
+  | 'USER'
+  | 'EXPERT'
+  | 'ADMIN';
 
-// Dual jurisdiction toggle: Domestic (India) vs International/Export.
-// Mirrors the domestic/international distinction already used by the
-// backend's jurisdiction_service.py and the ProductAnalyzerView's
-// target_market field, so this can later be passed straight through to
-// backend APIs without a data-shape mismatch.
-export type JurisdictionMode = 'India' | 'International';
+export const ALL_ROLES: UserRole[] = [
+  'Practitioner',
+  'Researcher',
+  'Expert',
+  'Admin',
+  'Organization'
+];
+
+export interface RoleMetaInfo {
+  id: UserRole;
+  label: string;
+  badge: string;
+  title: string;
+  desc: string;
+  pillBg: string;
+}
+
+export const ROLE_DEFINITIONS: Record<string, RoleMetaInfo> = {
+  Practitioner: {
+    id: 'Practitioner',
+    label: 'Practitioner',
+    badge: 'Practitioner',
+    title: 'AYUSH Clinician & Vaidya',
+    desc: 'Access to AYUSH formulation clearance, clinical Section 3(p) prior-art checks, and formulation documentation.',
+    pillBg: 'bg-teal-50 text-teal-900 border-teal-200'
+  },
+  Researcher: {
+    id: 'Researcher',
+    label: 'Researcher',
+    badge: 'Researcher',
+    title: 'Scientific & Ethnobotanical Researcher',
+    desc: 'Access to deep chemical-structure analysis, pharmacological literature retrieval, and scientific study archiving.',
+    pillBg: 'bg-blue-50 text-blue-900 border-blue-200'
+  },
+  Expert: {
+    id: 'Expert',
+    label: 'Expert',
+    badge: 'Expert',
+    title: 'Bio-Patent Attorney & IPR Counsel',
+    desc: 'Advanced Section 3(e) synergistic data analytics, TKDL citation cross-matching, and formal patent dossier exports.',
+    pillBg: 'bg-emerald-50 text-emerald-900 border-emerald-200'
+  },
+  Admin: {
+    id: 'Admin',
+    label: 'Admin',
+    badge: 'Admin',
+    title: 'Statutory Admin & Regulatory Authority',
+    desc: 'Full administrative rights with statutory verification audits, usage telemetry, and compliance logging.',
+    pillBg: 'bg-amber-50 text-amber-900 border-amber-200'
+  },
+  Organization: {
+    id: 'Organization',
+    label: 'Organization',
+    badge: 'Organization',
+    title: 'Institutional Enterprise & Council',
+    desc: 'Enterprise multi-user governance, institutional ABS benefit-sharing tracking, and portfolio-wide IP audits.',
+    pillBg: 'bg-purple-50 text-purple-900 border-purple-200'
+  }
+};
+
+export function normalizeRole(r?: string): UserRole {
+  if (!r) return 'Practitioner';
+  if (r === 'USER') return 'Practitioner';
+  if (r === 'EXPERT') return 'Expert';
+  if (r === 'ADMIN') return 'Admin';
+  if (ALL_ROLES.includes(r as UserRole)) return r as UserRole;
+  return 'Practitioner';
+}
+
+export interface ExpertCertificate {
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  fileDataUrl?: string;
+  certificateId: string;
+  certificateType: string;
+  issuingAuthority: string;
+  uploadedAt: string;
+  status: 'Verified' | 'Pending_Verification';
+}
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole; // currently ACTIVE role — kept for backward compatibility with existing code (Header, ProfileView, etc.)
-  roles: UserRole[]; // ALL roles this user has (signup role + any added via "+ Add Role"). Always includes `role`.
+  role: UserRole;
+  roles: UserRole[];
   preferred_language: Language;
   created_at: string;
+  photo_url?: string;
+  organization?: string;
+  expertCertificate?: ExpertCertificate;
 }
 
 export interface DocumentMetadata {
@@ -83,6 +215,7 @@ export interface Citation {
   source: string;
   excerpt: string;
   page?: number;
+  url?: string;
 }
 
 export type ConfidenceLevel = 'High' | 'Moderate' | 'Low' | 'Insufficient evidence';
@@ -92,6 +225,8 @@ export interface ConfidenceMetric {
   score: number; // 0.0 to 1.0
   reasons: string[];
 }
+
+export type Jurisdiction = 'india' | 'international';
 
 export interface StructuredChatMessage {
   id: string;
@@ -107,6 +242,7 @@ export interface StructuredChatMessage {
   feedback?: 'helpful' | 'unhelpful' | null;
   feedback_notes?: string;
   language?: Language;
+  jurisdiction?: Jurisdiction;
 }
 
 export interface Conversation {
@@ -114,6 +250,7 @@ export interface Conversation {
   user_id: string;
   title: string;
   language: Language;
+  jurisdiction?: Jurisdiction;
   created_at: string;
   updated_at: string;
   messages: StructuredChatMessage[];
@@ -140,6 +277,8 @@ export interface ProductInformation {
   claims: string;
   target_market: 'Domestic (India)' | 'Export' | 'Both';
   biological_source_details?: string;
+  target_symptoms?: string;
+  distribution_channels?: string;
 }
 
 export interface ProductAnalysisResult {
@@ -175,6 +314,43 @@ export interface ProductAnalysisResult {
   created_at: string;
 }
 
+// Low Confidence Flagged Query & Expert Legal Advisory Types
+export interface ExpertReview {
+  expert_id: string;
+  expert_name: string;
+  expert_title: string;
+  reviewed_at: string;
+  legal_opinion: string;
+  statutory_clauses: string[];
+  actionable_guidance: string[];
+  assessment: 'Approved with Modifications' | 'Section 3(p) Barred' | 'Alternative IP Pathway' | 'Requires Empirical Data';
+}
+
+export interface LowConfidenceQuery {
+  id: string;
+  conversation_id?: string;
+  inquirer_name: string;
+  inquirer_role: UserRole;
+  inquirer_organization?: string;
+  topic: string;
+  query: string;
+  created_at: string;
+  jurisdiction?: 'india' | 'international';
+  ai_response: {
+    content: string;
+    relevant_considerations?: string[];
+    recommended_next_steps?: string[];
+    citations?: Citation[];
+    confidence: {
+      level: 'Low' | 'Insufficient evidence' | 'Moderate' | 'High';
+      score: number;
+      reasons: string[];
+    };
+  };
+  status: 'pending_review' | 'in_review' | 'resolved';
+  expert_review?: ExpertReview;
+}
+
 // IPR Navigator Types
 export type ProtectableAssetType = 
   | 'New invention'
@@ -191,7 +367,8 @@ export type ProtectableAssetType =
 export type IPRAssetType = ProtectableAssetType;
 
 export interface IPRNavigatorQuery {
-  asset_type: ProtectableAssetType;
+  asset_type?: ProtectableAssetType | string;
+  asset_types?: ProtectableAssetType[];
   description: string;
   is_classical_text_derived?: boolean;
   has_synergistic_data?: boolean;
@@ -222,7 +399,13 @@ export interface TKABSQuery {
   geographic_origin: string;
   traditional_use: string;
   source_community_info: string;
-  intended_use: 'Domestic commercial utilization' | 'Foreign entity utilization' | 'Collaborative research' | 'IP filing';
+  intended_use:
+    | 'Domestic commercial utilization'
+    | 'Foreign entity utilization'
+    | 'Collaborative research'
+    | 'IP filing'
+    | 'Commercial utilization'
+    | 'Academic research';
 }
 
 export interface TKABSResult {

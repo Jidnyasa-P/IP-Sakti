@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { authFetch } from './auth/authStorage';
 import {
   FolderArchive,
   MessageSquare,
@@ -34,25 +33,35 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
   const loadWorkspaceData = async () => {
     try {
       const [convRes, prodRes, savedRes] = await Promise.all([
-        authFetch('/api/conversations'),
-        authFetch('/api/products'),
-        authFetch('/api/workspace/saved-research'),
+        fetch('/api/conversations').catch(() => null),
+        fetch('/api/products').catch(() => null),
+        fetch('/api/workspace/saved-research').catch(() => null),
       ]);
-      const convData = await convRes.json();
-      const prodData = await prodRes.json();
-      const savedData = await savedRes.json();
 
-      setConversations(convData);
-      setProducts(prodData);
-      setSavedResearch(savedData);
+      const convData =
+        convRes && convRes.ok && convRes.headers.get('content-type')?.includes('application/json')
+          ? await convRes.json()
+          : [];
+      const prodData =
+        prodRes && prodRes.ok && prodRes.headers.get('content-type')?.includes('application/json')
+          ? await prodRes.json()
+          : [];
+      const savedData =
+        savedRes && savedRes.ok && savedRes.headers.get('content-type')?.includes('application/json')
+          ? await savedRes.json()
+          : [];
+
+      setConversations(Array.isArray(convData) ? convData : []);
+      setProducts(Array.isArray(prodData) ? prodData : []);
+      setSavedResearch(Array.isArray(savedData) ? savedData : []);
     } catch (e) {
-      console.error('Failed to load workspace data:', e);
+      console.warn('Failed to load workspace data:', e);
     }
   };
 
   const deleteSavedItem = async (id: string) => {
     try {
-      await authFetch(`/api/workspace/saved-research/${id}`, { method: 'DELETE' });
+      await fetch(`/api/workspace/saved-research/${id}`, { method: 'DELETE' });
       setSavedResearch(savedResearch.filter(s => s.id !== id));
     } catch (e) {
       console.error('Failed to delete saved item:', e);
@@ -75,7 +84,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="w-full px-3 sm:px-5 lg:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
       {/* Workspace Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">

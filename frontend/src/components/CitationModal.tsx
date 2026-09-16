@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { authFetch } from './auth/authStorage';
 import { X, ExternalLink, BookOpen, ShieldCheck, FileText } from 'lucide-react';
 import { Citation, DocumentMetadata, DocumentChunk } from '../types';
+import { getSectionLink } from '../utils/sectionLinks';
 
 interface CitationModalProps {
   citation: Citation | null;
@@ -15,7 +15,7 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
   useEffect(() => {
     if (!citation) return;
     setLoading(true);
-    authFetch(`/api/documents/${citation.document_id}`)
+    fetch(`/api/documents/${citation.document_id}`)
       .then(res => res.json())
       .then(data => {
         setDocDetails(data);
@@ -28,6 +28,9 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
   }, [citation]);
 
   if (!citation) return null;
+
+  const sectionLinkInfo = getSectionLink(citation.section, citation.document_id);
+  const officialUrl = citation.url || sectionLinkInfo.url;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
@@ -56,22 +59,35 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {/* Metadata chips */}
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-medium">
-              Authority: {citation.authority}
-            </span>
-            <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 border border-slate-200 font-medium">
-              Section: {citation.section}
-            </span>
-            <span className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-800 border border-blue-200/60 font-medium">
-              Source: {citation.source}
-            </span>
-            {citation.page && (
-              <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200/60 font-medium">
-                Page {citation.page}
+          {/* Metadata chips & Official Link Action */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-medium">
+                Authority: {citation.authority}
               </span>
-            )}
+              <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 border border-slate-200 font-medium">
+                Section: {citation.section}
+              </span>
+              <span className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-800 border border-blue-200/60 font-medium">
+                Source: {citation.source}
+              </span>
+              {citation.page && (
+                <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200/60 font-medium">
+                  Page {citation.page}
+                </span>
+              )}
+            </div>
+
+            <a
+              href={officialUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-xs shadow-2xs transition-colors shrink-0"
+              title={`Visit official statutory portal: ${sectionLinkInfo.authority}`}
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Official Cited Section</span>
+            </a>
           </div>
 
           {/* Cited Passage */}
@@ -80,9 +96,9 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
               <FileText className="w-4 h-4 text-emerald-700" />
               Retrieved Statutory Passage
             </div>
-            <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap font-serif">
+            <div className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap font-serif">
               "{citation.excerpt}"
-            </p>
+            </div>
           </div>
 
           {/* Extended Document Information */}
@@ -118,18 +134,6 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
                   <span className="font-medium text-slate-800">{docDetails.metadata.chunk_count} verified chunks</span>
                 </div>
               </div>
-
-              {docDetails.metadata.url && (
-                <a
-                  href={docDetails.metadata.url}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-800 hover:text-emerald-950 hover:underline pt-1"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  View official portal ({docDetails.metadata.authority})
-                </a>
-              )}
             </div>
           ) : null}
         </div>

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { authFetch } from './auth/authStorage';
 import {
   BookOpen,
   Search,
@@ -14,6 +13,7 @@ import {
 import { Citation, DocumentChunk, DocumentMetadata } from '../types';
 import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
+import { getSectionLink } from '../utils/sectionLinks';
 
 interface ResearchViewProps {
   onOpenCitation: (citation: Citation) => void;
@@ -43,12 +43,14 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
       if (authorityFilter !== 'ALL') params.set('authority', authorityFilter);
       if (docTypeFilter !== 'ALL') params.set('document_type', docTypeFilter);
 
-      const res = await authFetch(`/api/research/search?${params.toString()}`);
-      const data = await res.json();
-      setDocuments(data.documents || []);
-      setMatchingChunks(data.matching_chunks || []);
+      const res = await fetch(`/api/research/search?${params.toString()}`).catch(() => null);
+      if (res && res.ok && res.headers.get('content-type')?.includes('application/json')) {
+        const data = await res.json();
+        setDocuments(Array.isArray(data) ? data : (data.documents || data.results || []));
+        setMatchingChunks(data.matching_chunks || []);
+      }
     } catch (err) {
-      console.error('Failed to load documents:', err);
+      console.warn('Failed to load documents:', err);
     } finally {
       setLoading(false);
     }
@@ -66,7 +68,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
   const handleInspectDoc = async (id: string) => {
     setSelectedDocId(id);
     try {
-      const res = await authFetch(`/api/documents/${id}`);
+      const res = await fetch(`/api/documents/${id}`);
       const data = await res.json();
       setSelectedDocChunks(data.chunks || []);
     } catch (e) {
@@ -76,7 +78,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
 
   const handleSaveToWorkspace = async (doc: DocumentMetadata) => {
     try {
-      await authFetch('/api/workspace/save-research', {
+      await fetch('/api/workspace/save-research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -94,7 +96,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="w-full px-3 sm:px-5 lg:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
       {/* Header */}
       <div className="space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-200/80 text-xs font-semibold">
@@ -252,7 +254,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
                   {doc.summary}
                 </p>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
                   <div className="flex items-center gap-2 text-[11px] text-slate-400">
                     <span>{doc.jurisdiction}</span>
                     <span>•</span>
@@ -261,14 +263,29 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
                     <span className="text-emerald-700 font-semibold">{doc.chunk_count} passages</span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleInspectDoc(doc.id)}
-                    className="flex items-center gap-1 font-semibold text-slate-800 hover:text-emerald-800 transition-colors"
-                  >
-                    <span>Inspect Sections</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {doc.url && (
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="inline-flex items-center gap-1 font-medium text-[11px] text-emerald-800 hover:text-emerald-950 hover:underline"
+                        title="Open official statutory portal"
+                      >
+                        <span>Official Source</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleInspectDoc(doc.id)}
+                      className="flex items-center gap-1 font-semibold text-slate-800 hover:text-emerald-800 transition-colors"
+                    >
+                      <span>Inspect Sections</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -285,36 +302,36 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
 
             {selectedDocId && selectedDocChunks.length > 0 ? (
               <div className="space-y-3 max-h-[calc(100vh-14rem)] overflow-y-auto pr-1">
-                {selectedDocChunks.map((chunk, idx) => (
-                  <div
-                    key={chunk.chunk_id}
-                    onClick={() =>
-                      onOpenCitation({
-                        index: idx + 1,
-                        chunk_id: chunk.chunk_id,
-                        document_id: chunk.document_id,
-                        title: chunk.title,
-                        authority: chunk.authority,
-                        section: chunk.section,
-                        source: chunk.source,
-                        excerpt: chunk.chunk_text,
-                        page: chunk.page,
-                      })
-                    }
-                    className="p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50/50 hover:border-emerald-300 transition-colors cursor-pointer group"
-                  >
-                    <div className="flex items-center justify-between text-xs font-semibold text-slate-900 group-hover:text-emerald-950 mb-1">
-                      <span>{chunk.section}</span>
-                      <span className="text-[10px] text-slate-400">Page {chunk.page}</span>
-                    </div>
-                    <p className="text-xs text-slate-600 line-clamp-3 font-serif">
-                      "{chunk.chunk_text}"
-                    </p>
-                    <span className="text-[10px] text-emerald-700 font-medium block mt-1">
-                      Click to view full statutory context →
-                    </span>
-                  </div>
-                ))}
+                {selectedDocChunks.map((chunk) => {
+                  const linkInfo = getSectionLink(chunk.section, chunk.document_id);
+                  return (
+                    <a
+                      key={chunk.chunk_id}
+                      href={linkInfo.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title={`Open official statutory text: ${chunk.section} (${linkInfo.authority})`}
+                      className="block p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group space-y-2 shadow-2xs hover:shadow-xs"
+                    >
+                      <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-900 group-hover:text-emerald-950">
+                        <span className="line-clamp-1">{chunk.section}</span>
+                        <span className="text-[10px] text-slate-500 font-normal shrink-0">Page {chunk.page}</span>
+                      </div>
+
+                      <div className="text-xs text-slate-600 line-clamp-3 font-serif leading-relaxed">
+                        "{chunk.chunk_text}"
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+                        <span className="text-[10px] text-slate-400 font-medium">{chunk.authority.split(',')[0]}</span>
+                        <span className="inline-flex items-center gap-1 font-semibold text-emerald-800 group-hover:text-emerald-950 group-hover:underline">
+                          <span>Open Official Section</span>
+                          <ExternalLink className="w-3.5 h-3.5 text-emerald-700 transition-transform group-hover:translate-x-0.5" />
+                        </span>
+                      </div>
+                    </a>
+                  );
+                })}
               </div>
             ) : (
               <div className="py-12 text-center text-xs text-slate-400 space-y-2">

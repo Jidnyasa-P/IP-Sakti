@@ -1,1 +1,486 @@
 @import "tailwindcss";
+
+@variant dark (&:is(.dark, .dark *));
+
+/* Smooth transition for theme change */
+html {
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ==========================================================================
+   Complete Dark Mode Color Adaptation System
+   Adapts all surfaces, text, borders, controls, and components to dark mode
+   with statutory high-contrast readability and AYUSH theme harmony.
+   ========================================================================== */
+
+.dark {
+  color-scheme: dark;
+}
+
+/* Base Body and Root Viewport */
+.dark,
+.dark body {
+  background-color: #0b0f19 !important;
+  color: #f3f4f6 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Surface Backgrounds
+   -------------------------------------------------------------------------- */
+
+/* Standard white card / panel backgrounds */
+.dark .bg-white,
+.dark [class*="bg-white/"] {
+  background-color: #111827 !important;
+}
+
+/* Preserve subtle translucent white overlays inside dark banners */
+.dark .bg-white\/5,
+.dark .bg-white\/10,
+.dark .bg-white\/15,
+.dark .bg-white\/20,
+.dark .bg-white\/25,
+.dark .bg-white\/30 {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Slate background hierarchies */
+.dark .bg-slate-50,
+.dark [class*="bg-slate-50"] {
+  background-color: #0b0f19 !important;
+}
+
+.dark .bg-slate-100,
+.dark [class*="bg-slate-100"] {
+  background-color: #1e293b !important;
+}
+
+.dark .bg-slate-200,
+.dark [class*="bg-slate-200"] {
+  background-color: #334155 !important;
+}
+
+.dark .bg-gray-50,
+.dark [class*="bg-gray-50"] {
+  background-color: #0b0f19 !important;
+}
+
+.dark .bg-gray-100,
+.dark [class*="bg-gray-100"] {
+  background-color: #1e293b !important;
+}
+
+/* --------------------------------------------------------------------------
+   Text Readability & Contrast
+   -------------------------------------------------------------------------- */
+
+.dark .text-slate-950,
+.dark [class*="text-slate-950"],
+.dark .text-slate-900,
+.dark [class*="text-slate-900"],
+.dark .text-gray-950,
+.dark [class*="text-gray-950"],
+.dark .text-gray-900,
+.dark [class*="text-gray-900"] {
+  color: #f9fafb !important;
+}
+
+.dark .text-slate-800,
+.dark [class*="text-slate-800"],
+.dark .text-gray-800,
+.dark [class*="text-gray-800"] {
+  color: #f3f4f6 !important;
+}
+
+.dark .text-slate-700,
+.dark [class*="text-slate-700"],
+.dark .text-gray-700,
+.dark [class*="text-gray-700"] {
+  color: #e5e7eb !important;
+}
+
+.dark .text-slate-600,
+.dark [class*="text-slate-600"],
+.dark .text-gray-600,
+.dark [class*="text-gray-600"] {
+  color: #d1d5db !important;
+}
+
+.dark .text-slate-500,
+.dark [class*="text-slate-500"],
+.dark .text-gray-500,
+.dark [class*="text-gray-500"] {
+  color: #9ca3af !important;
+}
+
+.dark .text-slate-400,
+.dark [class*="text-slate-400"],
+.dark .text-gray-400,
+.dark [class*="text-gray-400"] {
+  color: #9ca3af !important;
+}
+
+.dark .text-white,
+.dark [class*="text-white"] {
+  color: #ffffff !important;
+}
+
+/* --------------------------------------------------------------------------
+   Domain Theme Colors (Emerald, Teal, Amber, Blue, Indigo, Rose)
+   -------------------------------------------------------------------------- */
+
+/* Emerald (AYUSH / Statutory High-Confidence) */
+.dark .text-emerald-950,
+.dark [class*="text-emerald-950"],
+.dark .text-emerald-900,
+.dark [class*="text-emerald-900"] {
+  color: #6ee7b7 !important;
+}
+
+.dark .text-emerald-800,
+.dark [class*="text-emerald-800"] {
+  color: #34d399 !important;
+}
+
+.dark .text-emerald-700,
+.dark [class*="text-emerald-700"],
+.dark .text-emerald-600,
+.dark [class*="text-emerald-600"] {
+  color: #10b981 !important;
+}
+
+.dark .bg-emerald-50,
+.dark [class*="bg-emerald-50"] {
+  background-color: rgba(6, 78, 59, 0.35) !important;
+}
+
+.dark .bg-emerald-100,
+.dark [class*="bg-emerald-100"] {
+  background-color: rgba(6, 95, 70, 0.45) !important;
+}
+
+.dark .border-emerald-200,
+.dark [class*="border-emerald-200"],
+.dark .border-emerald-300,
+.dark [class*="border-emerald-300"] {
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+/* Teal (Traditional Knowledge / Biological Diversity) */
+.dark .text-teal-950,
+.dark [class*="text-teal-950"],
+.dark .text-teal-900,
+.dark [class*="text-teal-900"] {
+  color: #5eead4 !important;
+}
+
+.dark .text-teal-800,
+.dark [class*="text-teal-800"] {
+  color: #2dd4bf !important;
+}
+
+.dark .text-teal-700,
+.dark [class*="text-teal-700"] {
+  color: #14b8a6 !important;
+}
+
+.dark .bg-teal-50,
+.dark [class*="bg-teal-50"] {
+  background-color: rgba(17, 94, 89, 0.35) !important;
+}
+
+.dark .bg-teal-100,
+.dark [class*="bg-teal-100"] {
+  background-color: rgba(19, 78, 74, 0.45) !important;
+}
+
+.dark .border-teal-200,
+.dark [class*="border-teal-200"],
+.dark .border-teal-300,
+.dark [class*="border-teal-300"] {
+  border-color: rgba(20, 184, 166, 0.3) !important;
+}
+
+/* Amber (Statutory Disclaimers, Warnings, Flags) */
+.dark .text-amber-950,
+.dark [class*="text-amber-950"],
+.dark .text-amber-900,
+.dark [class*="text-amber-900"] {
+  color: #fde047 !important;
+}
+
+.dark .text-amber-800,
+.dark [class*="text-amber-800"] {
+  color: #facc15 !important;
+}
+
+.dark .text-amber-700,
+.dark [class*="text-amber-700"] {
+  color: #fbbf24 !important;
+}
+
+.dark .bg-amber-50,
+.dark [class*="bg-amber-50"] {
+  background-color: rgba(120, 53, 15, 0.35) !important;
+}
+
+.dark .bg-amber-100,
+.dark [class*="bg-amber-100"] {
+  background-color: rgba(146, 64, 14, 0.45) !important;
+}
+
+.dark .border-amber-200,
+.dark [class*="border-amber-200"],
+.dark .border-amber-300,
+.dark [class*="border-amber-300"] {
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Blue & Indigo (International Jurisdiction, Portals, Legal Citations) */
+.dark .text-blue-950,
+.dark [class*="text-blue-950"],
+.dark .text-blue-900,
+.dark [class*="text-blue-900"] {
+  color: #93c5fd !important;
+}
+
+.dark .text-blue-800,
+.dark [class*="text-blue-800"] {
+  color: #60a5fa !important;
+}
+
+.dark .bg-blue-50,
+.dark [class*="bg-blue-50"] {
+  background-color: rgba(30, 58, 138, 0.35) !important;
+}
+
+.dark .border-blue-200,
+.dark [class*="border-blue-200"],
+.dark .border-blue-300,
+.dark [class*="border-blue-300"] {
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+.dark .text-indigo-950,
+.dark [class*="text-indigo-950"],
+.dark .text-indigo-900,
+.dark [class*="text-indigo-900"] {
+  color: #a5b4fc !important;
+}
+
+.dark .text-indigo-800,
+.dark [class*="text-indigo-800"] {
+  color: #818cf8 !important;
+}
+
+.dark .bg-indigo-50,
+.dark [class*="bg-indigo-50"] {
+  background-color: rgba(49, 46, 129, 0.35) !important;
+}
+
+.dark .border-indigo-200,
+.dark [class*="border-indigo-200"],
+.dark .border-indigo-300,
+.dark [class*="border-indigo-300"] {
+  border-color: rgba(99, 102, 241, 0.35) !important;
+}
+
+/* Rose (Objections, Rejections, Critical Flags) */
+.dark .text-rose-950,
+.dark [class*="text-rose-950"],
+.dark .text-rose-900,
+.dark [class*="text-rose-900"] {
+  color: #fda4af !important;
+}
+
+.dark .text-rose-800,
+.dark [class*="text-rose-800"] {
+  color: #fb7185 !important;
+}
+
+.dark .text-rose-700,
+.dark [class*="text-rose-700"] {
+  color: #f43f5e !important;
+}
+
+.dark .bg-rose-50,
+.dark [class*="bg-rose-50"] {
+  background-color: rgba(136, 19, 55, 0.35) !important;
+}
+
+.dark .border-rose-200,
+.dark [class*="border-rose-200"],
+.dark .border-rose-300,
+.dark [class*="border-rose-300"] {
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Borders & Separators
+   -------------------------------------------------------------------------- */
+
+.dark .border-slate-100,
+.dark [class*="border-slate-100"],
+.dark .border-slate-200,
+.dark [class*="border-slate-200"],
+.dark .border-gray-200,
+.dark [class*="border-gray-200"] {
+  border-color: #1f2937 !important;
+}
+
+.dark .border-slate-300,
+.dark [class*="border-slate-300"],
+.dark .border-gray-300,
+.dark [class*="border-gray-300"] {
+  border-color: #374151 !important;
+}
+
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1f2937 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Buttons & Interactive Elements
+   -------------------------------------------------------------------------- */
+
+/* Ensure dark primary buttons are clearly distinct and contrasted against dark cards */
+.dark button.bg-slate-900,
+.dark button[class*="bg-slate-900"],
+.dark a.bg-slate-900,
+.dark a[class*="bg-slate-900"] {
+  background-color: #065f46 !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(52, 211, 153, 0.35) !important;
+}
+
+.dark button.bg-slate-900:hover,
+.dark button[class*="bg-slate-900"]:hover,
+.dark a.bg-slate-900:hover,
+.dark a[class*="bg-slate-900"]:hover {
+  background-color: #047857 !important;
+  border-color: rgba(52, 211, 153, 0.5) !important;
+}
+
+/* Secondary & Ghost Buttons Hover */
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-100:hover {
+  background-color: #1e293b !important;
+}
+
+.dark .hover\:bg-slate-200:hover {
+  background-color: #334155 !important;
+}
+
+.dark .hover\:text-slate-900:hover {
+  color: #ffffff !important;
+}
+
+.dark .hover\:text-slate-800:hover {
+  color: #f3f4f6 !important;
+}
+
+.dark .hover\:text-slate-700:hover {
+  color: #e5e7eb !important;
+}
+
+/* --------------------------------------------------------------------------
+   Forms & Controls
+   -------------------------------------------------------------------------- */
+
+.dark input[type="text"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="number"],
+.dark input[type="search"],
+.dark textarea,
+.dark select {
+  background-color: #1e293b !important;
+  color: #f9fafb !important;
+  border-color: #374151 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: #10b981 !important;
+  background-color: #111827 !important;
+  outline: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   Navigation Header, Footer & Modals
+   -------------------------------------------------------------------------- */
+
+.dark header,
+.dark header.bg-white\/95 {
+  background-color: rgba(17, 24, 39, 0.95) !important;
+  border-bottom-color: #1f2937 !important;
+}
+
+.dark footer {
+  background-color: #111827 !important;
+  border-top-color: #1f2937 !important;
+}
+
+.dark .bg-white.shadow-lg,
+.dark .bg-white.shadow-xl,
+.dark .bg-white.shadow-2xl,
+.dark [role="dialog"],
+.dark #mobile-nav-drawer {
+  background-color: #111827 !important;
+  border-color: #374151 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Gradients in Dark Mode
+   -------------------------------------------------------------------------- */
+
+.dark .from-slate-50 {
+  --tw-gradient-from: #111827 var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(17, 24, 39, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.dark .to-emerald-50\/20,
+.dark .to-emerald-50\/30 {
+  --tw-gradient-to: rgba(6, 78, 59, 0.3) var(--tw-gradient-to-position) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Shadows and Scrollbars
+   -------------------------------------------------------------------------- */
+
+.dark .shadow-2xs,
+.dark .shadow-xs,
+.dark .shadow-sm,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl,
+.dark .shadow-2xl {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.6) !important;
+}
+
+.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #0b0f19;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}

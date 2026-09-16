@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { authFetch } from './auth/authStorage';
 import {
   Shield,
   Leaf,
@@ -9,11 +8,15 @@ import {
   Sparkles,
   ArrowRight,
   BookOpen,
-  Info
+  Info,
+  FileDown,
+  ExternalLink
 } from 'lucide-react';
 import { Citation, TKABSQuery, TKABSResult } from '../types';
 import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
+import { exportTKABSToPDF } from '../utils/pdfGenerator';
+import { getSectionLink } from '../utils/sectionLinks';
 
 interface TraditionalKnowledgeViewProps {
   onOpenCitation: (citation: Citation) => void;
@@ -32,6 +35,19 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TKABSResult | null>(null);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+
+  const handleExportPDF = () => {
+    if (!result) return;
+    setIsExportingPDF(true);
+    try {
+      exportTKABSToPDF(result, formData);
+    } catch (err) {
+      console.error('Failed to export TK-ABS PDF dossier:', err);
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
 
   const plantPresets = [
     {
@@ -71,7 +87,7 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
   const handleAnalyze = async () => {
     setLoading(true);
     try {
-      const res = await authFetch('/api/abs/analyze', {
+      const res = await fetch('/api/abs/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -86,7 +102,7 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="w-full px-3 sm:px-5 lg:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
       {/* Title & Introduction */}
       <div className="space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-200/80 text-xs font-semibold">
@@ -243,6 +259,39 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
       {/* Results Display */}
       {result && (
         <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Header Actions */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <div>
+              <span className="text-[11px] font-bold text-emerald-800 tracking-wider uppercase">
+                Statutory Assessment Dossier
+              </span>
+              <h2 className="text-xl font-serif font-bold text-slate-900">
+                {formData.biological_resource}
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                id="export-tk-pdf-btn"
+                onClick={handleExportPDF}
+                disabled={isExportingPDF}
+                className="px-3.5 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+              >
+                <FileDown className="w-4 h-4 text-amber-300" />
+                <span>{isExportingPDF ? 'Generating PDF...' : 'Extract as PDF'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setResult(null)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors"
+              >
+                New Assessment
+              </button>
+            </div>
+          </div>
+
           {/* Section 1: Traditional Knowledge Overview */}
           <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
             <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
@@ -331,28 +380,44 @@ export const TraditionalKnowledgeView: React.FC<TraditionalKnowledgeViewProps> =
             </ol>
           </div>
 
-          {/* Section 5: Sources */}
+          {/* Section 5: Sources - 1 Option per section to open working link */}
           {result.sources && result.sources.length > 0 && (
             <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
               <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                 Authoritative Legal Provisions
               </h4>
-              <div className="space-y-2">
-                {result.sources.map((s) => (
-                  <div
-                    key={s.chunk_id}
-                    onClick={() => onOpenCitation(s)}
-                    className="p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-emerald-50/50 hover:border-emerald-300 transition-colors cursor-pointer group"
-                  >
-                    <div className="flex items-center justify-between text-xs font-semibold text-slate-800 group-hover:text-emerald-900 mb-1">
-                      <span>[{s.index}] {s.section} — {s.title}</span>
-                      <span className="text-[10px] text-slate-500">{s.authority}</span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 line-clamp-1 italic">
-                      "{s.excerpt}"
-                    </p>
-                  </div>
-                ))}
+              <div className="space-y-2.5">
+                {result.sources.map((s) => {
+                  const linkInfo = getSectionLink(s.section, s.document_id);
+                  const sourceUrl = s.url || linkInfo.url;
+                  return (
+                    <a
+                      key={s.chunk_id}
+                      href={sourceUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title={`Open official statutory text: ${s.section} (${linkInfo.authority})`}
+                      className="block p-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group space-y-2 shadow-2xs hover:shadow-xs"
+                    >
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-800 group-hover:text-emerald-900 mb-1">
+                        <span>[{s.index}] {s.section} — {s.title}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-white border border-slate-200 font-medium text-slate-700">
+                          {s.authority.split(',')[0]}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-600 line-clamp-2 italic font-serif leading-relaxed">
+                        "{s.excerpt}"
+                      </div>
+                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
+                        <span className="text-[10px] text-slate-400 font-medium">Official Reference</span>
+                        <span className="inline-flex items-center gap-1 font-semibold text-emerald-800 group-hover:text-emerald-950 group-hover:underline">
+                          <span>Open Official Section</span>
+                          <ExternalLink className="w-3.5 h-3.5 text-emerald-700 transition-transform group-hover:translate-x-0.5" />
+                        </span>
+                      </div>
+                    </a>
+                  );
+                })}
               </div>
             </div>
           )}

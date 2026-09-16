@@ -550,3 +550,36 @@ export const MARATHI_STATUTORY_DICTIONARY: Record<string, string> = {
   'footer.portals': 'अधिकृत वैधानिक पोर्टल्स',
   'footer.disclaimer': 'भारतातील आयुष संशोधक, आयपीआर वकील, नवसंशोधक आणि नियामक निर्णयकर्त्यांसाठी विकसित.'
 };
+
+import { Language } from '../types';
+import { INDIC_STATUTORY_DICTIONARIES } from './indicDictionaries';
+
+export const STATUTORY_DICTIONARIES: Record<Language, Record<string, string>> = {
+  en: BASE_DICTIONARY,
+  hi: HINDI_STATUTORY_DICTIONARY,
+  mr: MARATHI_STATUTORY_DICTIONARY,
+  as: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.as || {}) },
+  bn: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.bn || {}) },
+  brx: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.brx || {}) },
+  doi: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.doi || {}) },
+  gu: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.gu || {}) },
+  kn: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.kn || {}) },
+  ks: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.ks || {}) },
+  kok: { ...MARATHI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.kok || {}) },
+  mai: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.mai || {}) },
+  ml: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.ml || {}) },
+  mni: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.mni || {}) },
+  ne: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.ne || {}) },
+  or: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.or || {}) },
+  pa: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.pa || {}) },
+  sa: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.sa || {}) },
+  sat: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.sat || {}) },
+  sd: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.sd || {}) },
+  ta: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.ta || {}) },
+  te: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.te || {}) },
+  ur: { ...HINDI_STATUTORY_DICTIONARY, ...(INDIC_STATUTORY_DICTIONARIES.ur || {}) }
+};
+
+export function getInstantDictionary(lang: Language): Record<string, string> {
+  return STATUTORY_DICTIONARIES[lang] || BASE_DICTIONARY;
+}
