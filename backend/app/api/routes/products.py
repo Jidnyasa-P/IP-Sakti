@@ -7,8 +7,8 @@ from app.database.session import get_db
 from app.models.product import COLLECTION as PRODUCTS_COLLECTION, new_product_analysis, to_dict as product_to_dict
 from app.models.tk_abs_analysis import COLLECTION as TK_ABS_COLLECTION, new_tk_abs_analysis, to_dict as tk_abs_to_dict
 from app.schemas.domain import ProductAnalyzeRequest, IPRNavigatorRequest, TKABSRequest
-from app.retrieval.hybrid_retrieval import get_retriever
-from app.services import decision_engines, pdf_service
+from app.services import pdf_service
+import app.rag_client as rag_client
 
 router = APIRouter()
 
@@ -21,17 +21,13 @@ def _pdf_response(pdf_bytes: bytes, filename: str) -> Response:
     )
 
 
-def _evidence_for(query_text: str, top_k: int = 5) -> list[dict]:
-    retrieval = get_retriever().retrieve(query_text, top_k=top_k)
-    return retrieval.citations
-
-
 @router.post("/api/products/analyze")
-def analyze_product(body: ProductAnalyzeRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
+async def analyze_product(body: ProductAnalyzeRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     product = body.as_product_dict()
-    search_text = f"{product.get('product_type', '')} {product.get('ingredients', '')} {product.get('claims', '')} {product.get('classical_reference', '')}"
-    citations = _evidence_for(search_text)
-    result = decision_engines.analyze_product(product, citations, user_id=current_user["id"])
+    # ip_sakti_rag does classification, retrieval, and the full decision-engine
+    # writeup in one call -- see ip_sakti_rag/app/pipeline.py::analyze_product.
+    result = await rag_client.analyze_product(product)
+    result["user_id"] = current_user["id"]
 
     db[PRODUCTS_COLLECTION].insert_one(new_product_analysis(
         id=result["id"],
@@ -70,11 +66,6 @@ def get_product(product_id: str, current_user: dict = Depends(get_current_user),
 
 @router.get("/api/products/{product_id}/pdf")
 def download_product_pdf(product_id: str, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    """Exports an already-generated Product Analyzer result as a PDF.
-    Prefers the persisted result (written by POST /api/products/analyze)
-    rather than re-running the analysis. Same ownership rule as
-    GET /api/products/{product_id}: a normal user may only export their own
-    result; Admins may export any."""
     row = db[PRODUCTS_COLLECTION].find_one({"_id": product_id})
     if not row:
         raise HTTPException(status_code=404, detail="Product analysis not found.")
@@ -87,29 +78,21 @@ def download_product_pdf(product_id: str, current_user: dict = Depends(get_curre
 
 
 @router.post("/api/ipr/analyze")
-def analyze_ipr(body: IPRNavigatorRequest, current_user: dict = Depends(get_current_user)):
-    citations = _evidence_for(f"{body.asset_type} {body.description or ''}")
-    return decision_engines.evaluate_ipr(body.asset_type, citations)
+async def analyze_ipr(body: IPRNavigatorRequest, current_user: dict = Depends(get_current_user)):
+    return await rag_client.analyze_ipr(body.model_dump())
 
 
 @router.get("/api/ipr/overview")
-def ipr_overview(current_user: dict = Depends(get_current_user)):
-    """Read-only, structured data for the IPR Navigator "at a glance"
-    popup — reuses the existing decision-engine table and document corpus
-    rather than duplicating them (Section: IPR Navigator at-a-glance)."""
-    return decision_engines.ipr_overview()
+async def ipr_overview(current_user: dict = Depends(get_current_user)):
+    """Read-only overview for the IPR Navigator "at a glance" popup.
+    Reuses the RAG service's document search rather than a local corpus."""
+    docs = await rag_client.search_documents(query="IPR overview patent trademark design PPVFR")
+    return {"documents": docs}
 
 
-def _handle_abs(body: TKABSRequest, user_id: str, db) -> dict:
-    search_text = f"{body.biological_resource} {body.plant_material} {body.traditional_use}"
-    citations = _evidence_for(search_text)
-    result = decision_engines.evaluate_tk_abs(body.model_dump(), citations)
+async def _handle_abs(body: TKABSRequest, user_id: str, db) -> dict:
+    result = await rag_client.analyze_tk_abs(body.model_dump())
 
-    # Minimal persistence (Section: TK-ABS PDF export) so the result can be
-    # re-exported as a PDF later without re-running the analysis. Reuses
-    # the existing MongoDB architecture; does not touch any other
-    # collection. The original response shape below is unchanged — only an
-    # additive "id" key is included so the frontend can request the PDF.
     record_id = f"TKABS-{uuid.uuid4().hex[:10]}"
     db[TK_ABS_COLLECTION].insert_one(new_tk_abs_analysis(
         id=record_id, user_id=user_id, request=body.model_dump(), result=result,
@@ -118,13 +101,13 @@ def _handle_abs(body: TKABSRequest, user_id: str, db) -> dict:
 
 
 @router.post("/api/abs/analyze")
-def analyze_abs(body: TKABSRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    return _handle_abs(body, current_user["id"], db)
+async def analyze_abs(body: TKABSRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
+    return await _handle_abs(body, current_user["id"], db)
 
 
 @router.post("/api/tk-abs/analyze")
-def analyze_tk_abs(body: TKABSRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    return _handle_abs(body, current_user["id"], db)
+async def analyze_tk_abs(body: TKABSRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
+    return await _handle_abs(body, current_user["id"], db)
 
 
 @router.get("/api/tk-abs/{analysis_id}")

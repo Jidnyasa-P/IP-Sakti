@@ -1,7 +1,5 @@
-import json
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_current_user
 from app.database.session import get_db
@@ -9,16 +7,15 @@ from app.models.conversation import CONVERSATIONS_COLLECTION, CHAT_MESSAGES_COLL
 from app.models.expert_escalation import COLLECTION as EXPERT_ESCALATIONS_COLLECTION, new_expert_escalation
 from app.models.feedback import COLLECTION as FEEDBACK_COLLECTION, new_feedback
 from app.schemas.chat import ChatRequest, QueryRequest, FeedbackRequest, NewConversationRequest
-from app.rag.pipeline import run_pipeline
-from app.services import conversation_service, audit_service
-from app.api.routes.misc_routes import record_telemetry
+from app.services import conversation_service, audit_service, expert_escalation_service
+import app.rag_client as rag_client
 
 router = APIRouter()
 
 
 def _get_owned_conversation(db, conversation_id: str, user_id: str, is_admin: bool) -> dict:
     """Fetch a conversation and enforce ownership (Section 7: user data
-    isolation) — Admins may access any conversation, everyone else only
+    isolation) -- Admins may access any conversation, everyone else only
     their own."""
     conv = db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id})
     if not conv:
@@ -34,26 +31,40 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
 
     conv = conversation_service.get_or_create_conversation(db, conversation_id, query, language, user_id=user_id)
 
-    result = await run_pipeline(query, language=language, target_market=target_market)
+    # All retrieval + reasoning happens in the ip_sakti_rag microservice now.
+    rag_result = await rag_client.chat(query=query, language=language, conversation_id=conv["_id"])
+
+    confidence = rag_result.get("confidence") or {}
+    escalation = expert_escalation_service.evaluate_escalation(
+        query=query,
+        confidence_level=confidence.get("level", "Low"),
+        has_conflicts=False,
+        jurisdiction_coverage_available=bool(rag_result.get("jurisdiction")),
+        user_requested=bool(rag_result.get("needs_expert")),
+    )
 
     conversation_service.add_message(
-        db, conversation_id=conv["_id"], role="user", content=query, language=result["detected_language"],
+        db, conversation_id=conv["_id"], role="user", content=query, language=rag_result.get("language"),
     )
     assistant_msg = conversation_service.add_message(
         db,
         conversation_id=conv["_id"],
         role="assistant",
-        content=result["answer"],
-        answer=result["answer"],
-        relevant_considerations=result["relevant_considerations"],
-        recommended_next_steps=result["recommended_next_steps"],
-        citations=result["citations"],
-        confidence=result["confidence"],
-        warnings=result["warnings"],
-        classification=result["classification"],
-        jurisdiction=result["jurisdiction"],
-        expert_escalation=result["expert_escalation"],
-        language=result["detected_language"],
+        content=rag_result.get("answer"),
+        answer=rag_result.get("answer"),
+        relevant_considerations=rag_result.get("relevant_considerations", []),
+        recommended_next_steps=rag_result.get("recommended_next_steps", []),
+        citations=rag_result.get("citations", []),
+        confidence=confidence,
+        warnings=[rag_result["disclaimer"]] if rag_result.get("needs_clarification") else [],
+        classification={"category": rag_result.get("product_classification")},
+        jurisdiction=rag_result.get("jurisdiction"),
+        expert_escalation={
+            "recommended": escalation.recommended,
+            "reason": escalation.reason,
+            "case_summary": escalation.case_summary,
+        },
+        language=rag_result.get("language"),
     )
     conversation_service.touch_conversation(db, conv)
 
@@ -61,31 +72,30 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
         db,
         conversation_id=conv["_id"],
         query=query,
-        classification=result["classification"],
-        jurisdiction=result["jurisdiction"],
-        retrieved_sources=result["citations"],
-        validation_status=result["validation_status"],
-        confidence=result["confidence"],
-        warnings=result["warnings"],
-        model_info={"model_used": result["model_used"], "demo_mode": result["demo_mode"]},
-        latency_ms=result["latency_ms"],
+        classification={"category": rag_result.get("product_classification")},
+        jurisdiction=rag_result.get("jurisdiction"),
+        retrieved_sources=rag_result.get("citations", []),
+        validation_status="validated",
+        confidence=confidence,
+        warnings=[],
+        model_info={"model_used": "ip_sakti_rag", "demo_mode": None},
+        latency_ms=rag_result.get("retrieval_metadata", {}).get("latency_ms"),
     )
 
-    record_telemetry(query, result["latency_ms"]["total_ms"], result["confidence"]["level"], len(result["citations"]))
-
-    if result["expert_escalation"]["recommended"]:
+    if escalation.recommended:
         db[EXPERT_ESCALATIONS_COLLECTION].insert_one(new_expert_escalation(
             id=f"esc-{uuid.uuid4().hex[:10]}",
             conversation_id=conv["_id"],
             recommended=True,
-            reason=result["expert_escalation"]["reason"],
-            case_summary=result["expert_escalation"]["case_summary"],
+            reason=escalation.reason,
+            case_summary=escalation.case_summary,
         ))
 
     return {
         "conversation_id": conv["_id"],
         "message": conversation_service.message_to_dict(assistant_msg),
-        "result": result,
+        "result": rag_result,
+        "escalation": escalation,
     }
 
 
@@ -98,28 +108,8 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
     return {
         "conversation_id": outcome["conversation_id"],
         "message": outcome["message"],
-        "retrieval_metadata": {
-            "intent": outcome["result"]["detected_intent"],
-            "language": outcome["result"]["detected_language"],
-            "latency_ms": outcome["result"]["latency_ms"]["total_ms"],
-        },
+        "retrieval_metadata": outcome["result"].get("retrieval_metadata", {}),
     }
-
-
-@router.post("/api/chat/stream")
-async def chat_stream(body: ChatRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    query = body.resolved_query()
-
-    async def event_generator():
-        try:
-            outcome = await _handle_query(
-                db, query, body.conversation_id, body.language, user_id=current_user["id"], target_market=body.target_market,
-            )
-            yield f"data: {json.dumps({'type': 'complete', **outcome})}\n\n"
-        except HTTPException as exc:
-            yield f"data: {json.dumps({'type': 'error', 'error': exc.detail})}\n\n"
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @router.post("/api/query")
@@ -127,27 +117,32 @@ async def query_endpoint(body: QueryRequest, current_user: dict = Depends(get_cu
     """Canonical SIH-spec endpoint (Section 25/26)."""
     outcome = await _handle_query(db, body.query, body.conversation_id, body.language, user_id=current_user["id"], target_market=body.target_market)
     result = outcome["result"]
+    escalation = outcome["escalation"]
     return {
         "conversation_id": outcome["conversation_id"],
-        "answer": result["answer"],
-        "classification": result["classification"],
-        "jurisdiction": result["jurisdiction"],
+        "answer": result.get("answer"),
+        "classification": {"category": result.get("product_classification")},
+        "jurisdiction": result.get("jurisdiction"),
         "recommended_actions": [
             {"step": i + 1, "action": step, "reason": "", "source": ""}
-            for i, step in enumerate(result["recommended_next_steps"])
+            for i, step in enumerate(result.get("recommended_next_steps", []))
         ],
         "compliance_requirements": [],
-        "citations": result["citations"],
-        "evidence": result["citations"],
-        "warnings": result["warnings"],
-        "confidence": result["confidence"]["score"],
-        "confidence_detail": result["confidence"],
-        "expert_escalation": result["expert_escalation"],
-        "language": result["detected_language"],
-        "demo_mode": result["demo_mode"],
-        "knowledge_graph_context": result["knowledge_graph_context"],
-        "conflicts": result["conflicts"],
-        "validation_status": result["validation_status"],
+        "citations": result.get("citations", []),
+        "evidence": result.get("evidence", []),
+        "warnings": [],
+        "confidence": (result.get("confidence") or {}).get("score"),
+        "confidence_detail": result.get("confidence"),
+        "expert_escalation": {
+            "recommended": escalation.recommended,
+            "reason": escalation.reason,
+            "case_summary": escalation.case_summary,
+        },
+        "language": result.get("language"),
+        "demo_mode": None,
+        "knowledge_graph_context": None,
+        "conflicts": [],
+        "validation_status": "validated",
     }
 
 
@@ -190,7 +185,7 @@ def delete_conversation(conversation_id: str, current_user: dict = Depends(get_c
 
 
 @router.post("/api/conversations/{conversation_id}/feedback")
-def submit_feedback(conversation_id: str, body: FeedbackRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
+async def submit_feedback(conversation_id: str, body: FeedbackRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     is_admin = "Admin" in current_user.get("roles", [])
     _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)
 
@@ -207,4 +202,9 @@ def submit_feedback(conversation_id: str, body: FeedbackRequest, current_user: d
         feedback=body.feedback,
         notes=body.notes,
     ))
+    # Mirror the feedback into ip_sakti_rag so its own telemetry stays in sync.
+    try:
+        await rag_client.submit_feedback(conversation_id, body.message_id, body.feedback, body.notes)
+    except rag_client.RagServiceError:
+        pass  # local feedback record already saved; RAG-side mirror is best-effort
     return {"success": True}

@@ -5,8 +5,6 @@ pydantic-settings==2.7.0
 pydantic[email]==2.10.4
 python-dotenv==1.0.1
 httpx==0.28.1
-rank-bm25==0.2.2
-networkx==3.4.2
 python-multipart==0.0.20
 
 # --- Authentication (Section 3) ---
@@ -23,11 +21,6 @@ PyJWT==2.10.1
 # (DEMO MODE, non-persistent). See app/database/session.py.
 pymongo==4.10.1
 mongomock==4.3.0
-
-# Optional real-service clients (only used if the matching env vars are set;
-# safe to leave installed even when the live services are not reachable).
-qdrant-client==1.12.1
-neo4j==5.27.0
 
 # --- PDF export (Product Analyzer / TK-ABS "download as PDF") ---
 # Pure-Python, no system dependencies (unlike wkhtmltopdf/weasyprint), so it
