@@ -29,6 +29,12 @@ mongomock==4.3.0
 qdrant-client==1.12.1
 neo4j==5.27.0
 
+# --- PDF export (Product Analyzer / TK-ABS "download as PDF") ---
+# Pure-Python, no system dependencies (unlike wkhtmltopdf/weasyprint), so it
+# works in the same zero-external-setup DEMO MODE as the rest of this
+# backend. See app/services/pdf_service.py.
+reportlab==4.2.5
+
 # Testing
 pytest==8.3.4
 pytest-asyncio==0.25.0

@@ -11,7 +11,20 @@ import uuid
 from fastapi import HTTPException
 
 from app.core.security import hash_password, verify_password
-from app.models.user import COLLECTION, new_user, to_dict
+from app.models.user import ALLOWED_ROLES, COLLECTION, new_user, to_dict
+
+
+def _validate_roles(roles: list[str]) -> None:
+    """Section 5/7: never blindly accept arbitrary role strings from a
+    client — only the project's known role vocabulary is allowed. Prevents
+    a client from self-granting e.g. "SuperAdmin" or a typo'd role that
+    would silently fail every `require_role(...)` check downstream."""
+    unknown = [r for r in roles if r not in ALLOWED_ROLES]
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown role(s): {', '.join(unknown)}. Allowed roles: {', '.join(sorted(ALLOWED_ROLES))}.",
+        )
 
 
 def register_user(db, name: str, email: str, password: str, roles: list[str], preferred_language: str = "en") -> dict:
@@ -22,6 +35,7 @@ def register_user(db, name: str, email: str, password: str, roles: list[str], pr
 
     if not roles:
         roles = ["Practitioner"]
+    _validate_roles(roles)
 
     user_doc = new_user(
         id=f"user-{uuid.uuid4().hex[:12]}",
@@ -52,6 +66,7 @@ def get_user_by_id(db, user_id: str) -> dict | None:
 
 
 def add_role(db, user_id: str, role: str) -> dict:
+    _validate_roles([role])
     user_doc = db[COLLECTION].find_one({"_id": user_id})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found.")

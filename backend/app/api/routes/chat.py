@@ -92,7 +92,9 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
 @router.post("/api/chat")
 async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     query = body.resolved_query()
-    outcome = await _handle_query(db, query, body.conversation_id, body.language, user_id=current_user["id"])
+    outcome = await _handle_query(
+        db, query, body.conversation_id, body.language, user_id=current_user["id"], target_market=body.target_market,
+    )
     return {
         "conversation_id": outcome["conversation_id"],
         "message": outcome["message"],
@@ -110,7 +112,9 @@ async def chat_stream(body: ChatRequest, current_user: dict = Depends(get_curren
 
     async def event_generator():
         try:
-            outcome = await _handle_query(db, query, body.conversation_id, body.language, user_id=current_user["id"])
+            outcome = await _handle_query(
+                db, query, body.conversation_id, body.language, user_id=current_user["id"], target_market=body.target_market,
+            )
             yield f"data: {json.dumps({'type': 'complete', **outcome})}\n\n"
         except HTTPException as exc:
             yield f"data: {json.dumps({'type': 'error', 'error': exc.detail})}\n\n"

@@ -76,6 +76,30 @@ def delete_saved_research(research_id: str, current_user: dict = Depends(get_cur
     return {"success": True}
 
 
+@router.get("/api/resources")
+def resources_mini_tab(current_user: dict = Depends(get_current_user)):
+    """Lightweight document listing for the frontend's smaller Resources
+    tab (Section: Resources mini tab). Reuses the existing document corpus
+    (app/rag/corpus.py, same data backing GET /api/sources) but trims each
+    entry down to just the fields a compact tab needs, and never exposes
+    internal indexing fields such as `status` or `chunk_count`."""
+    resources = [
+        {
+            "id": doc.get("id"),
+            "title": doc.get("title"),
+            "source": doc.get("source"),
+            "authority": doc.get("authority"),
+            "document_type": doc.get("document_type"),
+            "jurisdiction": doc.get("jurisdiction"),
+            "topic": doc.get("topic"),
+            "url": doc.get("url"),
+            "summary": doc.get("summary"),
+        }
+        for doc in get_metadata()
+    ]
+    return {"resources": resources, "total": len(resources)}
+
+
 def _admin_documents_payload():
     return {
         "documents": get_metadata(),

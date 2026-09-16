@@ -204,6 +204,53 @@ _IPR_TABLE = {
 }
 
 
+def ipr_overview() -> dict:
+    """Structured, frontend-friendly summary for the IPR Navigator "at a
+    glance" popup (read-only). Built entirely from data this project
+    already has — the same `_IPR_TABLE` used by `evaluate_ipr` below, plus
+    the authoritative-document corpus (app/rag/corpus.py) — rather than
+    fabricating new legal content or duplicating the corpus. Aliases in
+    `_IPR_TABLE` (e.g. "Manufacturing process" -> "New invention") are
+    resolved and de-duplicated so each protection category appears once.
+    """
+    from app.rag.corpus import get_metadata
+
+    seen_entries: list[dict] = []
+    seen_ids = set()
+    for asset_type, entry in _IPR_TABLE.items():
+        resolved = _IPR_TABLE[entry] if isinstance(entry, str) else entry
+        entry_id = id(resolved)
+        if entry_id in seen_ids:
+            continue
+        seen_ids.add(entry_id)
+        seen_entries.append({
+            "asset_type": asset_type,
+            "primary_protection": resolved["primary_protection"],
+            "potential_protection": resolved["potential_protection"],
+            "why_relevant": resolved["why_relevant"],
+            "key_considerations": resolved["important_considerations"],
+            "relevant_authority": resolved["relevant_authority"],
+        })
+
+    statutory_sources = [
+        {
+            "id": m.get("id"),
+            "title": m.get("title"),
+            "authority": m.get("authority"),
+            "document_type": m.get("document_type"),
+            "topic": m.get("topic"),
+        }
+        for m in get_metadata()
+    ]
+
+    return {
+        "protection_categories": seen_entries,
+        "statutory_sources": statutory_sources,
+        "disclaimer": "Informational decision support based on Indian statutory frameworks; does not constitute formal legal counsel.",
+        "engine": "rule_based_v1",
+    }
+
+
 def evaluate_ipr(asset_type: str, citations: list[dict]) -> dict:
     entry = _IPR_TABLE.get(asset_type)
     if isinstance(entry, str):  # alias

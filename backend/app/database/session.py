@@ -29,8 +29,9 @@ _using_mock = False
 COLLECTION_INDEXES = {
     "users": [("email", {"unique": True})],
     "conversations": [("user_id", {}), ("updated_at", {})],
-    "chat_messages": [("conversation_id", {}), ("created_at", {})],
+    "chat_messages": [("conversation_id", {}), ("created_at", {}), ("sequence", {})],
     "product_analyses": [("user_id", {}), ("created_at", {})],
+    "tk_abs_analyses": [("user_id", {}), ("created_at", {})],
     "saved_research": [("user_id", {}), ("created_at", {})],
     "classification_records": [("conversation_id", {}), ("created_at", {})],
     "validation_results": [("conversation_id", {}), ("created_at", {})],

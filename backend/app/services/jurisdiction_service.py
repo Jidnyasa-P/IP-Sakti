@@ -47,13 +47,27 @@ def detect_jurisdiction(text: str, target_market: str | None = None) -> Jurisdic
     is_export_signal = any(w in q for w in EXPORT_SIGNAL_WORDS)
 
     if target_market:
-        tm = target_market.lower()
-        if "export" in tm and "domestic" not in tm:
+        tm = target_market.strip().lower()
+        # Two vocabularies reach this function with the same meaning:
+        #   - ProductInformation.target_market: "Domestic (India)" | "Export" | "Both"
+        #   - the former navbar Indian/International toggle (now request-level
+        #     only, see frontend/src/context/JurisdictionContext.tsx): "India" | "International"
+        # Both are normalised here rather than adding a second field.
+        if tm in ("india", "domestic", "national", "indian") or ("domestic" in tm and "export" not in tm and "both" not in tm):
+            return JurisdictionResult(country="India", type="domestic", coverage_available=True, notes=[])
+        if ("export" in tm or "international" in tm) and "domestic" not in tm and "both" not in tm:
+            if explicit_market:
+                return JurisdictionResult(
+                    country=explicit_market,
+                    type="international",
+                    coverage_available=explicit_market in SUPPORTED_JURISDICTIONS,
+                    notes=[f"Detailed statutory coverage for {explicit_market} is not yet indexed in this deployment's knowledge base."],
+                )
             return JurisdictionResult(
-                country=explicit_market or "Unspecified export market",
+                country="Unspecified export market",
                 type="international",
-                coverage_available=explicit_market in SUPPORTED_JURISDICTIONS if explicit_market else False,
-                notes=["Target market marked as Export. Detailed statute-level coverage for non-Indian jurisdictions is not yet indexed; general guidance only."],
+                coverage_available=False,
+                notes=["Target market marked as Export/International with no specific destination named. Ask the user which destination market applies."],
             )
         if "both" in tm:
             return JurisdictionResult(

@@ -19,6 +19,14 @@ def new_conversation(id: str, user_id: str, title: str, language: str = "en") ->
         "language": language,
         "created_at": now,
         "updated_at": now,
+        # Monotonic per-conversation message counter (Section: chatbot
+        # message order). created_at alone can collide at millisecond/
+        # microsecond resolution under rapid user->assistant inserts within
+        # a single request; `sequence` (see new_chat_message /
+        # conversation_service.add_message, which increments this
+        # atomically via $inc) gives a deterministic, gap-tolerant
+        # oldest -> newest ordering that never depends on clock resolution.
+        "message_seq": 0,
     }
 
 
@@ -39,10 +47,12 @@ def new_chat_message(
     feedback: str | None = None,
     feedback_notes: str | None = None,
     language: str = "en",
+    sequence: int = 0,
 ) -> dict:
     return {
         "_id": id,
         "conversation_id": conversation_id,
+        "sequence": sequence,  # monotonic, atomically-assigned — see conversation_service.add_message
         "role": role,  # user | assistant
         "content": content,
         "answer": answer,
@@ -77,6 +87,7 @@ def message_to_dict(m: dict) -> dict:
     return {
         "id": m["_id"],
         "conversation_id": m.get("conversation_id"),
+        "sequence": m.get("sequence", 0),
         "role": m.get("role"),
         "content": m.get("content"),
         "answer": m.get("answer"),

@@ -17,6 +17,15 @@ from datetime import datetime, timezone
 
 COLLECTION = "users"
 
+# Allowed role vocabulary (Section 5/7). Must match the frontend's UserRole
+# union exactly (frontend/src/types.ts: ALL_ROLE_OPTIONS) — the frontend is
+# the source of truth for role labels. Enforced server-side in
+# app/services/auth_service.py so a client cannot self-grant an arbitrary or
+# privileged-sounding role string; Organization and Startup are already
+# first-class members of this vocabulary (not a separate concept to bolt on
+# later).
+ALLOWED_ROLES = {"Practitioner", "Researcher", "Expert", "Admin", "Organization", "Startup"}
+
 
 def new_user(
     id: str,
