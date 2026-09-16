@@ -1,3 +1,23 @@
+> **Which implementation is "live"? (added 2026-09)**
+> This folder contains two implementations. **The root-level microservice
+> (`main.py`, `embeddings.py`, `bm25_index.py`, `graph.py`, `retrieval.py`,
+> `ingest.py`) is the one being deployed to Render/Vercel and is under
+> active maintenance.** The `app/` package below (with `scripts/ingest.py`,
+> `pipeline.py`, the classification/jurisdiction/safety modules) was an
+> earlier, heavier design for local/GPU-less prototyping and is **not**
+> currently wired into deployment — most of this README describes `app/`,
+> not the root service. To run the live pipeline:
+> ```bash
+> cd ip_sakti_rag
+> pip install -r requirements.txt
+> cp .env.example .env   # fill in LLM_API_KEY, QDRANT_*, NEO4J_*, MONGODB_URI
+> python -m ingest        # extracts data/documents/*.pdf, embeds, upserts to Mongo+Qdrant+BM25
+> uvicorn main:app --reload --port 8001   # local dev; Render start command: uvicorn main:app --host 0.0.0.0 --port $PORT
+> ```
+> If you want to migrate the safety/citation-validation/classification logic
+> from `app/` onto the root service later, that's a deliberate follow-up
+> task, not something silently merged here.
+
 # IP-SAKTI RAG Engine
 
 A standalone, modular **Retrieval-Augmented Generation** layer for **IP-SAKTI Sahayak**
