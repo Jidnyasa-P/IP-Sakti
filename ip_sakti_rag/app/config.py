@@ -24,7 +24,10 @@ class Settings(BaseSettings):
 
     # LLM + embeddings (both via Gemini, same key)
     LLM_API_KEY: str | None = None
-    LLM_MODEL: str = "gemini-2.0-flash"
+    # gemini-2.0-flash was shut down 2026-06-01 — see .env.example for the
+    # current recommended model and its own shutdown-date caveat. This
+    # default is only used if LLM_MODEL isn't set in .env/Render env vars.
+    LLM_MODEL: str = "gemini-3.1-flash-lite"
 
     # Qdrant
     qdrant_local_path: str = "./data/qdrant_local"
