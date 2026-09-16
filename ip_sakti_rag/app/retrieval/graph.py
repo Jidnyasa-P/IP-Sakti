@@ -2,8 +2,8 @@
 Neo4j / GraphRAG knowledge-graph context — products, classifications,
 regulations, authorities, ingredients, TK and ABS as a connected graph.
 
-Off unless NEO4J_ENABLED=true AND all of NEO4J_URI/NEO4J_USERNAME/
-NEO4J_PASSWORD are set. The rest of the pipeline (hybrid RAG, generation,
+Uses Neo4j when NEO4J_URI/NEO4J_USERNAME/NEO4J_PASSWORD are set.
+The local fallback is retained for development. The rest of the pipeline (hybrid RAG, generation,
 safety) works fully without it — this class only ever *adds* graph-derived
 context on top, and fails open (falls back to "no graph context") on any
 connection problem, so a paused/misconfigured Aura instance never breaks

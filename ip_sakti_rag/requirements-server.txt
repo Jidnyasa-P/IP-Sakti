@@ -23,7 +23,6 @@ python-dotenv==1.2.3
 # Embeddings (ingest + query) and generation
 google-genai==2.23.0
 google-generativeai==0.8.3
-tenacity==9.0.0
 
 # Retrieval
 qdrant-client==1.11.3
@@ -31,6 +30,7 @@ rank-bm25==0.2.2
 
 # Knowledge graph (optional — safe to keep even if NEO4J_ENABLED=false)
 neo4j==5.24.0
+pymongo==4.9.1
 
 # Bhashini translation client (optional — safe to keep even if unused)
 requests==2.34.2

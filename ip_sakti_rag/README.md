@@ -11,7 +11,7 @@
 > cd ip_sakti_rag
 > pip install -r requirements.txt
 > cp .env.example .env   # fill in LLM_API_KEY, QDRANT_*, NEO4J_*, MONGODB_URI
-> python -m ingest        # extracts data/documents/*.pdf, embeds, upserts to Mongo+Qdrant+BM25
+> python -m ingest        # extracts data/documents/*.pdf, embeds only new/changed chunks, upserts to Qdrant, and persists processed chunks for BM25
 > uvicorn main:app --reload --port 8001   # local dev; Render start command: uvicorn main:app --host 0.0.0.0 --port $PORT
 > ```
 > If you want to migrate the safety/citation-validation/classification logic

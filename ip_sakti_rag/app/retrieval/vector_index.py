@@ -78,6 +78,40 @@ class VectorIndex:
                 collection_name=self.collection,
                 vectors_config=qmodels.VectorParams(size=vector_size, distance=qmodels.Distance.COSINE),
             )
+            self._ensure_payload_indexes()
+            return
+
+        info = self.client.get_collection(self.collection)
+        actual_size = info.config.params.vectors.size
+        if actual_size != vector_size:
+            raise RuntimeError(
+                f"Qdrant collection '{self.collection}' has vector size {actual_size}, "
+                f"but the configured Gemini embedding size is {vector_size}. "
+                "Recreate the collection before ingesting."
+            )
+        self._ensure_payload_indexes()
+
+    def _ensure_payload_indexes(self) -> None:
+        """Ensure fields used by Qdrant filters have payload indexes.
+
+        Qdrant Cloud requires an index for filtered deletes/searches on
+        payload fields such as document_id. Creating an existing index is
+        avoided by checking the collection schema first.
+        """
+        try:
+            info = self.client.get_collection(self.collection)
+            existing = info.payload_schema or {}
+            if "document_id" not in existing:
+                self.client.create_payload_index(
+                    collection_name=self.collection,
+                    field_name="document_id",
+                    field_schema=qmodels.PayloadSchemaType.KEYWORD,
+                    wait=True,
+                )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Could not create the Qdrant payload index for 'document_id': {exc}"
+            ) from exc
 
     def collection_exists(self) -> bool:
         try:
@@ -130,3 +164,20 @@ class VectorIndex:
                 continue
             results.append((chunk, float(h.score)))
         return results
+
+
+    def delete_document(self, document_id: str) -> None:
+        """Delete every vector belonging to one legal source document."""
+        if not self.collection_exists():
+            return
+        selector = qmodels.FilterSelector(
+            filter=qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="document_id",
+                        match=qmodels.MatchValue(value=document_id),
+                    )
+                ]
+            )
+        )
+        self.client.delete(collection_name=self.collection, points_selector=selector, wait=True)

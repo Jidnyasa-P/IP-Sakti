@@ -8,6 +8,7 @@ Run the full ingestion pipeline:
 Usage:
     python scripts/ingest.py
 """
+import argparse
 import sys
 from pathlib import Path
 
@@ -17,7 +18,13 @@ from app.ingestion.embed_and_index import run_ingestion  # noqa: E402
 
 
 def main():
-    docs, chunks = run_ingestion()
+    parser = argparse.ArgumentParser(description="Incrementally ingest the IP-SAKTI legal corpus.")
+    parser.add_argument(
+        "--force", action="store_true",
+        help="Re-embed every document. Use only when the embedding model/dimension changes or a full rebuild is required."
+    )
+    args = parser.parse_args()
+    docs, chunks = run_ingestion(force=args.force)
     print(f"\nSummary: {len(docs)} documents, {len(chunks)} chunks.")
     if not docs:
         print(

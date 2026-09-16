@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.classification import classify_product
+from app.database.mongo import save_chat
 from app.config import settings
 from app.generation.grounded_generator import generate_grounded_answer
 from app.ingestion.metadata import load_processed_documents
@@ -67,10 +68,12 @@ class IPSaktiRAG:
 
         retrieval = self.retriever.retrieve(query=query, language=language, top_k=settings.top_k)
 
+        graph_context = self.graph.get_context([classification.category])
         generated = generate_grounded_answer(
             query=query,
             language=retrieval.detected_language,
             chunks=retrieval.top_chunks,
+            graph_context=graph_context.__dict__,
         )
 
         validation = validate_citations(generated["answer"], retrieval.citations)
@@ -116,6 +119,7 @@ class IPSaktiRAG:
             "language": retrieval.detected_language,
             "latency_ms": int((datetime.now(timezone.utc) - started).total_seconds() * 1000),
         }
+        save_chat(out["conversation_id"], query, out)
         return out
 
     # ------------------------------------------------------------------
@@ -133,7 +137,10 @@ class IPSaktiRAG:
         search_context = f"{info.product_name} {info.ingredients} {info.intended_use} {info.product_type} {classification.category}"
         retrieval = self.retriever.retrieve(query=search_context, top_k=6)
 
-        generated = generate_grounded_answer(query=search_context, language="en", chunks=retrieval.top_chunks)
+        graph_context = self.graph.get_context([classification.category])
+        generated = generate_grounded_answer(
+            query=search_context, language="en", chunks=retrieval.top_chunks, graph_context=graph_context.__dict__
+        )
         validation = validate_citations(generated["answer"], retrieval.citations)
         confidence = compute_confidence(retrieval.top_fused_score, len(retrieval.top_chunks), validation)
         _, needs_expert = decide_abstention(confidence, len(retrieval.top_chunks), retrieval.detected_intent, len(jurisdictions))

@@ -1,15 +1,12 @@
 """
-IP-SAKTI RAG microservice — FastAPI entrypoint.
+IP-SAKTI RAG service — FastAPI entrypoint.
 
 Promoted from example_fastapi_integration.py (which said "copy whatever's
 useful" — this is that): same routes, matching what server/routes.ts
 already calls, plus:
-  - a shared-secret check on every route except /api/health, so this
-    service can be safely public on Render's free tier (no private
-    networking there) while only your Node backend can actually use it.
-  - CORS still permissive (frontend never calls this directly — only the
-    Node backend does — but kept open in case you want to hit it directly
-    while testing).
+  - a shared-secret check on every route except /api/health.
+  - MongoDB persistence for chat/feedback when MONGODB_URI is configured.
+  - Neo4j GraphRAG context is used by the FastAPI RAG pipeline when configured.
 
 Run: uvicorn main:app --host 0.0.0.0 --port $PORT
 """
@@ -20,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.config import settings
+from app.database.mongo import save_feedback
 from app.pipeline import IPSaktiRAG
 
 app = FastAPI(title="IP-SAKTI RAG API")
@@ -128,4 +126,5 @@ def feedback(
 ):
     _check_secret(x_internal_secret)
     rag.record_feedback(helpful=payload.feedback == "helpful")
+    save_feedback(conversation_id, payload.message_id, payload.feedback, payload.notes)
     return {"success": True}

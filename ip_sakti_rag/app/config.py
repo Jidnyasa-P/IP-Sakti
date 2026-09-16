@@ -39,10 +39,14 @@ class Settings(BaseSettings):
     tkdl_enabled: bool = False
 
     # Neo4j
-    neo4j_enabled: bool = False
+    neo4j_enabled: bool = True
     neo4j_uri: str | None = None
     neo4j_username: str | None = None
     neo4j_password: str | None = None
+
+    # MongoDB application data
+    mongodb_uri: str | None = None
+    mongodb_db_name: str = "ip_sakti"
 
     # Retrieval tuning
     top_k: int = 5
@@ -59,8 +63,7 @@ class Settings(BaseSettings):
     bhashini_api_key: str | None = None
     bhashini_user_id: str | None = None
 
-    # Shared secret: only the Node backend should be able to call this
-    # service's endpoints once it's deployed publicly on Render.
+    # Shared secret for callers of the FastAPI service.
     rag_service_shared_secret: str | None = None
 
     @property
@@ -78,6 +81,10 @@ class Settings(BaseSettings):
     @property
     def processed_documents_file(self) -> Path:
         return self.processed_dir / "documents.jsonl"
+
+    @property
+    def ingestion_state_file(self) -> Path:
+        return self.processed_dir / "ingestion_state.json"
 
 
 settings = Settings()
