@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # LLM
-    gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.0-flash"
+    LLM_API_KEY: str | None = None
+    LLM_MODEL: str = "gemini-2.0-flash"
 
     # Embeddings
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"

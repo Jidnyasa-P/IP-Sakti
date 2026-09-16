@@ -1,7 +1,7 @@
 """
 Pluggable LLM client.
 
-If GEMINI_API_KEY is set and valid, calls Google's Gemini free-tier API
+If LLM_API_KEY is set and valid, calls Google's Gemini free-tier API
 (same provider the existing frontend prototype already uses in
 `server/gemini.ts`, for consistency). If not set (or the call fails/times
 out), falls back to a fully offline, deterministic, evidence-templated
@@ -30,14 +30,14 @@ def _is_key_valid(key: str | None) -> bool:
 
 class LLMClient:
     def __init__(self):
-        self.available = _is_key_valid(settings.gemini_api_key)
+        self.available = _is_key_valid(settings.LLM_API_KEY)
         self._client = None
         if self.available:
             try:
                 import google.generativeai as genai
 
-                genai.configure(api_key=settings.gemini_api_key)
-                self._client = genai.GenerativeModel(settings.gemini_model)
+                genai.configure(api_key=settings.LLM_API_KEY)
+                self._client = genai.GenerativeModel(settings.LLM_MODEL)
             except Exception as exc:  # pragma: no cover - optional dependency path
                 print(f"[llm_client] Gemini unavailable, using offline fallback: {exc}")
                 self.available = False

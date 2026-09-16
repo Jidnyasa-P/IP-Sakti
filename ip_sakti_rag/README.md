@@ -3,7 +3,7 @@
 A standalone, modular **Retrieval-Augmented Generation** layer for **IP-SAKTI Sahayak**
 (Multilingual RAG assistant for IP & regulatory guidance in Ayurveda).
 
-This package is built to sit *behind* your existing React frontend (`/frontend`) and the
+This package is built to sit _behind_ your existing React frontend (`/frontend`) and the
 FastAPI backend you are writing yourself. It does **not** touch or redesign the frontend.
 It only implements the "brain": ingestion → hybrid retrieval → grounded generation →
 citation/safety validation → structured output.
@@ -74,15 +74,15 @@ ip_sakti_rag/
 
 ## 2. How this maps onto your existing frontend / routes
 
-| Frontend needs (from `server.ts` / `types.ts`)                | RAG module call                                   |
-|-----------------------------------------------------------------|----------------------------------------------------|
+| Frontend needs (from `server.ts` / `types.ts`)                  | RAG module call                                      |
+| --------------------------------------------------------------- | ---------------------------------------------------- |
 | `POST /api/chat`, `/api/chat/stream` → `StructuredChatMessage`  | `rag.answer_query(query, language, conversation_id)` |
-| `POST /api/products/analyze` → `ProductAnalysisResult`          | `rag.analyze_product(product_info)`                 |
-| `POST /api/ipr/analyze` → `IPRNavigatorResult`                  | `rag.analyze_ipr(ipr_query)`                        |
-| `POST /api/abs/analyze` / `/api/tk-abs/analyze` → `TKABSResult` | `rag.analyze_tk_abs(tk_query)`                      |
-| `GET /api/research/search` → chunk/document search              | `rag.search_documents(query, filters)`              |
-| `GET /api/rag/documents`                                         | `rag.list_documents(filters)`                       |
-| `GET /api/rag/telemetry`                                         | `rag.get_telemetry()`                               |
+| `POST /api/products/analyze` → `ProductAnalysisResult`          | `rag.analyze_product(product_info)`                  |
+| `POST /api/ipr/analyze` → `IPRNavigatorResult`                  | `rag.analyze_ipr(ipr_query)`                         |
+| `POST /api/abs/analyze` / `/api/tk-abs/analyze` → `TKABSResult` | `rag.analyze_tk_abs(tk_query)`                       |
+| `GET /api/research/search` → chunk/document search              | `rag.search_documents(query, filters)`               |
+| `GET /api/rag/documents`                                        | `rag.list_documents(filters)`                        |
+| `GET /api/rag/telemetry`                                        | `rag.get_telemetry()`                                |
 
 Every method returns **plain JSON-serialisable dicts** (via `.model_dump()` on the
 Pydantic schemas in `app/schemas.py`), so your FastAPI backend can do:
@@ -133,7 +133,7 @@ python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\
 pip install -r requirements.txt
 
 cp .env.example .env
-# Fill in GEMINI_API_KEY (free tier) — optional. Without it the module runs in
+# Fill in LLM_API_KEY (free tier) — optional. Without it the module runs in
 # "offline grounded synthesis" mode (evidence-templated answer, no LLM cost/key needed).
 ```
 
@@ -153,11 +153,11 @@ of the rules that guide this step:
   (patent/trademark search databases, court databases) — they change constantly,
   aren't meant for bulk extraction, and often sit behind ToS/anti-bot protections.
 - **Never fabricate or guess a direct PDF URL.** Government PDF links rotate/break
-  often; always record the *page you found it on*, not a constructed URL.
+  often; always record the _page you found it on_, not a constructed URL.
 - **Fill in `manifest.json` yourself**, reading title/authority/dates directly off
   the document — the ingestion pipeline deliberately refuses to guess this metadata
   (see `app/ingestion/metadata.py`).
-- **`scripts/download_static_sources.py`** is a *helper*, not a guarantee — some
+- **`scripts/download_static_sources.py`** is a _helper_, not a guarantee — some
   government sites block generic user-agents or require a browser session, so treat
   any failure as "download this one manually" rather than a bug to chase.
 
@@ -200,6 +200,7 @@ python scripts/ingest.py
 ```
 
 This will:
+
 1. Extract text from each file in `data/documents/` (`app/ingestion/extract.py`)
 2. Perform legal-aware chunking by Chapter → Section → Clause (`chunker.py`)
 3. Attach/validate metadata (title, authority, jurisdiction, publication/effective date,
@@ -227,16 +228,16 @@ prints the structured JSON output, including the exact example from the brief:
 
 ## 4. Design choices for a FREE, GPU-less SIH prototype
 
-| Component        | Choice                                                                 | Why free / light |
-|-------------------|-------------------------------------------------------------------------|-------------------|
-| Embeddings        | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (118MB)   | Runs on CPU, covers en/hi/mr, no API cost |
-| Vector store      | Qdrant, **local on-disk mode** (`qdrant-client` embedded, no server)    | Zero infra for dev; swap to **Qdrant Cloud free tier (1 GB cluster)** for deployment — verify current limits at qdrant.tech/pricing before relying on them |
-| Lexical search    | `rank_bm25` (pure Python)                                                | No infra |
-| Re-ranking        | Optional `cross-encoder/ms-marco-MiniLM-L-6-v2` via `sentence-transformers`, gated by `RERANKER_ENABLED` | Small, CPU-ok; disable on very low RAM (Render/Railway free tier ~512MB) |
-| Knowledge graph   | Optional Neo4j (`app/retrieval/graph.py`), gated by `NEO4J_ENABLED`     | Neo4j Aura has a free tier (check current node/relationship caps before depending on it) — module runs fully without it |
-| LLM               | Google **Gemini** (`gemini-2.5-flash` / `gemini-2.0-flash`) via free-tier API key, same provider frontend already uses | Check current Google AI Studio free-tier rate limits before demo day; if unavailable/unset, an **offline grounded synthesis fallback** (`llm_client.py`) builds a templated, citation-grounded answer directly from retrieved chunks — the exact same "resilience" idea already in `server/gemini.ts` |
-| Multilingual UI   | `app/language.py` keeps translation modular — plug in Anuvadini/BHASHINI later via a `TranslationProvider` interface | Doesn't block prototype |
-| Deployment        | FastAPI backend (yours) + this module on **Render/Railway free web service** or a single **Hugging Face Space (CPU)**; Qdrant on local disk for demo or Qdrant Cloud free cluster | No GPU, no paid infra required |
+| Component       | Choice                                                                                                                                                                            | Why free / light                                                                                                                                                                                                                                                                                      |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Embeddings      | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (118MB)                                                                                                             | Runs on CPU, covers en/hi/mr, no API cost                                                                                                                                                                                                                                                             |
+| Vector store    | Qdrant, **local on-disk mode** (`qdrant-client` embedded, no server)                                                                                                              | Zero infra for dev; swap to **Qdrant Cloud free tier (1 GB cluster)** for deployment — verify current limits at qdrant.tech/pricing before relying on them                                                                                                                                            |
+| Lexical search  | `rank_bm25` (pure Python)                                                                                                                                                         | No infra                                                                                                                                                                                                                                                                                              |
+| Re-ranking      | Optional `cross-encoder/ms-marco-MiniLM-L-6-v2` via `sentence-transformers`, gated by `RERANKER_ENABLED`                                                                          | Small, CPU-ok; disable on very low RAM (Render/Railway free tier ~512MB)                                                                                                                                                                                                                              |
+| Knowledge graph | Optional Neo4j (`app/retrieval/graph.py`), gated by `NEO4J_ENABLED`                                                                                                               | Neo4j Aura has a free tier (check current node/relationship caps before depending on it) — module runs fully without it                                                                                                                                                                               |
+| LLM             | Google **Gemini** (`gemini-2.5-flash` / `gemini-2.0-flash`) via free-tier API key, same provider frontend already uses                                                            | Check current Google AI Studio free-tier rate limits before demo day; if unavailable/unset, an **offline grounded synthesis fallback** (`llm_client.py`) builds a templated, citation-grounded answer directly from retrieved chunks — the exact same "resilience" idea already in `server/gemini.ts` |
+| Multilingual UI | `app/language.py` keeps translation modular — plug in Anuvadini/BHASHINI later via a `TranslationProvider` interface                                                              | Doesn't block prototype                                                                                                                                                                                                                                                                               |
+| Deployment      | FastAPI backend (yours) + this module on **Render/Railway free web service** or a single **Hugging Face Space (CPU)**; Qdrant on local disk for demo or Qdrant Cloud free cluster | No GPU, no paid infra required                                                                                                                                                                                                                                                                        |
 
 **Before deployment**, re-check current pricing/limits yourself for whichever of
 Qdrant Cloud, Neo4j Aura, Google AI Studio, and your chosen hosting platform you use —
@@ -247,7 +248,7 @@ free tiers change often and this README should not be treated as pricing truth.
 ## 5. Safety pipeline (already wired into `pipeline.py`)
 
 1. **Retrieval** — hybrid BM25 + vector, metadata-filtered by jurisdiction/topic/product type.
-2. **Evidence-grounded generation** — the LLM is instructed to answer *only* from the
+2. **Evidence-grounded generation** — the LLM is instructed to answer _only_ from the
    retrieved chunk text and to tag every claim with `[n]` matching a citation index.
    It is never treated as a source of truth on its own.
 3. **Citation validation** (`safety/citation_validator.py`) — every `[n]` tag referenced
@@ -260,8 +261,8 @@ free tiers change often and this README should not be treated as pricing truth.
 6. **Safe abstention** (`safety/abstention.py`) — below a configurable threshold, the
    pipeline sets `needs_clarification` or `needs_expert` and returns a hedged answer
    instead of a confident-sounding guess.
-7. **Disclaimer** — always attached: *"This is informational guidance, not legal
-   advice."*
+7. **Disclaimer** — always attached: _"This is informational guidance, not legal
+   advice."_
 
 ---
 
