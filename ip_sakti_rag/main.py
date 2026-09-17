@@ -62,6 +62,11 @@ class FeedbackRequest(BaseModel):
     notes: str | None = None
 
 
+@app.get("/")
+def root():
+    return {"name": "IP-SAKTI RAG API", "docs": "/docs", "health": "/api/health"}
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok"}

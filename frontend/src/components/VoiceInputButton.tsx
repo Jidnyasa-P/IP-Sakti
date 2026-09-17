@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Mic, MicOff, AlertCircle, Loader2, ExternalLink, Volume2, Square } from 'lucide-react';
 import { Language } from '../types';
+import { apiUrl } from './auth/authStorage';
 
 interface VoiceInputButtonProps {
   onTranscript: (text: string, isFinal?: boolean) => void;
@@ -109,7 +110,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
           reader.readAsDataURL(audioBlob);
           reader.onloadend = async () => {
             const base64Audio = reader.result as string;
-            const res = await fetch('/api/transcribe', {
+            const res = await fetch(apiUrl('/api/transcribe'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

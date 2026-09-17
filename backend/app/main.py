@@ -63,6 +63,7 @@ app.include_router(misc_routes.router, tags=["misc"])
 app.include_router(experts.router, tags=["experts"])
 
 
+@app.get("/")
 @app.get("/api")
 def root():
     return {"name": "IP-SAKTI Sahayak API", "docs": "/docs", "health": "/api/health"}

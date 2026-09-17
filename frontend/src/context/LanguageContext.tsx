@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Language, SUPPORTED_LANGUAGES } from '../types';
 import { BASE_DICTIONARY, getInstantDictionary } from './translations';
+import { apiUrl } from '../components/auth/authStorage';
 
 interface LanguageContextType {
   currentLanguage: Language;
@@ -75,7 +76,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Call server translation endpoint using Gemini API
     setIsTranslating(true);
     try {
-      const response = await fetch('/api/translate', {
+      const response = await fetch(apiUrl('/api/translate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -179,7 +180,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
   const translateDynamicText = async (text: string): Promise<string> => {
     if (!text || currentLanguage === 'en') return text;
     try {
-      const res = await fetch('/api/translate', {
+      const res = await fetch(apiUrl('/api/translate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

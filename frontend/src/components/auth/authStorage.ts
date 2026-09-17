@@ -20,6 +20,22 @@ import { User, UserRole } from '../../types';
 const TOKEN_KEY = 'ipsakti_auth_token';
 const USER_CACHE_KEY = 'ipsakti_auth_user_cache';
 
+// The frontend is deployed as a separate static site from the backend (no
+// dev-server proxy, no Vercel-style rewrite in production on Render), so a
+// bare `fetch('/api/...')` resolves against the FRONTEND's own origin and
+// 404s. VITE_API_BASE_URL (set in the frontend service's Render env vars —
+// the backend's full https URL, e.g. https://ip-sakti-backend-dwox.onrender.com,
+// NO trailing slash) is baked in at build time and prepended to every API
+// call. Falls back to '' (same-origin, i.e. the old relative-path behavior)
+// if it isn't set, so local dev via the Vite proxy still works untouched.
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+
+/** Prefixes a `/api/...` path with the backend's base URL. Use this for
+ * every backend call — including ones that don't go through authFetch. */
+export function apiUrl(path: string): string {
+  return `${API_BASE_URL}${path}`;
+}
+
 function readCachedUser(): User | null {
   try {
     const raw = localStorage.getItem(USER_CACHE_KEY);
@@ -64,7 +80,7 @@ export async function authFetch(input: string, init: RequestInit = {}): Promise<
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  return fetch(input, { ...init, headers });
+  return fetch(apiUrl(input), { ...init, headers });
 }
 
 async function parseErrorMessage(res: Response, fallback: string): Promise<string> {
@@ -90,7 +106,7 @@ export async function verifySession(): Promise<User | null> {
   if (!token) return null;
 
   try {
-    const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(apiUrl('/api/auth/me'), { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) {
       clearSession();
       return null;
@@ -112,7 +128,7 @@ export async function dummyRegister(params: {
   preferred_language?: string;
   roles: UserRole[];
 }): Promise<User> {
-  const res = await fetch('/api/auth/register', {
+  const res = await fetch(apiUrl('/api/auth/register'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
@@ -126,7 +142,7 @@ export async function dummyRegister(params: {
 }
 
 export async function dummyLogin(email: string, password: string): Promise<User> {
-  const res = await fetch('/api/auth/login', {
+  const res = await fetch(apiUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -145,7 +161,7 @@ export function dummyLogout(): void {
   // token revocation) and clear the local session immediately either way.
   const token = getAuthToken();
   if (token) {
-    fetch('/api/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+    fetch(apiUrl('/api/auth/logout'), { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
   }
   clearSession();
 }
