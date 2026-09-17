@@ -17,7 +17,7 @@ from rank_bm25 import BM25Okapi
 from app.embeddings import embed_query
 from app.language import detect_intent, detect_language
 from app.retrieval.vector_index import VectorIndex
-from app.schemas import Citation, DocumentChunk, Language
+from app.schemas import Citation, DocumentChunk, DocumentMetadata, Language
 
 _RRF_K = 60  # standard RRF constant — de-emphasizes rank-1-vs-rank-2 noise
 _EXCERPT_CHARS = 400
@@ -38,9 +38,15 @@ class RetrievalResult:
 
 
 class HybridRetriever:
-    def __init__(self, chunks: list[DocumentChunk]):
+    def __init__(self, chunks: list[DocumentChunk], documents: list[DocumentMetadata] | None = None):
         self.chunks = chunks
         self._by_id = {c.chunk_id: c for c in chunks}
+        # Real, authoritative source URL per document (e.g. India Code / IP
+        # India / NBA portal link) — comes from the manifest via
+        # DocumentMetadata, NOT stored on the chunk/vector itself. Looking
+        # it up here means adding/fixing a URL only needs a manifest edit +
+        # restart, never a re-embed/re-ingest.
+        self._doc_url_by_id = {d.id: d.url for d in (documents or []) if d.url}
         self._bm25 = BM25Okapi([_tokenize(c.chunk_text) for c in chunks]) if chunks else None
         # Just opens/reuses the Qdrant connection — does NOT create the
         # collection (no vector_size passed). If nothing has been ingested
@@ -89,6 +95,7 @@ class HybridRetriever:
                     source=chunk.source,
                     excerpt=excerpt,
                     page=chunk.page,
+                    url=self._doc_url_by_id.get(chunk.document_id),
                 )
             )
 

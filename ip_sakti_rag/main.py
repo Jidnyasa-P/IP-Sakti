@@ -102,10 +102,11 @@ def research_search(
     q: str = "",
     topic: str | None = None,
     authority: str | None = None,
+    document_type: str | None = None,
     x_internal_secret: str | None = Header(default=None),
 ):
     _check_secret(x_internal_secret)
-    return rag.search_documents(query=q, topic=topic, authority=authority)
+    return rag.search_documents(query=q, topic=topic, authority=authority, document_type=document_type)
 
 
 @app.get("/api/rag/documents")

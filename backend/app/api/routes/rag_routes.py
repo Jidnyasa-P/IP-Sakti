@@ -14,8 +14,10 @@ router = APIRouter()
 
 @router.post("/api/search")
 async def search(body: SearchRequest, current_user: dict = Depends(get_current_user)):
-    results = await rag_client.search_documents(query=body.query)
-    return {"query": body.query, "results": results[: body.top_k]}
+    # search_documents() now returns {"documents": [...], "matching_chunks": [...]}
+    # (see ip_sakti_rag/app/pipeline.py) rather than a bare list — updated to match.
+    result = await rag_client.search_documents(query=body.query)
+    return {"query": body.query, "results": result.get("matching_chunks", [])[: body.top_k]}
 
 
 @router.get("/api/sources")

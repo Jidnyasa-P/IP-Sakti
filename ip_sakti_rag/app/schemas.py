@@ -77,6 +77,7 @@ class Citation(BaseModel):
     source: str
     excerpt: str
     page: Optional[int] = None
+    url: Optional[str] = None
 
 
 class ConfidenceMetric(BaseModel):

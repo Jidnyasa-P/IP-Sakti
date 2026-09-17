@@ -69,12 +69,16 @@ async def analyze_tk_abs(tk_query: dict) -> dict:
     return await _request("POST", "/api/tk-abs/analyze", json=tk_query)
 
 
-async def search_documents(query: str = "", topic: str | None = None, authority: str | None = None) -> list[dict]:
+async def search_documents(
+    query: str = "", topic: str | None = None, authority: str | None = None, document_type: str | None = None
+) -> dict:
     params = {"q": query}
     if topic:
         params["topic"] = topic
     if authority:
         params["authority"] = authority
+    if document_type:
+        params["document_type"] = document_type
     return await _request("GET", "/api/research/search", params=params)
 
 

@@ -52,7 +52,7 @@ class IPSaktiRAG:
     def __init__(self):
         chunks = _load_chunks(settings.processed_chunks_file)
         self.documents: list[DocumentMetadata] = load_processed_documents(settings.processed_documents_file)
-        self.retriever = HybridRetriever(chunks)
+        self.retriever = HybridRetriever(chunks, self.documents)
         self.graph = KnowledgeGraphContext()
         self.tkdl = TKDLConnector()
         self.telemetry = RAGTelemetry()
@@ -267,9 +267,66 @@ class IPSaktiRAG:
     # ------------------------------------------------------------------
     # 5. Research / document search  (-> GET /api/research/search, /api/rag/documents)
     # ------------------------------------------------------------------
-    def search_documents(self, query: str = "", topic: str | None = None, authority: str | None = None) -> list[dict]:
-        retrieval = self.retriever.retrieve(query=query or "overview", topic_filter=topic, authority_filter=authority, top_k=10)
-        return [c.model_dump() for c in retrieval.top_chunks]
+    def search_documents(
+        self,
+        query: str = "",
+        topic: str | None = None,
+        authority: str | None = None,
+        document_type: str | None = None,
+    ) -> dict:
+        """Backs GET /api/research/search (the Research tab's search box +
+        filters).
+
+        CHANGED: previously returned a bare list of matching *chunks* —
+        the frontend's ResearchView renders a list of *documents* (title,
+        summary, official url, chunk_count...), so those chunk dicts were
+        being rendered as if they were documents: `doc.summary`/`doc.url`/
+        `doc.chunk_count`/`doc.id` are all undefined on a DocumentChunk,
+        which is why result cards showed no "Official Source" link and
+        "Inspect Sections" opened nothing. Now returns real DocumentMetadata
+        for the matched documents (ranked by their best-matching chunk),
+        plus the matching chunks themselves for the "Inspect Sections" panel.
+        """
+        query = (query or "").strip()
+        docs_by_id = {d.id: d for d in self.documents}
+
+        if not query:
+            # No search text yet (e.g. initial page load, or a filter-only
+            # search) — list everything matching the filters instead of
+            # requiring a query to see anything.
+            matched_documents = [
+                d for d in self.documents if self._document_matches_filters(d, topic, authority, document_type)
+            ]
+            return {
+                "documents": [d.model_dump() for d in matched_documents],
+                "matching_chunks": [],
+            }
+
+        retrieval = self.retriever.retrieve(query=query, topic_filter=topic, authority_filter=authority, top_k=30)
+        matching_chunks = [
+            c for c in retrieval.top_chunks if not document_type or c.document_type == document_type
+        ]
+        # Rank documents by the order their best-matching chunk appears in
+        # (retrieval.top_chunks is already best-first), de-duplicated.
+        matched_doc_ids = list(dict.fromkeys(c.document_id for c in matching_chunks))
+        matched_documents = [docs_by_id[doc_id] for doc_id in matched_doc_ids if doc_id in docs_by_id]
+
+        return {
+            "documents": [d.model_dump() for d in matched_documents],
+            "matching_chunks": [c.model_dump() for c in matching_chunks],
+        }
+
+    @staticmethod
+    def _document_matches_filters(
+        doc: DocumentMetadata, topic: str | None, authority: str | None, document_type: str | None
+    ) -> bool:
+        if topic and doc.topic != topic:
+            return False
+        if authority and authority.lower() not in doc.authority.lower():
+            return False
+        if document_type and doc.document_type != document_type:
+            return False
+        return True
 
     def list_documents(self) -> list[dict]:
         return [d.model_dump() for d in self.documents]

@@ -13,8 +13,15 @@ router = APIRouter()
 
 @router.get("/api/research/search")
 async def research_search(query: str = "", authority: str = "", topic: str = "", document_type: str = "", current_user: dict = Depends(get_current_user)):
-    results = await rag_client.search_documents(query=query, topic=topic or None, authority=authority or None)
-    return {"results": results, "total": len(results)}
+    # CHANGED: previously wrapped the RAG service's response as
+    # {"results": ..., "total": ...} and dropped `document_type` entirely.
+    # ResearchView.tsx reads `data.documents` / `data.matching_chunks`
+    # directly off this response, so pass ip_sakti_rag's shape straight
+    # through instead of re-wrapping it, and forward document_type so the
+    # "Document Type" filter actually does something.
+    return await rag_client.search_documents(
+        query=query, topic=topic or None, authority=authority or None, document_type=document_type or None
+    )
 
 
 @router.get("/api/workspace/saved-research")
