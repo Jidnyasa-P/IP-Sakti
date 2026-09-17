@@ -25,7 +25,7 @@ uvicorn[standard]==0.30.6
 pydantic==2.13.5
 pydantic-settings==2.15.0
 python-dotenv==1.2.3
-
+pymongo==4.10.1
 # Embeddings (ingest + query), generation, and the Gemini-mode reranker —
 # all through the one unified SDK.
 google-genai==2.23.0
