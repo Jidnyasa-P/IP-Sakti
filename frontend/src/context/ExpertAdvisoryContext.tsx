@@ -2,6 +2,27 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { LowConfidenceQuery, ExpertReview } from '../types';
 import { INITIAL_LOW_CONFIDENCE_QUERIES } from '../data/lowConfidenceQueries';
 
+// ---------------------------------------------------------------------------
+// CHANGED: this module used to call `/api/expert/flagged-queries` on every
+// single app load, for every user (logged in or not) -- that route has
+// never existed on the backend (which has `/api/expert-escalations`
+// instead, with a completely different record shape: conversation_id/
+// recommended/reason/case_summary vs. this module's inquirer_name/topic/
+// ai_response/status='pending_review'). That mismatch is a real, separate
+// data-model reconciliation (Expert Advisory dashboard vs. the backend's
+// expert-escalation records) -- not something to paper over by guessing a
+// field mapping and pushing possibly-wrong shapes into React state (that's
+// exactly the kind of unvalidated-shape bug that caused the earlier
+// blank-page crash in ProductAnalyzerView/TraditionalKnowledgeView/
+// IPRNavigatorView).
+//
+// Until that reconciliation is actually done, this context runs in
+// local-storage-only mode (which is what it already fell back to on every
+// failed request anyway) -- no network calls, no 404s, same UI behavior.
+// See README's "honest gaps" section.
+// ---------------------------------------------------------------------------
+const SERVER_SYNC_ENABLED = false;
+
 const STORAGE_KEY = 'ipsakti_expert_flagged_queries_v2';
 
 interface ExpertAdvisoryContextType {
@@ -48,6 +69,7 @@ export const ExpertAdvisoryProvider: React.FC<{ children: ReactNode }> = ({ chil
 
   // Fetch from server on mount
   const refreshQueries = async () => {
+    if (!SERVER_SYNC_ENABLED) return; // see file-level note
     try {
       setIsLoading(true);
       const res = await fetch('/api/expert/flagged-queries');
@@ -85,6 +107,7 @@ export const ExpertAdvisoryProvider: React.FC<{ children: ReactNode }> = ({ chil
       })
     );
 
+    if (!SERVER_SYNC_ENABLED) return; // see file-level note
     try {
       await fetch(`/api/expert/flagged-queries/${id}/resolve`, {
         method: 'POST',
@@ -120,6 +143,7 @@ export const ExpertAdvisoryProvider: React.FC<{ children: ReactNode }> = ({ chil
 
     setQueries(prev => [newQuery, ...prev]);
 
+    if (!SERVER_SYNC_ENABLED) return; // see file-level note
     try {
       await fetch('/api/expert/flagged-queries', {
         method: 'POST',
@@ -131,6 +155,7 @@ export const ExpertAdvisoryProvider: React.FC<{ children: ReactNode }> = ({ chil
 
   const deleteQuery = async (id: string) => {
     setQueries(prev => prev.filter(q => q.id !== id));
+    if (!SERVER_SYNC_ENABLED) return; // see file-level note
     try {
       await fetch(`/api/expert/flagged-queries/${id}`, { method: 'DELETE' });
     } catch (e) {}

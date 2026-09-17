@@ -14,6 +14,7 @@ import { Citation, DocumentChunk, DocumentMetadata } from '../types';
 import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
 import { getSectionLink } from '../utils/sectionLinks';
+import { authFetch } from './auth/authStorage';
 
 interface ResearchViewProps {
   onOpenCitation: (citation: Citation) => void;
@@ -38,12 +39,15 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (query.trim()) params.set('q', query.trim());
+      // NOTE: backend's GET /api/research/search reads a param named
+      // `query`, not `q` -- this was silently sending an empty search to
+      // the backend before (it would just use its default query="").
+      if (query.trim()) params.set('query', query.trim());
       if (topicFilter !== 'ALL') params.set('topic', topicFilter);
       if (authorityFilter !== 'ALL') params.set('authority', authorityFilter);
       if (docTypeFilter !== 'ALL') params.set('document_type', docTypeFilter);
 
-      const res = await fetch(`/api/research/search?${params.toString()}`).catch(() => null);
+      const res = await authFetch(`/api/research/search?${params.toString()}`).catch(() => null);
       if (res && res.ok && res.headers.get('content-type')?.includes('application/json')) {
         const data = await res.json();
         setDocuments(Array.isArray(data) ? data : (data.documents || data.results || []));
@@ -68,7 +72,11 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
   const handleInspectDoc = async (id: string) => {
     setSelectedDocId(id);
     try {
-      const res = await fetch(`/api/documents/${id}`);
+      const res = await authFetch(`/api/documents/${id}`);
+      if (!res.ok) {
+        setSelectedDocChunks([]);
+        return;
+      }
       const data = await res.json();
       setSelectedDocChunks(data.chunks || []);
     } catch (e) {
@@ -78,7 +86,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
 
   const handleSaveToWorkspace = async (doc: DocumentMetadata) => {
     try {
-      await fetch('/api/workspace/save-research', {
+      await authFetch('/api/workspace/save-research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

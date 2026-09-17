@@ -1,5 +1,42 @@
+// ---------------------------------------------------------------------------
+// THE ROOT CAUSE OF THE 401 STORM: this file was still the original fake,
+// local-storage-only auth implementation. `components/auth/authStorage.ts`
+// already had real backend calls (dummyLogin/dummyRegister/authFetch/a real
+// JWT in localStorage) — but nothing here ever called it. login()/register()
+// below just matched against a hardcoded SEEDED_INITIAL_USERS array (no
+// password check, no backend call, no token ever issued), so
+// getAuthToken() was always null and every authFetch()-wrapped request
+// downstream (and any plain fetch()) got a 401, no matter how "logged in"
+// the UI looked. Fixed by actually calling authStorage.ts here — this is
+// the change authStorage.ts's own comment assumed had already happened.
+//
+// Exported interface (AuthContextType) is UNCHANGED — every component that
+// calls useAuth() (LoginView, RegisterView, Header, ProfileView,
+// LandingView, ExpertAdvisoryView) needed zero changes.
+//
+// Known, honest gaps (no backend endpoint exists for these yet — flagging
+// rather than silently pretending they're wired up):
+//   - updateProfile(): no PATCH /api/auth/me equivalent on the backend yet.
+//     Kept as a local-only state update, same as before. A page reload that
+//     re-runs verifySession() (GET /api/auth/me) will overwrite it with the
+//     server's stored values, since the server never received the edit.
+//   - removeRole(): no backend endpoint for removing a role. Local-only,
+//     same caveat as updateProfile().
+//   - organization / photo_url / expertCertificate: not fields on the
+//     backend's User model (see backend/app/schemas/auth.py UserPublic) —
+//     kept client-side-only on the cached user object, same caveat.
+// ---------------------------------------------------------------------------
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, UserRole, Language, normalizeRole, ALL_ROLES, ExpertCertificate } from '../types';
+import { User, UserRole, Language, normalizeRole, ExpertCertificate } from '../types';
+import {
+  dummyLogin,
+  dummyRegister,
+  dummyLogout,
+  dummyAddRole,
+  dummySetActiveRole,
+  getSessionUser,
+  verifySession,
+} from '../components/auth/authStorage';
 
 export interface RegisterData {
   name: string;
@@ -27,302 +64,138 @@ export interface AuthContextType {
   removeRole: (role: UserRole) => Promise<void>;
 }
 
-const STORAGE_USERS_KEY = 'ipsakti_auth_users_v2';
-const STORAGE_CURRENT_USER_KEY = 'ipsakti_auth_current_user_v2';
-
-export const SEEDED_INITIAL_USERS: User[] = [
-  {
-    id: 'user-expert-aarav',
-    name: 'Dr. Aarav Sharma',
-    email: 'aarav.sharma@ayush-research.in',
-    role: 'Expert',
-    roles: ['Expert'],
-    organization: 'Supreme Court & Patent Bar Association',
-    preferred_language: 'en',
-    created_at: '2025-01-15T09:30:00.000Z',
-    expertCertificate: {
-      fileName: 'CGPDTM_Patent_Agent_Certificate_IN_PA_3842.pdf',
-      fileSize: 428000,
-      fileType: 'application/pdf',
-      certificateId: 'IN/PA/3842',
-      certificateType: 'CGPDTM Registered Patent Agent (Rule 110, Patents Rules 2003)',
-      issuingAuthority: 'CGPDTM, Ministry of Commerce and Industry, Govt of India',
-      uploadedAt: '2025-01-15T09:30:00.000Z',
-      status: 'Verified'
-    }
-  },
-  {
-    id: 'user-practitioner-radhika',
-    name: 'Vaidya Radhika Sen',
-    email: 'radhika.sen@ayurveda-clinic.in',
-    role: 'Practitioner',
-    roles: ['Practitioner'],
-    organization: 'AyurMed Chikitsalaya & Research, Pune',
-    preferred_language: 'en',
-    created_at: '2025-02-10T10:00:00.000Z'
-  },
-  {
-    id: 'user-researcher-vikram',
-    name: 'Dr. Vikramaditya Joshi',
-    email: 'v.joshi@bioayush-research.in',
-    role: 'Researcher',
-    roles: ['Researcher'],
-    organization: 'Centre for Ethnobotanical Phytochemistry, Bangalore',
-    preferred_language: 'en',
-    created_at: '2025-02-12T11:00:00.000Z'
-  },
-  {
-    id: 'user-org-himalayan',
-    name: 'Himalayan Bio-Wellness Ltd',
-    email: 'ipr@himalayanbiowellness.in',
-    role: 'Organization',
-    roles: ['Organization'],
-    organization: 'AYUSH GMP Certified Manufacturer, Dehradun',
-    preferred_language: 'en',
-    created_at: '2025-02-15T14:00:00.000Z'
-  },
-  {
-    id: 'user-admin-suresh',
-    name: 'Suresh Kumar',
-    email: 'admin@ipsakti.gov.in',
-    role: 'Admin',
-    roles: ['Admin'],
-    organization: 'Ministry of Ayush / CGPDTM System Administration',
-    preferred_language: 'en',
-    created_at: '2025-01-01T00:00:00.000Z'
-  }
-];
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Keep any client-only fields (not part of the backend's User model) when
+ * merging a fresh server response over the previously-cached user. */
+function mergeClientOnlyFields(serverUser: User, previous: User | null): User {
+  if (!previous) return serverUser;
+  return {
+    ...serverUser,
+    organization: serverUser.organization ?? previous.organization,
+    photo_url: serverUser.photo_url ?? previous.photo_url,
+    expertCertificate: serverUser.expertCertificate ?? previous.expertCertificate,
+  };
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [users, setUsers] = useState<User[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem(STORAGE_USERS_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const mapped = parsed.map((u: any) => ({
-              ...u,
-              role: normalizeRole(u.role),
-              roles: Array.isArray(u.roles) && u.roles.length > 0
-                ? Array.from(new Set(u.roles.map((r: any) => normalizeRole(r))))
-                : [normalizeRole(u.role)]
-            }));
-            // Ensure seeded accounts exist
-            const existingEmails = new Set(mapped.map((u: User) => u.email.toLowerCase()));
-            const missingSeed = SEEDED_INITIAL_USERS.filter(s => !existingEmails.has(s.email.toLowerCase()));
-            return [...mapped, ...missingSeed];
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to load stored auth users:', e);
-      }
-    }
-    return SEEDED_INITIAL_USERS;
-  });
-
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const storedUser = localStorage.getItem(STORAGE_CURRENT_USER_KEY);
-        if (storedUser) {
-          const parsed = JSON.parse(storedUser);
-          const activeRole = normalizeRole(parsed.role);
-          const activeRoles = Array.isArray(parsed.roles) && parsed.roles.length > 0
-            ? Array.from(new Set(parsed.roles.map((r: any) => normalizeRole(r))))
-            : [activeRole];
-          return {
-            ...parsed,
-            role: activeRole,
-            roles: activeRoles
-          };
-        }
-      } catch (e) {
-        console.warn('Failed to load stored current user:', e);
-      }
-    }
-    // Unauthenticated by default so user begins on Landing Page
-    return null;
-  });
-
+  // Synchronous initial value from the cached session (see authStorage.ts's
+  // getSessionUser doc comment for why this must stay synchronous).
+  const [currentUser, setCurrentUser] = useState<User | null>(() => getSessionUser());
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Sync users to localStorage whenever updated
+  // Background session check on mount: confirms the cached token is still
+  // valid (GET /api/auth/me) and refreshes the cached user; clears the
+  // session if the token has expired or the user no longer exists.
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
-      } catch (e) {}
-    }
-  }, [users]);
+    let cancelled = false;
+    verifySession().then(user => {
+      if (!cancelled) {
+        setCurrentUser(prev => (user ? mergeClientOnlyFields(user, prev) : null));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  // Sync currentUser to localStorage whenever updated
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        if (currentUser) {
-          localStorage.setItem(STORAGE_CURRENT_USER_KEY, JSON.stringify(currentUser));
-        } else {
-          localStorage.removeItem(STORAGE_CURRENT_USER_KEY);
-        }
-      } catch (e) {}
-    }
-  }, [currentUser]);
-
-  const login = async (email: string, _password?: string, expertCertificate?: ExpertCertificate): Promise<{ success: boolean; user?: User; error?: string }> => {
+  const login = async (
+    email: string,
+    password?: string,
+    expertCertificate?: ExpertCertificate,
+  ): Promise<{ success: boolean; user?: User; error?: string }> => {
     setIsLoading(true);
-    // Simulate brief asynchronous authentication delay
-    await new Promise(resolve => setTimeout(resolve, 250));
-
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) {
+    try {
+      const user = await dummyLogin(email, password || '');
+      const merged = expertCertificate ? { ...user, expertCertificate } : user;
+      setCurrentUser(merged);
+      return { success: true, user: merged };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Invalid email or password.' };
+    } finally {
       setIsLoading(false);
-      return { success: false, error: 'Email address is required.' };
     }
-
-    const matchedUser = users.find(u => u.email.toLowerCase() === normalizedEmail);
-    if (!matchedUser) {
-      setIsLoading(false);
-      return { success: false, error: 'No account found with this email. Please check your credentials or register.' };
-    }
-
-    const updatedMatchedUser = expertCertificate
-      ? { ...matchedUser, expertCertificate }
-      : matchedUser;
-
-    if (expertCertificate) {
-      setUsers(prev => prev.map(u => u.id === matchedUser.id ? updatedMatchedUser : u));
-    }
-
-    setCurrentUser(updatedMatchedUser);
-    setIsLoading(false);
-    return { success: true, user: updatedMatchedUser };
   };
 
   const register = async (data: RegisterData): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
+    try {
+      const roles = (data.roles && data.roles.length > 0)
+        ? Array.from(new Set(data.roles.map(r => normalizeRole(r))))
+        : [data.role ? normalizeRole(data.role) : ('Practitioner' as UserRole)];
 
-    const normalizedEmail = data.email.trim().toLowerCase();
-    const normalizedName = data.name.trim();
+      const user = await dummyRegister({
+        name: data.name,
+        email: data.email,
+        password: data.password || '',
+        preferred_language: data.preferred_language,
+        roles,
+      });
 
-    if (!normalizedName) {
+      // organization/photo_url/expertCertificate aren't persisted server-side
+      // (see the file-level note above) — kept on the cached user anyway so
+      // the UI that just collected them doesn't immediately lose them.
+      const merged: User = {
+        ...user,
+        organization: data.organization,
+        photo_url: data.photo_url,
+        expertCertificate: data.expertCertificate,
+      };
+      setCurrentUser(merged);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Registration failed. Please try again.' };
+    } finally {
       setIsLoading(false);
-      return { success: false, error: 'Full name is required.' };
     }
-
-    if (!normalizedEmail || !normalizedEmail.includes('@')) {
-      setIsLoading(false);
-      return { success: false, error: 'A valid email address is required.' };
-    }
-
-    const existing = users.find(u => u.email.toLowerCase() === normalizedEmail);
-    if (existing) {
-      setIsLoading(false);
-      return { success: false, error: 'An account with this email address already exists. Please login instead.' };
-    }
-
-    const rawRoles = (data.roles && data.roles.length > 0)
-      ? data.roles.map(r => normalizeRole(r))
-      : [data.role ? normalizeRole(data.role) : 'Practitioner'];
-
-    const userRoles = Array.from(new Set(rawRoles)) as UserRole[];
-    const activeRole = data.role && userRoles.includes(normalizeRole(data.role))
-      ? normalizeRole(data.role)
-      : userRoles[0];
-
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      name: normalizedName,
-      email: normalizedEmail,
-      role: activeRole,
-      roles: userRoles,
-      organization: data.organization,
-      preferred_language: data.preferred_language || 'en',
-      photo_url: data.photo_url,
-      expertCertificate: data.expertCertificate,
-      created_at: new Date().toISOString()
-    };
-
-    setUsers(prev => [newUser, ...prev]);
-    setCurrentUser(newUser);
-    setIsLoading(false);
-    return { success: true };
   };
 
   const logout = () => {
+    dummyLogout();
     setCurrentUser(null);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem(STORAGE_CURRENT_USER_KEY);
-      } catch (e) {}
-    }
   };
 
-  const updateProfile = async (updates: Partial<Pick<User, 'name' | 'role' | 'roles' | 'preferred_language' | 'photo_url' | 'organization' | 'expertCertificate'>>) => {
+  const updateProfile = async (
+    updates: Partial<Pick<User, 'name' | 'role' | 'roles' | 'preferred_language' | 'photo_url' | 'organization' | 'expertCertificate'>>,
+  ) => {
+    // No backend profile-update endpoint yet — see file-level note.
     if (!currentUser) return;
-    const nextRoles = updates.roles
-      ? Array.from(new Set(updates.roles.map(r => normalizeRole(r))))
-      : currentUser.roles || [currentUser.role];
-
-    const nextRole = updates.role
-      ? normalizeRole(updates.role)
-      : currentUser.role;
-
-    const updatedUser: User = {
-      ...currentUser,
-      ...updates,
-      role: nextRole,
-      roles: nextRoles
-    };
-    setCurrentUser(updatedUser);
-    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+    setCurrentUser({ ...currentUser, ...updates });
   };
 
   const setActiveRole = async (role: UserRole) => {
     if (!currentUser) return;
-    const normalized = normalizeRole(role);
-    const existingRoles = currentUser.roles || [currentUser.role];
-    const newRoles = existingRoles.includes(normalized) ? existingRoles : [...existingRoles, normalized];
-    const updatedUser: User = {
-      ...currentUser,
-      role: normalized,
-      roles: newRoles
-    };
-    setCurrentUser(updatedUser);
-    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+    try {
+      const user = await dummySetActiveRole(currentUser.id, normalizeRole(role));
+      setCurrentUser(prev => mergeClientOnlyFields(user, prev));
+    } catch {
+      // Keep the previous active role if the backend rejects the switch
+      // (e.g. the account doesn't actually hold that role).
+    }
   };
 
   const addRole = async (role: UserRole, certificate?: ExpertCertificate) => {
     if (!currentUser) return;
-    const normalized = normalizeRole(role);
-    const existingRoles = currentUser.roles || [currentUser.role];
-    const newRoles = existingRoles.includes(normalized) ? existingRoles : [...existingRoles, normalized];
-    const updatedUser: User = {
-      ...currentUser,
-      roles: newRoles,
-      expertCertificate: certificate || currentUser.expertCertificate
-    };
-    setCurrentUser(updatedUser);
-    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+    try {
+      const user = await dummyAddRole(currentUser.id, normalizeRole(role));
+      setCurrentUser(prev => {
+        const merged = mergeClientOnlyFields(user, prev);
+        return certificate ? { ...merged, expertCertificate: certificate } : merged;
+      });
+    } catch {
+      // Leave roles unchanged on failure; caller's UI should surface an error via its own try/catch if needed.
+    }
   };
 
   const removeRole = async (role: UserRole) => {
+    // No backend endpoint for removing a role yet — see file-level note.
     if (!currentUser) return;
     const normalized = normalizeRole(role);
     const existingRoles = currentUser.roles || [currentUser.role];
-    if (existingRoles.length <= 1) return; // Must keep at least one role
+    if (existingRoles.length <= 1) return; // must keep at least one role
     const newRoles = existingRoles.filter(r => r !== normalized);
     const newActiveRole = currentUser.role === normalized ? newRoles[0] : currentUser.role;
-    const updatedUser: User = {
-      ...currentUser,
-      role: newActiveRole,
-      roles: newRoles
-    };
-    setCurrentUser(updatedUser);
-    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+    setCurrentUser({ ...currentUser, role: newActiveRole, roles: newRoles });
   };
 
   return (
@@ -338,7 +211,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updateProfile,
         setActiveRole,
         addRole,
-        removeRole
+        removeRole,
       }}
     >
       {children}

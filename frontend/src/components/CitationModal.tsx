@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, ExternalLink, BookOpen, ShieldCheck, FileText } from 'lucide-react';
 import { Citation, DocumentMetadata, DocumentChunk } from '../types';
 import { getSectionLink } from '../utils/sectionLinks';
+import { authFetch } from './auth/authStorage';
 
 interface CitationModalProps {
   citation: Citation | null;
@@ -15,9 +16,15 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
   useEffect(() => {
     if (!citation) return;
     setLoading(true);
-    fetch(`/api/documents/${citation.document_id}`)
-      .then(res => res.json())
+    authFetch(`/api/documents/${citation.document_id}`)
+      .then(res => (res.ok ? res.json() : null))
       .then(data => {
+        // Was previously called with a plain fetch() (no auth header) --
+        // the backend's 401 error body ({"detail": "..."}) got set as
+        // docDetails as if it were real data. The `docDetails?.metadata`
+        // check below happened to render nothing in that case rather than
+        // crashing, so this always silently failed instead of ever
+        // showing the extended document info.
         setDocDetails(data);
         setLoading(false);
       })

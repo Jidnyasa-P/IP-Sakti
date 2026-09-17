@@ -416,7 +416,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
 
   const fetchServerConversations = async () => {
     try {
-      const res = await fetch('/api/conversations');
+      const res = await authFetch('/api/conversations');
       const contentType = res.headers.get('content-type') || '';
       if (!res.ok || !contentType.includes('application/json')) {
         return;
@@ -489,9 +489,10 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
     if (local && local.messages) {
       setMessages(local.messages);
     }
-    fetch(`/api/conversations/${id}`)
-      .then(res => res.json())
+    authFetch(`/api/conversations/${id}`)
+      .then(res => (res.ok ? res.json() : null))
       .then(data => {
+        if (!data) return;
         if (data && Array.isArray(data.messages) && data.messages.length > 0) {
           setMessages(data.messages);
         }
@@ -528,7 +529,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
     setInputValue('');
 
     // Register on server
-    fetch('/api/conversations', {
+    authFetch('/api/conversations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: defaultTitle, language, jurisdiction: currentJur })
@@ -542,7 +543,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
   const deleteConversation = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     try {
-      fetch(`/api/conversations/${id}`, { method: 'DELETE' }).catch(() => null);
+      authFetch(`/api/conversations/${id}`, { method: 'DELETE' }).catch(() => null);
       const updated = conversations.filter(c => c.id !== id);
       const currentJur: Jurisdiction = isInternational ? 'international' : 'india';
       const remainingMatching = updated.filter(c => (c.jurisdiction || 'india') === currentJur);
@@ -689,61 +690,14 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
 
     let assistantMsg: StructuredChatMessage | null = null;
 
-    try {
-      // 1. Attempt streaming via /api/chat/stream
-      const response = await fetch('/api/chat/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: textToSend,
-          conversation_id: targetConvId,
-          language,
-          jurisdiction: currentJur
-        }),
-      });
-
-      if (!response.ok || !response.body) {
-        throw new Error(`Streaming not available, status: ${response.status}`);
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let accumulated = '';
-      let done = false;
-
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          const chunkStr = decoder.decode(value);
-          const lines = chunkStr.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const dataStr = line.slice(6).trim();
-              if (!dataStr) continue;
-
-              try {
-                const parsed = JSON.parse(dataStr);
-                if (parsed.type === 'token') {
-                  accumulated += parsed.token;
-                  setStreamingText(accumulated);
-                } else if (parsed.type === 'done') {
-                  assistantMsg = parsed.message || parsed;
-                }
-              } catch (parseErr) {
-                // partial chunk
-              }
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('Stream ended or interrupted, using direct chat query:', err);
-    }
-
-    // 2. Fallback to /api/chat if streaming did not complete message
-    if (!assistantMsg || !assistantMsg.content) {
+    // NOTE: there is no POST /api/chat/stream route on the backend (chat.py
+    // only implements /api/chat and /api/query, both non-streaming) -- an
+    // earlier version of this function tried it first on every single
+    // message, which was a guaranteed 404 every time before falling back.
+    // Removed that attempt entirely; goes straight to the real endpoint below.
+    // (streamingText/setStreamingText are left in place for a future real
+    // streaming endpoint -- see README's "honest gaps" section.)
+    {
       try {
         const syncRes = await authFetch('/api/chat', {
           method: 'POST',
@@ -924,7 +878,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
 
   const handleFeedback = async (msgId: string, feedback: 'helpful' | 'unhelpful') => {
     try {
-      fetch(`/api/conversations/${activeConvId}/feedback`, {
+      authFetch(`/api/conversations/${activeConvId}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message_id: msgId, feedback }),

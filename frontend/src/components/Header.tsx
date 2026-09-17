@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Shield,
   BookOpen,
@@ -20,15 +20,33 @@ import {
   Search,
   Sun,
   Moon,
-  HelpCircle
-} from 'lucide-react';
-import { Language, UserRole, normalizeRole, SUPPORTED_LANGUAGES, LANGUAGES_MAP } from '../types';
-import { useTranslation } from '../context/LanguageContext';
-import { useAuth } from '../context/AuthContext';
-import { useExpertAdvisory } from '../context/ExpertAdvisoryContext';
-import { useTheme } from '../context/ThemeContext';
+  HelpCircle,
+} from "lucide-react";
+import {
+  Language,
+  UserRole,
+  normalizeRole,
+  SUPPORTED_LANGUAGES,
+  LANGUAGES_MAP,
+} from "../types";
+import { useTranslation } from "../context/LanguageContext";
+import { useAuth } from "../context/AuthContext";
+import { useExpertAdvisory } from "../context/ExpertAdvisoryContext";
+import { useTheme } from "../context/ThemeContext";
 
-export type ActiveTab = 'landing' | 'chat' | 'product' | 'ipr' | 'tk' | 'research' | 'workspace' | 'admin' | 'login' | 'register' | 'profile' | 'expert';
+export type ActiveTab =
+  | "landing"
+  | "chat"
+  | "product"
+  | "ipr"
+  | "tk"
+  | "research"
+  | "workspace"
+  | "admin"
+  | "login"
+  | "register"
+  | "profile"
+  | "expert";
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -45,12 +63,12 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveTab,
   language,
   setLanguage,
-  userRole = 'EXPERT',
+  userRole = "EXPERT",
   onOpenWalkthrough,
-  isTourActive = false
+  isTourActive = false,
 }) => {
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
-  const [langSearchTerm, setLangSearchTerm] = useState('');
+  const [langSearchTerm, setLangSearchTerm] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { t } = useTranslation();
   const { currentUser, isLoggedIn, logout } = useAuth();
@@ -58,24 +76,46 @@ export const Header: React.FC<HeaderProps> = ({
   const { theme, toggleTheme, isDark } = useTheme();
 
   // Normalize role check for Expert
-  const isExpert = isLoggedIn && currentUser && normalizeRole(currentUser.role) === 'Expert';
+  const isExpert =
+    isLoggedIn && currentUser && normalizeRole(currentUser.role) === "Expert";
 
   const standardNavItems = [
-    { id: 'chat' as ActiveTab, label: t('nav.chat', 'Sahayak'), icon: Sparkles, badge: 'AI' },
-    { id: 'product' as ActiveTab, label: t('nav.product', 'Product Analyzer'), icon: FlaskConical },
-    { id: 'ipr' as ActiveTab, label: t('nav.ipr', 'IPR Navigator'), icon: Compass },
-    { id: 'tk' as ActiveTab, label: t('nav.tk', 'TK & ABS'), icon: Shield },
-    { id: 'research' as ActiveTab, label: t('nav.research', 'Research'), icon: BookOpen },
-    { id: 'workspace' as ActiveTab, label: t('nav.workspace', 'My Workspace'), icon: FolderArchive },
+    {
+      id: "chat" as ActiveTab,
+      label: t("nav.chat", "Sahayak"),
+      icon: Sparkles,
+      badge: "AI",
+    },
+    {
+      id: "product" as ActiveTab,
+      label: t("nav.product", "Product Analyzer"),
+      icon: FlaskConical,
+    },
+    {
+      id: "ipr" as ActiveTab,
+      label: t("nav.ipr", "IPR Navigator"),
+      icon: Compass,
+    },
+    { id: "tk" as ActiveTab, label: t("nav.tk", "TK & ABS"), icon: Shield },
+    {
+      id: "research" as ActiveTab,
+      label: t("nav.research", "Research"),
+      icon: BookOpen,
+    },
+    {
+      id: "workspace" as ActiveTab,
+      label: t("nav.workspace", "My Workspace"),
+      icon: FolderArchive,
+    },
   ];
 
   const expertNavItems = [
     {
-      id: 'expert' as ActiveTab,
-      label: 'Low-Confidence Legal Queries',
+      id: "expert" as ActiveTab,
+      label: "Low-Confidence Legal Queries",
       icon: Scale,
-      badge: pendingCount > 0 ? `${pendingCount} Flagged` : undefined
-    }
+      badge: pendingCount > 0 ? `${pendingCount} Flagged` : undefined,
+    },
   ];
 
   // Restrict navigation: Expert role ONLY sees the low-confidence query advisory queue
@@ -83,7 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const currentLang = LANGUAGES_MAP[language] || SUPPORTED_LANGUAGES[0];
 
-  const filteredLanguages = SUPPORTED_LANGUAGES.filter(l => {
+  const filteredLanguages = SUPPORTED_LANGUAGES.filter((l) => {
     if (!langSearchTerm.trim()) return true;
     const term = langSearchTerm.toLowerCase();
     return (
@@ -107,7 +147,7 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Logo & Brand */}
             <div
               id="brand-logo-btn"
-              onClick={() => handleNavClick(isExpert ? 'expert' : 'landing')}
+              onClick={() => handleNavClick(isExpert ? "expert" : "landing")}
               className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none min-w-0 shrink-0 order-1"
             >
               <div className="w-8 h-8 sm:w-9 sm:h-9 min-w-[2rem] sm:min-w-[2.25rem] aspect-square rounded-lg sm:rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 flex items-center justify-center text-amber-300 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
@@ -116,10 +156,12 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="min-w-0 flex items-center">
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <span className="font-serif font-semibold text-base sm:text-lg xl:text-xl tracking-tight text-slate-900 leading-none whitespace-nowrap">
-                    {t('brand.name', 'IP-SAKTI')}
+                    {t("brand.name", "IP-SAKTI")}
                   </span>
                   <span className="hidden xl:inline-block text-[11px] font-semibold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300 uppercase tracking-wider shrink-0 whitespace-nowrap leading-tight">
-                    {isExpert ? 'Legal Advisor Console' : t('brand.badge', 'Sahayak')}
+                    {isExpert
+                      ? "Legal Advisor Console"
+                      : t("brand.badge", "Sahayak")}
                   </span>
                 </div>
               </div>
@@ -128,7 +170,7 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Desktop Navigation Tabs */}
             {(isLoggedIn || isTourActive) && (
               <nav className="hidden lg:flex flex-wrap items-center justify-center gap-1 xl:gap-1.5 order-3 2xl:order-2 w-full 2xl:w-auto mt-0.5 2xl:mt-0 pt-1.5 2xl:pt-0 border-t 2xl:border-t-0 border-slate-100 dark:border-slate-800 shrink-0">
-                {navItems.map(item => {
+                {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
                   return (
@@ -138,14 +180,18 @@ export const Header: React.FC<HeaderProps> = ({
                       onClick={() => handleNavClick(item.id)}
                       className={`flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1.5 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-all shrink-0 ${
                         isActive
-                          ? 'bg-slate-900 text-white shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                          ? "bg-slate-900 text-white shadow-2xs"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                       }`}
                     >
-                      <Icon className={`w-3.5 h-3.5 xl:w-4 xl:h-4 shrink-0 ${isActive ? 'text-amber-300' : 'text-slate-500'}`} />
+                      <Icon
+                        className={`w-3.5 h-3.5 xl:w-4 xl:h-4 shrink-0 ${isActive ? "text-amber-300" : "text-slate-500"}`}
+                      />
                       <span className="whitespace-nowrap">{item.label}</span>
                       {item.badge && (
-                        <span className={`hidden xl:inline-block text-[10px] px-1.5 py-0.2 rounded font-medium uppercase tracking-wider ${isActive ? 'bg-slate-800 text-amber-200 border border-amber-400/30' : 'bg-emerald-100 text-emerald-800'}`}>
+                        <span
+                          className={`hidden xl:inline-block text-[10px] px-1.5 py-0.2 rounded font-medium uppercase tracking-wider ${isActive ? "bg-slate-800 text-amber-200 border border-amber-400/30" : "bg-emerald-100 text-emerald-800"}`}
+                        >
                           {item.badge}
                         </span>
                       )}
@@ -164,20 +210,26 @@ export const Header: React.FC<HeaderProps> = ({
                   id="language-selector-btn"
                   onClick={() => setLangDropdownOpen(!langDropdownOpen)}
                   className={`flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 xl:px-3 xl:py-1.5 rounded-lg border text-xs font-medium transition-all shrink-0 ${
-                    language !== 'en'
-                      ? 'border-emerald-300 bg-emerald-50/80 text-emerald-900 font-semibold shadow-2xs'
-                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                    language !== "en"
+                      ? "border-emerald-300 bg-emerald-50/80 text-emerald-900 font-semibold shadow-2xs"
+                      : "border-slate-200 hover:bg-slate-50 text-slate-700"
                   }`}
                   title="Switch Language / भाषा बदलें"
                 >
-                  <Globe className={`w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 ${language !== 'en' ? 'text-emerald-700' : 'text-slate-500'}`} />
-                  <span className="font-semibold hidden xl:inline">{currentLang.native}</span>
-                  <span className="font-semibold inline xl:hidden uppercase">{currentLang.code}</span>
+                  <Globe
+                    className={`w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 ${language !== "en" ? "text-emerald-700" : "text-slate-500"}`}
+                  />
+                  <span className="font-semibold hidden xl:inline">
+                    {currentLang.native}
+                  </span>
+                  <span className="font-semibold inline xl:hidden uppercase">
+                    {currentLang.code}
+                  </span>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden xl:inline-block shrink-0" />
                 </button>
 
                 {langDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-1">
+                  <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-1">
                     <div className="px-3 pb-2 border-b border-slate-100">
                       <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
                         22 Eighth Schedule Languages / भाषा
@@ -187,33 +239,39 @@ export const Header: React.FC<HeaderProps> = ({
                         <input
                           type="text"
                           value={langSearchTerm}
-                          onChange={e => setLangSearchTerm(e.target.value)}
+                          onChange={(e) => setLangSearchTerm(e.target.value)}
                           placeholder="Search language / भाषा खोजें..."
                           className="w-full pl-8 pr-2.5 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-emerald-700"
                         />
                       </div>
                     </div>
                     <div className="max-h-64 overflow-y-auto divide-y divide-slate-50 p-1">
-                      {filteredLanguages.map(l => (
+                      {filteredLanguages.map((l) => (
                         <button
                           key={l.code}
                           type="button"
                           onClick={() => {
                             setLanguage(l.code);
                             setLangDropdownOpen(false);
-                            setLangSearchTerm('');
+                            setLangSearchTerm("");
                           }}
                           className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left rounded-lg transition-colors cursor-pointer ${
                             language === l.code
-                              ? 'bg-emerald-50 text-emerald-950 font-semibold'
-                              : 'hover:bg-slate-50 text-slate-700'
+                              ? "bg-emerald-50 text-emerald-950 font-semibold"
+                              : "hover:bg-slate-50 text-slate-700"
                           }`}
                         >
                           <div className="flex flex-col">
-                            <span className="font-semibold text-sm leading-tight">{l.native}</span>
-                            <span className="text-[11px] text-slate-500">{l.label}</span>
+                            <span className="font-semibold text-sm leading-tight">
+                              {l.native}
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              {l.label}
+                            </span>
                           </div>
-                          {language === l.code && <Check className="w-4 h-4 text-emerald-700 shrink-0" />}
+                          {language === l.code && (
+                            <Check className="w-4 h-4 text-emerald-700 shrink-0" />
+                          )}
                         </button>
                       ))}
                       {filteredLanguages.length === 0 && (
@@ -231,23 +289,33 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 id="theme-toggle-btn"
                 onClick={toggleTheme}
-                aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-                title={isDark ? 'Switch to Light Mode / लाइट मोड चालू करें' : 'Switch to Dark Mode / डार्क मोड चालू करें'}
+                aria-label={
+                  isDark ? "Switch to light mode" : "Switch to dark mode"
+                }
+                title={
+                  isDark
+                    ? "Switch to Light Mode / लाइट मोड चालू करें"
+                    : "Switch to Dark Mode / डार्क मोड चालू करें"
+                }
                 className={`flex items-center gap-1.5 px-2 py-1.5 xl:px-2.5 xl:py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer shadow-2xs select-none shrink-0 ${
                   isDark
-                    ? 'border-amber-400/40 bg-slate-800 text-amber-300 hover:bg-slate-750 hover:border-amber-400 focus:ring-2 focus:ring-amber-400/50'
-                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-300 focus:ring-2 focus:ring-emerald-600/30'
+                    ? "border-amber-400/40 bg-slate-800 text-amber-300 hover:bg-slate-750 hover:border-amber-400 focus:ring-2 focus:ring-amber-400/50"
+                    : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-300 focus:ring-2 focus:ring-emerald-600/30"
                 }`}
               >
                 {isDark ? (
                   <>
                     <Sun className="w-4 h-4 text-amber-400 shrink-0 transition-transform duration-300 hover:rotate-45" />
-                    <span className="hidden 2xl:inline font-semibold">Light</span>
+                    <span className="hidden 2xl:inline font-semibold">
+                      Light
+                    </span>
                   </>
                 ) : (
                   <>
                     <Moon className="w-4 h-4 text-slate-600 shrink-0 transition-transform duration-300 hover:-rotate-12" />
-                    <span className="hidden 2xl:inline font-semibold">Dark</span>
+                    <span className="hidden 2xl:inline font-semibold">
+                      Dark
+                    </span>
                   </>
                 )}
               </button>
@@ -262,21 +330,23 @@ export const Header: React.FC<HeaderProps> = ({
                   className="flex items-center gap-1.5 px-2 py-1.5 xl:px-2.5 xl:py-1.5 rounded-lg border border-emerald-300/80 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-950 font-medium text-xs transition-all cursor-pointer shadow-2xs shrink-0 select-none"
                 >
                   <HelpCircle className="w-4 h-4 text-emerald-800 shrink-0" />
-                  <span className="hidden xl:inline font-semibold whitespace-nowrap">How to Use</span>
+                  <span className="hidden xl:inline font-semibold whitespace-nowrap">
+                    How to Use
+                  </span>
                 </button>
               )}
 
               {/* Admin Button (Desktop/Tablet) - Hidden for Expert */}
-              {isLoggedIn && !isExpert && currentUser?.role === 'ADMIN' && (
+              {isLoggedIn && !isExpert && currentUser?.role === "ADMIN" && (
                 <button
                   type="button"
                   id="admin-nav-btn"
-                  onClick={() => handleNavClick('admin')}
-                  title={t('nav.admin', 'Admin & Telemetry')}
+                  onClick={() => handleNavClick("admin")}
+                  title={t("nav.admin", "Admin & Telemetry")}
                   className={`p-1.5 xl:p-2 rounded-xl transition-colors border shrink-0 ${
-                    activeTab === 'admin'
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-slate-200'
+                    activeTab === "admin"
+                      ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-slate-200"
                   }`}
                 >
                   <Settings className="w-4 h-4 xl:w-4.5 xl:h-4.5" />
@@ -289,17 +359,21 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     id="user-profile-header-btn"
-                    onClick={() => handleNavClick('profile')}
+                    onClick={() => handleNavClick("profile")}
                     className={`flex items-center gap-1.5 xl:gap-2 px-2 xl:px-2.5 py-1.5 rounded-xl border transition-all shrink-0 ${
-                      activeTab === 'profile'
-                        ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-semibold ring-1 ring-emerald-700 shadow-2xs'
-                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                      activeTab === "profile"
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-950 font-semibold ring-1 ring-emerald-700 shadow-2xs"
+                        : "border-slate-200 hover:bg-slate-50 text-slate-700"
                     }`}
                     title="View Account Profile"
                   >
                     <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 flex items-center justify-center font-bold text-xs overflow-hidden shrink-0">
                       {currentUser.photo_url ? (
-                        <img src={currentUser.photo_url} alt={currentUser.name} className="w-full h-full object-cover" />
+                        <img
+                          src={currentUser.photo_url}
+                          alt={currentUser.name}
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <span>{currentUser.name.charAt(0).toUpperCase()}</span>
                       )}
@@ -319,11 +393,11 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     id="header-login-btn"
-                    onClick={() => handleNavClick('login')}
+                    onClick={() => handleNavClick("login")}
                     className={`flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shrink-0 ${
-                      activeTab === 'login'
-                        ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
-                        : 'border-slate-300 hover:bg-slate-100 text-slate-700'
+                      activeTab === "login"
+                        ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                        : "border-slate-300 hover:bg-slate-100 text-slate-700"
                     }`}
                   >
                     <LogIn className="w-3.5 h-3.5" />
@@ -332,11 +406,11 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     id="header-register-btn"
-                    onClick={() => handleNavClick('register')}
+                    onClick={() => handleNavClick("register")}
                     className={`flex items-center gap-1 px-2.5 xl:px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shrink-0 ${
-                      activeTab === 'register'
-                        ? 'bg-emerald-800 text-white border-emerald-800 shadow-2xs'
-                        : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100'
+                      activeTab === "register"
+                        ? "bg-emerald-800 text-white border-emerald-800 shadow-2xs"
+                        : "bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100"
                     }`}
                   >
                     <span>Register</span>
@@ -403,15 +477,21 @@ export const Header: React.FC<HeaderProps> = ({
               {isLoggedIn && currentUser ? (
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
                   <div
-                    onClick={() => handleNavClick('profile')}
+                    onClick={() => handleNavClick("profile")}
                     className="flex items-center justify-between cursor-pointer group"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
                         {currentUser.photo_url ? (
-                          <img src={currentUser.photo_url} alt={currentUser.name} className="w-full h-full object-cover" />
+                          <img
+                            src={currentUser.photo_url}
+                            alt={currentUser.name}
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
-                          <span>{currentUser.name.charAt(0).toUpperCase()}</span>
+                          <span>
+                            {currentUser.name.charAt(0).toUpperCase()}
+                          </span>
                         )}
                       </div>
                       <div className="min-w-0">
@@ -431,7 +511,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <div className="flex items-center gap-2 pt-1 border-t border-slate-200/60 text-xs">
                     <button
                       type="button"
-                      onClick={() => handleNavClick('profile')}
+                      onClick={() => handleNavClick("profile")}
                       className="flex-1 py-1.5 px-2 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-700 font-medium text-center"
                     >
                       My Profile
@@ -440,7 +520,7 @@ export const Header: React.FC<HeaderProps> = ({
                       type="button"
                       onClick={() => {
                         logout();
-                        handleNavClick('landing');
+                        handleNavClick("landing");
                       }}
                       className="py-1.5 px-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg text-rose-700 font-medium flex items-center gap-1"
                     >
@@ -454,7 +534,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => handleNavClick('login')}
+                      onClick={() => handleNavClick("login")}
                       className="py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold text-center flex items-center justify-center gap-1.5"
                     >
                       <LogIn className="w-3.5 h-3.5" />
@@ -462,7 +542,7 @@ export const Header: React.FC<HeaderProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleNavClick('register')}
+                      onClick={() => handleNavClick("register")}
                       className="py-2 px-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold text-center"
                     >
                       Register
@@ -478,18 +558,18 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Navigation Tabs */}
             <div className="py-4 space-y-1.5 flex-1">
               <div className="text-xs font-bold uppercase tracking-wider text-slate-400 px-3 py-1">
-                {isExpert ? 'Legal Advisor Navigation' : 'Navigation Modules'}
+                {isExpert ? "Legal Advisor Navigation" : "Navigation Modules"}
               </div>
 
               {/* Home - Hidden for Expert */}
               {!isExpert && (
                 <button
                   type="button"
-                  onClick={() => handleNavClick('landing')}
+                  onClick={() => handleNavClick("landing")}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors ${
-                    activeTab === 'landing'
-                      ? 'bg-slate-900 text-white'
-                      : 'text-slate-700 hover:bg-slate-100'
+                    activeTab === "landing"
+                      ? "bg-slate-900 text-white"
+                      : "text-slate-700 hover:bg-slate-100"
                   }`}
                 >
                   <Home className="w-5 h-5" />
@@ -520,7 +600,7 @@ export const Header: React.FC<HeaderProps> = ({
 
               {isLoggedIn ? (
                 <>
-                  {navItems.map(item => {
+                  {navItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.id;
                     return (
@@ -530,18 +610,24 @@ export const Header: React.FC<HeaderProps> = ({
                         onClick={() => handleNavClick(item.id)}
                         className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors ${
                           isActive
-                            ? 'bg-slate-900 text-white'
-                            : 'text-slate-700 hover:bg-slate-100'
+                            ? "bg-slate-900 text-white"
+                            : "text-slate-700 hover:bg-slate-100"
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <Icon className={`w-5 h-5 ${isActive ? 'text-amber-300' : 'text-slate-500'}`} />
+                          <Icon
+                            className={`w-5 h-5 ${isActive ? "text-amber-300" : "text-slate-500"}`}
+                          />
                           <span>{item.label}</span>
                         </div>
                         {item.badge && (
-                          <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase ${
-                            isActive ? 'bg-slate-800 text-amber-200' : 'bg-emerald-100 text-emerald-800'
-                          }`}>
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase ${
+                              isActive
+                                ? "bg-slate-800 text-amber-200"
+                                : "bg-emerald-100 text-emerald-800"
+                            }`}
+                          >
                             {item.badge}
                           </span>
                         )}
@@ -549,14 +635,14 @@ export const Header: React.FC<HeaderProps> = ({
                     );
                   })}
 
-                  {!isExpert && currentUser?.role === 'ADMIN' && (
+                  {!isExpert && currentUser?.role === "ADMIN" && (
                     <button
                       type="button"
-                      onClick={() => handleNavClick('admin')}
+                      onClick={() => handleNavClick("admin")}
                       className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors ${
-                        activeTab === 'admin'
-                          ? 'bg-slate-900 text-white'
-                          : 'text-slate-700 hover:bg-slate-100'
+                        activeTab === "admin"
+                          ? "bg-slate-900 text-white"
+                          : "text-slate-700 hover:bg-slate-100"
                       }`}
                     >
                       <Settings className="w-5 h-5" />
@@ -570,11 +656,12 @@ export const Header: React.FC<HeaderProps> = ({
                     Locked Research Modules
                   </div>
                   <p className="text-[11px] text-slate-500 leading-relaxed">
-                    AI Assistant, Product Analyzer, IPR Navigator, TKDL & Dossier Workspace require sign in.
+                    AI Assistant, Product Analyzer, IPR Navigator, TKDL &
+                    Dossier Workspace require sign in.
                   </p>
                   <button
                     type="button"
-                    onClick={() => handleNavClick('login')}
+                    onClick={() => handleNavClick("login")}
                     className="w-full py-2 px-3 bg-slate-900 text-white rounded-lg text-xs font-semibold text-center"
                   >
                     Sign In to Unlock
@@ -589,10 +676,12 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
                   Select Language / भाषा
                 </div>
-                <span className="text-[10px] text-emerald-800 font-semibold">22 Languages</span>
+                <span className="text-[10px] text-emerald-800 font-semibold">
+                  22 Languages
+                </span>
               </div>
               <div className="max-h-56 overflow-y-auto grid grid-cols-2 gap-2 pr-1">
-                {SUPPORTED_LANGUAGES.map(l => (
+                {SUPPORTED_LANGUAGES.map((l) => (
                   <button
                     key={l.code}
                     onClick={() => {
@@ -601,12 +690,16 @@ export const Header: React.FC<HeaderProps> = ({
                     }}
                     className={`py-2 px-2.5 rounded-lg text-left border transition-all ${
                       language === l.code
-                        ? 'bg-emerald-700 text-white border-emerald-800 shadow-xs'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        ? "bg-emerald-700 text-white border-emerald-800 shadow-xs"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
                     }`}
                   >
-                    <div className="font-semibold text-xs leading-tight">{l.native}</div>
-                    <div className={`text-[10px] ${language === l.code ? 'text-emerald-100' : 'text-slate-400'}`}>
+                    <div className="font-semibold text-xs leading-tight">
+                      {l.native}
+                    </div>
+                    <div
+                      className={`text-[10px] ${language === l.code ? "text-emerald-100" : "text-slate-400"}`}
+                    >
                       {l.label}
                     </div>
                   </button>
@@ -622,7 +715,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <Moon className="w-4 h-4 text-slate-600" />
                   )}
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    {isDark ? 'Dark Mode' : 'Light Mode'}
+                    {isDark ? "Dark Mode" : "Light Mode"}
                   </span>
                 </div>
                 <button
@@ -631,8 +724,8 @@ export const Header: React.FC<HeaderProps> = ({
                   onClick={toggleTheme}
                   className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                     isDark
-                      ? 'bg-slate-800 border-amber-400/40 text-amber-300 hover:bg-slate-700'
-                      : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'
+                      ? "bg-slate-800 border-amber-400/40 text-amber-300 hover:bg-slate-700"
+                      : "bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200"
                   }`}
                 >
                   {isDark ? (
@@ -651,7 +744,9 @@ export const Header: React.FC<HeaderProps> = ({
 
               <div className="pt-3 flex items-center justify-between text-xs text-slate-500">
                 <span>Account Status:</span>
-                <span className="font-semibold text-emerald-800">{userRole} ACCESS</span>
+                <span className="font-semibold text-emerald-800">
+                  {userRole} ACCESS
+                </span>
               </div>
             </div>
           </div>
@@ -666,57 +761,77 @@ export const Header: React.FC<HeaderProps> = ({
       >
         <button
           type="button"
-          onClick={() => handleNavClick('landing')}
+          onClick={() => handleNavClick("landing")}
           className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-lg transition-colors ${
-            activeTab === 'landing' ? 'text-emerald-800 font-bold' : 'text-slate-500 hover:text-slate-800'
+            activeTab === "landing"
+              ? "text-emerald-800 font-bold"
+              : "text-slate-500 hover:text-slate-800"
           }`}
         >
           <Home className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0" />
-          <span className="text-[10px] mt-0.5 truncate w-full text-center">Home</span>
+          <span className="text-[10px] mt-0.5 truncate w-full text-center">
+            Home
+          </span>
         </button>
 
         <button
           type="button"
-          onClick={() => handleNavClick('chat')}
+          onClick={() => handleNavClick("chat")}
           className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-lg transition-colors ${
-            activeTab === 'chat' ? 'text-emerald-800 font-bold' : 'text-slate-500 hover:text-slate-800'
+            activeTab === "chat"
+              ? "text-emerald-800 font-bold"
+              : "text-slate-500 hover:text-slate-800"
           }`}
         >
           <Sparkles className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0" />
-          <span className="text-[10px] mt-0.5 truncate w-full text-center">Sahayak</span>
+          <span className="text-[10px] mt-0.5 truncate w-full text-center">
+            Sahayak
+          </span>
         </button>
 
         <button
           type="button"
-          onClick={() => handleNavClick('product')}
+          onClick={() => handleNavClick("product")}
           className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-lg transition-colors ${
-            activeTab === 'product' ? 'text-emerald-800 font-bold' : 'text-slate-500 hover:text-slate-800'
+            activeTab === "product"
+              ? "text-emerald-800 font-bold"
+              : "text-slate-500 hover:text-slate-800"
           }`}
         >
           <FlaskConical className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0" />
-          <span className="text-[10px] mt-0.5 truncate w-full text-center">Analyzer</span>
+          <span className="text-[10px] mt-0.5 truncate w-full text-center">
+            Analyzer
+          </span>
         </button>
 
         <button
           type="button"
-          onClick={() => handleNavClick('ipr')}
+          onClick={() => handleNavClick("ipr")}
           className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-lg transition-colors ${
-            activeTab === 'ipr' ? 'text-emerald-800 font-bold' : 'text-slate-500 hover:text-slate-800'
+            activeTab === "ipr"
+              ? "text-emerald-800 font-bold"
+              : "text-slate-500 hover:text-slate-800"
           }`}
         >
           <Compass className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0" />
-          <span className="text-[10px] mt-0.5 truncate w-full text-center">IPR</span>
+          <span className="text-[10px] mt-0.5 truncate w-full text-center">
+            IPR
+          </span>
         </button>
 
         <button
           type="button"
-          onClick={() => handleNavClick('tk')}
+          onClick={() => handleNavClick("tk")}
           className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-lg transition-colors ${
-            activeTab === 'tk' ? 'text-emerald-800 font-bold' : 'text-slate-500 hover:text-slate-800'
+            activeTab === "tk"
+              ? "text-emerald-800 font-bold"
+              : "text-slate-500 hover:text-slate-800"
           }`}
         >
           <Shield className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0" />
-          <span className="text-[10px] mt-0.5 truncate w-full text-center">TK & ABS</span>
+          <span className="text-[10px] mt-0.5 truncate w-full text-center">
+            TK & ABS
+          </span>
         </button>
 
         <button
@@ -726,7 +841,9 @@ export const Header: React.FC<HeaderProps> = ({
           aria-label="More navigation options"
         >
           <Menu className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0" />
-          <span className="text-[10px] mt-0.5 truncate w-full text-center">More</span>
+          <span className="text-[10px] mt-0.5 truncate w-full text-center">
+            More
+          </span>
         </button>
       </nav>
     </>
