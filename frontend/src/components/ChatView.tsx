@@ -30,6 +30,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { getSectionLink } from '../utils/sectionLinks';
 import { evaluateQueryJurisdiction, JurisdictionCheckResult } from '../utils/jurisdictionValidation';
 import { evaluateQueryRelevance, QueryRelevanceResult } from '../utils/queryRelevance';
+import { authFetch } from './auth/authStorage';
 
 interface ChatViewProps {
   language: Language;
@@ -744,7 +745,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ language, onOpenCitation }) 
     // 2. Fallback to /api/chat if streaming did not complete message
     if (!assistantMsg || !assistantMsg.content) {
       try {
-        const syncRes = await fetch('/api/chat', {
+        const syncRes = await authFetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
