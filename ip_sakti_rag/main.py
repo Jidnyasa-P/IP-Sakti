@@ -12,6 +12,7 @@ Run: uvicorn main:app --host 0.0.0.0 --port $PORT
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -20,17 +21,25 @@ from app.config import settings
 from app.database.mongo import save_feedback
 from app.pipeline import IPSaktiRAG
 
-app = FastAPI(title="IP-SAKTI RAG API")
+# Use a lifespan context manager to initialize the RAG pipeline explicitly at startup
+rag: IPSaktiRAG = None # type: ignore
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global rag
+    rag = IPSaktiRAG()  # loaded once at startup
+    yield
+
+app = FastAPI(title="IP-SAKTI RAG API", lifespan=lifespan)
+
+# Optimized CORS configuration for communication with Vercel
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"],  # Allows all origins including production and dynamic Vercel previews
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows GET, POST, OPTIONS, etc.
+    allow_headers=["*"],  # Essential to accept your 'X-Internal-Secret' header from Vercel
 )
-
-rag = IPSaktiRAG()  # loaded once at startup
-
 
 def _check_secret(x_internal_secret: str | None) -> None:
     # If no secret is configured (e.g. local dev), skip the check entirely.
