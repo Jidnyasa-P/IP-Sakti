@@ -1,0 +1,33 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+pydantic[email]==2.10.4
+python-dotenv==1.0.1
+httpx==0.28.1
+python-multipart==0.0.20
+
+# --- Authentication (Section 3) ---
+# passlib[bcrypt] hashes/verifies passwords; PyJWT issues/validates the
+# stateless session tokens used by app/api/deps.py.
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+PyJWT==2.10.1
+
+# --- Persistent application database (Section 22/33) ---
+# pymongo talks to a real MongoDB when MONGODB_URI is set. When it is blank
+# (or unreachable), the backend falls back to mongomock — a pymongo-API
+# compatible in-memory store — so it still boots with zero external setup
+# (DEMO MODE, non-persistent). See app/database/session.py.
+pymongo==4.10.1
+mongomock==4.3.0
+
+# --- PDF export (Product Analyzer / TK-ABS "download as PDF") ---
+# Pure-Python, no system dependencies (unlike wkhtmltopdf/weasyprint), so it
+# works in the same zero-external-setup DEMO MODE as the rest of this
+# backend. See app/services/pdf_service.py.
+reportlab==4.2.5
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.25.0
