@@ -1090,7 +1090,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           className={`text-[11px] px-2 py-0.5 rounded-full border font-medium flex items-center gap-1 cursor-help ${badgeClasses}`}
         >
           {icon}
-          <span>Confidence Score: 95</span>
+          <span>Confidence Score: 80</span>
         </span>
         {reasons && reasons.length > 0 && (
           <div className="absolute right-0 top-full mt-1 w-64 p-2 bg-slate-900 text-white text-[11px] rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50">
