@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { DocumentMetadata, RAGTelemetry } from '../types';
 import { DisclaimerBanner } from './DisclaimerBanner';
+import { authFetch } from './auth/authStorage';
 
 export const AdminView: React.FC = () => {
   const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
@@ -39,8 +40,8 @@ export const AdminView: React.FC = () => {
     setLoading(true);
     try {
       const [docsRes, telRes] = await Promise.all([
-        fetch('/api/admin/documents').catch(() => null),
-        fetch('/api/admin/telemetry').catch(() => null),
+        authFetch('/api/admin/documents').catch(() => null),
+        authFetch('/api/admin/telemetry').catch(() => null),
       ]);
 
       if (docsRes && docsRes.ok && docsRes.headers.get('content-type')?.includes('application/json')) {
@@ -64,7 +65,7 @@ export const AdminView: React.FC = () => {
     if (!newDocTitle.trim()) return;
 
     try {
-      const res = await fetch('/api/admin/documents', {
+      const res = await authFetch('/api/admin/documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -90,7 +91,7 @@ export const AdminView: React.FC = () => {
 
   const handleReindex = async (id: string) => {
     try {
-      await fetch(`/api/admin/documents/${id}/index`, { method: 'POST' });
+      await authFetch(`/api/admin/documents/${id}/index`, { method: 'POST' });
       loadAdminData();
     } catch (e) {
       console.error('Re-indexing failed:', e);

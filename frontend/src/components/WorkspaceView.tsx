@@ -14,6 +14,7 @@ import { Conversation, ProductAnalysisResult } from '../types';
 import { ActiveTab } from './Header';
 import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
+import { authFetch } from './auth/authStorage';
 
 interface WorkspaceViewProps {
   setActiveTab: (tab: ActiveTab) => void;
@@ -33,9 +34,9 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
   const loadWorkspaceData = async () => {
     try {
       const [convRes, prodRes, savedRes] = await Promise.all([
-        fetch('/api/conversations').catch(() => null),
-        fetch('/api/products').catch(() => null),
-        fetch('/api/workspace/saved-research').catch(() => null),
+        authFetch('/api/conversations').catch(() => null),
+        authFetch('/api/products').catch(() => null),
+        authFetch('/api/workspace/saved-research').catch(() => null),
       ]);
 
       const convData =
@@ -61,7 +62,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
 
   const deleteSavedItem = async (id: string) => {
     try {
-      await fetch(`/api/workspace/saved-research/${id}`, { method: 'DELETE' });
+      await authFetch(`/api/workspace/saved-research/${id}`, { method: 'DELETE' });
       setSavedResearch(savedResearch.filter(s => s.id !== id));
     } catch (e) {
       console.error('Failed to delete saved item:', e);

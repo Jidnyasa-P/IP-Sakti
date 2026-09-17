@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from "react";
 import {
   Compass,
   CheckCircle2,
@@ -23,12 +23,18 @@ import {
   FileCheck2,
   FileBadge,
   Sparkle,
-  Cpu
-} from 'lucide-react';
-import { Citation, IPRAssetType, IPRNavigatorQuery, IPRNavigatorResult } from '../types';
-import { DisclaimerBanner } from './DisclaimerBanner';
-import { useTranslation } from '../context/LanguageContext';
-import { getSectionLink } from '../utils/sectionLinks';
+  Cpu,
+} from "lucide-react";
+import {
+  Citation,
+  IPRAssetType,
+  IPRNavigatorQuery,
+  IPRNavigatorResult,
+} from "../types";
+import { DisclaimerBanner } from "./DisclaimerBanner";
+import { useTranslation } from "../context/LanguageContext";
+import { getSectionLink } from "../utils/sectionLinks";
+import { authFetch } from "./auth/authStorage";
 
 interface IPRNavigatorViewProps {
   onOpenCitation: (citation: Citation) => void;
@@ -43,105 +49,115 @@ interface AssetOption {
   filingForm: string;
 }
 
-export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitation }) => {
+export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({
+  onOpenCitation,
+}) => {
   const { t } = useTranslation();
-  
+
   // Multi-select for assets to protect
   const [selectedAssets, setSelectedAssets] = useState<IPRAssetType[]>([
-    'Manufacturing process',
-    'New formulation'
+    "Manufacturing process",
+    "New formulation",
   ]);
 
-  const [description, setDescription] = useState('');
-  const [usesBiologicalResource, setUsesBiologicalResource] = useState<boolean>(true);
+  const [description, setDescription] = useState("");
+  const [usesBiologicalResource, setUsesBiologicalResource] =
+    useState<boolean>(true);
   const [hasTraditionalBasis, setHasTraditionalBasis] = useState<boolean>(true);
   const [hasSynergyData, setHasSynergyData] = useState<boolean>(false);
   const [isCommercialized, setIsCommercialized] = useState<boolean>(false);
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<IPRNavigatorResult | null>(null);
-  
+  const [error, setError] = useState<string | null>(null);
+
   // Pagination state for answer division (1: Primary, 2: Constraints, 3: Filings & Steps, 4: Citations)
   const [currentPage, setCurrentPage] = useState<number>(1);
   const totalPages = 4;
-  
+
   const resultCardRef = useRef<HTMLDivElement>(null);
 
   const assetOptions: AssetOption[] = [
     {
-      type: 'Manufacturing process',
-      label: 'Manufacturing Process / Extraction',
-      desc: 'Novel standardized extraction, separation, or green solvent purification methods',
-      category: 'Patent / Trade Secret',
-      primaryMechanism: 'Process Patent (Section 3 compliant) & Trade Secret for SOP parameters',
-      filingForm: 'Patent Form 1 & Form 2 (Complete Specification)'
+      type: "Manufacturing process",
+      label: "Manufacturing Process / Extraction",
+      desc: "Novel standardized extraction, separation, or green solvent purification methods",
+      category: "Patent / Trade Secret",
+      primaryMechanism:
+        "Process Patent (Section 3 compliant) & Trade Secret for SOP parameters",
+      filingForm: "Patent Form 1 & Form 2 (Complete Specification)",
     },
     {
-      type: 'New formulation',
-      label: 'New Herbal Formulation',
-      desc: 'Standardized poly-herbal mixtures, novel dosage forms, and synergistic compounds',
-      category: 'Patent & Trademark',
-      primaryMechanism: 'Process Patent with Section 3(e) synergy assay + Trademark Class 5',
-      filingForm: 'Patent Form 1/2 with Synergy Data + TM-A'
+      type: "New formulation",
+      label: "New Herbal Formulation",
+      desc: "Standardized poly-herbal mixtures, novel dosage forms, and synergistic compounds",
+      category: "Patent & Trademark",
+      primaryMechanism:
+        "Process Patent with Section 3(e) synergy assay + Trademark Class 5",
+      filingForm: "Patent Form 1/2 with Synergy Data + TM-A",
     },
     {
-      type: 'Brand name',
-      label: 'Brand Name / Product Title',
-      desc: 'Coined product names, commercial identity, and market trade titles',
-      category: 'Trademark',
-      primaryMechanism: 'Word Mark Registration under Class 5 (Ayurveda) and Class 3 (Cosmetics)',
-      filingForm: 'Form TM-A (Trade Marks Act, 1999)'
+      type: "Brand name",
+      label: "Brand Name / Product Title",
+      desc: "Coined product names, commercial identity, and market trade titles",
+      category: "Trademark",
+      primaryMechanism:
+        "Word Mark Registration under Class 5 (Ayurveda) and Class 3 (Cosmetics)",
+      filingForm: "Form TM-A (Trade Marks Act, 1999)",
     },
     {
-      type: 'Logo',
-      label: 'Logo / Graphic Device',
-      desc: 'Stylized emblems, traditional geometric seals, and custom visual emblems',
-      category: 'Trademark & Copyright',
-      primaryMechanism: 'Device Mark (Trade Marks Act) & Artistic Copyright (Copyright Act)',
-      filingForm: 'Form TM-A (Device) & Copyright Form XIV'
+      type: "Logo",
+      label: "Logo / Graphic Device",
+      desc: "Stylized emblems, traditional geometric seals, and custom visual emblems",
+      category: "Trademark & Copyright",
+      primaryMechanism:
+        "Device Mark (Trade Marks Act) & Artistic Copyright (Copyright Act)",
+      filingForm: "Form TM-A (Device) & Copyright Form XIV",
     },
     {
-      type: 'Packaging/design',
-      label: 'Packaging / Container Geometry',
-      desc: 'Aesthetic bottle contours, dropper ergonomics, cap geometry, and blister design',
-      category: 'Industrial Design',
-      primaryMechanism: 'Industrial Design Registration (Designs Act, 2000 - 10+5 years monopoly)',
-      filingForm: 'Design Application Form 1 (4-view orthographic sheets)'
+      type: "Packaging/design",
+      label: "Packaging / Container Geometry",
+      desc: "Aesthetic bottle contours, dropper ergonomics, cap geometry, and blister design",
+      category: "Industrial Design",
+      primaryMechanism:
+        "Industrial Design Registration (Designs Act, 2000 - 10+5 years monopoly)",
+      filingForm: "Design Application Form 1 (4-view orthographic sheets)",
     },
     {
-      type: 'Plant variety',
-      label: 'Plant Variety / Cultivar',
-      desc: 'Distinct, uniform, and stable (DUS) medicinal plant cultivars and seed strains',
-      category: 'Plant Variety (PPV&FR)',
-      primaryMechanism: 'PPV&FR Certificate of Registration (PPV&FR Act, 2001)',
-      filingForm: 'Form PV-1 with DUS Seed Deposit'
+      type: "Plant variety",
+      label: "Plant Variety / Cultivar",
+      desc: "Distinct, uniform, and stable (DUS) medicinal plant cultivars and seed strains",
+      category: "Plant Variety (PPV&FR)",
+      primaryMechanism: "PPV&FR Certificate of Registration (PPV&FR Act, 2001)",
+      filingForm: "Form PV-1 with DUS Seed Deposit",
     },
     {
-      type: 'Traditional knowledge',
-      label: 'Codified Traditional Knowledge',
-      desc: 'Classical formulations seeking defensive prior-art protection or GI tagging',
-      category: 'Defensive / GI Registry',
-      primaryMechanism: 'Defensive TKDL Prior Art Citation or Geographical Indication (GI) tag',
-      filingForm: 'GI Application Form GI-1 / TKDL Prior Art Notice'
+      type: "Traditional knowledge",
+      label: "Codified Traditional Knowledge",
+      desc: "Classical formulations seeking defensive prior-art protection or GI tagging",
+      category: "Defensive / GI Registry",
+      primaryMechanism:
+        "Defensive TKDL Prior Art Citation or Geographical Indication (GI) tag",
+      filingForm: "GI Application Form GI-1 / TKDL Prior Art Notice",
     },
     {
-      type: 'New invention',
-      label: 'New Technological Apparatus',
-      desc: 'Hardware apparatus, automated Panchakarma devices, or diagnostic instruments',
-      category: 'Apparatus Patent',
-      primaryMechanism: 'Product & System Patent under the Patents Act, 1970',
-      filingForm: 'Patent Form 1, Form 2, Form 3, Form 5, Form 18'
+      type: "New invention",
+      label: "New Technological Apparatus",
+      desc: "Hardware apparatus, automated Panchakarma devices, or diagnostic instruments",
+      category: "Apparatus Patent",
+      primaryMechanism: "Product & System Patent under the Patents Act, 1970",
+      filingForm: "Patent Form 1, Form 2, Form 3, Form 5, Form 18",
     },
   ];
 
   // Multi-select toggle handler
   const handleToggleAsset = (type: IPRAssetType) => {
-    setSelectedAssets(prev => {
+    setSelectedAssets((prev) => {
       if (prev.includes(type)) {
         if (prev.length === 1) {
           return prev; // keep at least one asset selected
         }
-        return prev.filter(t => t !== type);
+        return prev.filter((t) => t !== type);
       } else {
         return [...prev, type];
       }
@@ -151,31 +167,42 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
   };
 
   const handleSelectAll = () => {
-    setSelectedAssets(assetOptions.map(o => o.type));
+    setSelectedAssets(assetOptions.map((o) => o.type));
     setResult(null);
     setCurrentPage(1);
   };
 
-  const handleSelectPreset = (preset: 'product' | 'brand' | 'tech') => {
-    if (preset === 'product') {
-      setSelectedAssets(['Manufacturing process', 'New formulation', 'Brand name', 'Packaging/design']);
-    } else if (preset === 'brand') {
-      setSelectedAssets(['Brand name', 'Logo', 'Packaging/design']);
+  const handleSelectPreset = (preset: "product" | "brand" | "tech") => {
+    if (preset === "product") {
+      setSelectedAssets([
+        "Manufacturing process",
+        "New formulation",
+        "Brand name",
+        "Packaging/design",
+      ]);
+    } else if (preset === "brand") {
+      setSelectedAssets(["Brand name", "Logo", "Packaging/design"]);
     } else {
-      setSelectedAssets(['New invention', 'Manufacturing process']);
+      setSelectedAssets(["New invention", "Manufacturing process"]);
     }
     setResult(null);
     setCurrentPage(1);
   };
 
   const hasFormulationOrProcess = selectedAssets.some(
-    a => a === 'New formulation' || a === 'Manufacturing process' || a === 'New invention'
+    (a) =>
+      a === "New formulation" ||
+      a === "Manufacturing process" ||
+      a === "New invention",
   );
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
     if (resultCardRef.current) {
-      resultCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      resultCardRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }
   };
 
@@ -183,10 +210,10 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
     if (selectedAssets.length === 0) return;
     setLoading(true);
     setCurrentPage(1);
-    
+
     try {
       const payload: IPRNavigatorQuery = {
-        asset_type: selectedAssets.join(', '),
+        asset_type: selectedAssets.join(", "),
         asset_types: selectedAssets,
         description,
         uses_biological_resource: usesBiologicalResource,
@@ -195,22 +222,32 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
         is_already_commercialized: isCommercialized,
       };
 
-      const res = await fetch('/api/ipr/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await authFetch("/api/ipr/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(
+          errBody.detail || `Evaluation failed (HTTP ${res.status})`,
+        );
+      }
       const serverData: IPRNavigatorResult = await res.json();
 
       // Synthesize multi-asset recommendations if multiple assets selected
       if (selectedAssets.length > 1) {
-        const synthesized = synthesizeMultiAssetResult(serverData, selectedAssets, {
-          usesBiologicalResource,
-          hasTraditionalBasis,
-          hasSynergyData,
-          isCommercialized
-        });
+        const synthesized = synthesizeMultiAssetResult(
+          serverData,
+          selectedAssets,
+          {
+            usesBiologicalResource,
+            hasTraditionalBasis,
+            hasSynergyData,
+            isCommercialized,
+          },
+        );
         setResult(synthesized);
       } else {
         setResult(serverData);
@@ -219,11 +256,15 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
       // Smooth scroll to answer
       setTimeout(() => {
         if (resultCardRef.current) {
-          resultCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          resultCardRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
         }
       }, 100);
-    } catch (e) {
-      console.error('IPR analysis failed:', e);
+    } catch (e: any) {
+      console.error("IPR analysis failed:", e);
+      setError(e?.message || "Evaluation failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -238,27 +279,30 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
       hasTraditionalBasis: boolean;
       hasSynergyData: boolean;
       isCommercialized: boolean;
-    }
+    },
   ): IPRNavigatorResult => {
-    const hasFormulation = assets.includes('New formulation');
-    const hasProcess = assets.includes('Manufacturing process');
-    const hasBrand = assets.includes('Brand name');
-    const hasLogo = assets.includes('Logo');
-    const hasDesign = assets.includes('Packaging/design');
-    const hasPlant = assets.includes('Plant variety');
-    const hasTK = assets.includes('Traditional knowledge');
-    const hasInvention = assets.includes('New invention');
+    const hasFormulation = assets.includes("New formulation");
+    const hasProcess = assets.includes("Manufacturing process");
+    const hasBrand = assets.includes("Brand name");
+    const hasLogo = assets.includes("Logo");
+    const hasDesign = assets.includes("Packaging/design");
+    const hasPlant = assets.includes("Plant variety");
+    const hasTK = assets.includes("Traditional knowledge");
+    const hasInvention = assets.includes("New invention");
 
-    const assetNames = assets.join(' + ');
+    const assetNames = assets.join(" + ");
 
     // Compile primary protection title
     let primary = `Comprehensive Multi-Layer IPR Portfolio Strategy (${assets.length} Assets)`;
     if (hasFormulation && hasBrand && hasDesign) {
-      primary = 'Integrated 3-Pillar IP Portfolio: Process Patent + Class 5 Trademark + Industrial Design';
+      primary =
+        "Integrated 3-Pillar IP Portfolio: Process Patent + Class 5 Trademark + Industrial Design";
     } else if (hasBrand && hasLogo && !hasFormulation && !hasProcess) {
-      primary = 'Comprehensive Commercial Branding Shield: Trademark (Word & Device) + Artistic Copyright';
+      primary =
+        "Comprehensive Commercial Branding Shield: Trademark (Word & Device) + Artistic Copyright";
     } else if (hasProcess && hasFormulation) {
-      primary = 'Dual-Track Patent & Trade Secret Strategy with Class 5 Commercial Brand Shield';
+      primary =
+        "Dual-Track Patent & Trade Secret Strategy with Class 5 Commercial Brand Shield";
     }
 
     // Compile Why Relevant
@@ -270,80 +314,112 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
     // Potential protections merged
     const protectionsSet = new Set<string>();
     if (hasFormulation || hasProcess || hasInvention) {
-      protectionsSet.add('Process Patent (Extraction / Standardization)');
-      protectionsSet.add('Trade Secret (Manufacturing SOPs & Ratios)');
+      protectionsSet.add("Process Patent (Extraction / Standardization)");
+      protectionsSet.add("Trade Secret (Manufacturing SOPs & Ratios)");
     }
     if (hasBrand) {
-      protectionsSet.add('Trade Mark (Class 5 Pharmaceuticals/Herbal)');
-      protectionsSet.add('Trade Mark (Class 3 Wellness/Cosmetics)');
+      protectionsSet.add("Trade Mark (Class 5 Pharmaceuticals/Herbal)");
+      protectionsSet.add("Trade Mark (Class 3 Wellness/Cosmetics)");
     }
     if (hasLogo) {
-      protectionsSet.add('Device / Logo Trade Mark (Class 5 & 35)');
-      protectionsSet.add('Artistic Copyright (Copyright Act, 1957)');
+      protectionsSet.add("Device / Logo Trade Mark (Class 5 & 35)");
+      protectionsSet.add("Artistic Copyright (Copyright Act, 1957)");
     }
     if (hasDesign) {
-      protectionsSet.add('Industrial Design Registration (Designs Act, 2000)');
+      protectionsSet.add("Industrial Design Registration (Designs Act, 2000)");
     }
     if (hasPlant) {
-      protectionsSet.add('PPV&FR Certificate of Registration (PPV&FR Act, 2001)');
+      protectionsSet.add(
+        "PPV&FR Certificate of Registration (PPV&FR Act, 2001)",
+      );
     }
     if (hasTK) {
-      protectionsSet.add('Geographical Indication (GI Tag) / TKDL Defensive Citation');
+      protectionsSet.add(
+        "Geographical Indication (GI Tag) / TKDL Defensive Citation",
+      );
     }
 
     // Important considerations
     const considerations: string[] = [];
     if (criteria.hasTraditionalBasis) {
-      considerations.push('Section 3(p) Statutory Bar: The Indian Patent Office bars patenting traditional Ayurvedic knowledge. Claims must be restricted to novel, non-obvious standardized extraction processes or synergistic combinations.');
+      considerations.push(
+        "Section 3(p) Statutory Bar: The Indian Patent Office bars patenting traditional Ayurvedic knowledge. Claims must be restricted to novel, non-obvious standardized extraction processes or synergistic combinations.",
+      );
     }
     if (hasFormulation && !criteria.hasSynergyData) {
-      considerations.push('Section 3(e) Admixture Bar: Mere admixture of known ingredients resulting only in the aggregation of properties is not patentable. You must conduct comparative synergy assays demonstrating super-additive therapeutic efficacy (Combination Index < 1).');
+      considerations.push(
+        "Section 3(e) Admixture Bar: Mere admixture of known ingredients resulting only in the aggregation of properties is not patentable. You must conduct comparative synergy assays demonstrating super-additive therapeutic efficacy (Combination Index < 1).",
+      );
     } else if (hasFormulation && criteria.hasSynergyData) {
-      considerations.push('Section 3(e) Synergy Evidence: Empirical synergy data significantly strengthens patentability over Section 3(e) objections. Include comparative IC50 or antioxidant assays in the complete specification.');
+      considerations.push(
+        "Section 3(e) Synergy Evidence: Empirical synergy data significantly strengthens patentability over Section 3(e) objections. Include comparative IC50 or antioxidant assays in the complete specification.",
+      );
     }
     if (criteria.usesBiologicalResource) {
-      considerations.push('National Biodiversity Authority (NBA) Mandate: Under Section 6 of the Biological Diversity Act, 2002, prior NBA Form III approval is legally mandatory before applying for any IPR inside or outside India.');
+      considerations.push(
+        "National Biodiversity Authority (NBA) Mandate: Under Section 6 of the Biological Diversity Act, 2002, prior NBA Form III approval is legally mandatory before applying for any IPR inside or outside India.",
+      );
     }
     if (hasBrand) {
-      considerations.push('Section 9 & 11 Distinctiveness (Trade Marks Act): Ensure the brand name is coined or arbitrary. Descriptive Sanskrit plant names (e.g. "Pure Ashwagandha") cannot be monopolized.');
+      considerations.push(
+        'Section 9 & 11 Distinctiveness (Trade Marks Act): Ensure the brand name is coined or arbitrary. Descriptive Sanskrit plant names (e.g. "Pure Ashwagandha") cannot be monopolized.',
+      );
     }
     if (hasDesign) {
-      considerations.push('Novelty Under Designs Act, 2000: Bottle shapes and packaging ergonomics must be published nowhere in India or abroad prior to the application filing date.');
+      considerations.push(
+        "Novelty Under Designs Act, 2000: Bottle shapes and packaging ergonomics must be published nowhere in India or abroad prior to the application filing date.",
+      );
     }
     if (criteria.isCommercialized) {
-      considerations.push('Commercial Disclosure Risk: Prior commercial public use or sale destroys absolute novelty for patents and designs. File provisional patent and design applications immediately.');
+      considerations.push(
+        "Commercial Disclosure Risk: Prior commercial public use or sale destroys absolute novelty for patents and designs. File provisional patent and design applications immediately.",
+      );
     }
 
     // Documents to prepare
     const documents: string[] = [];
     if (hasFormulation || hasProcess || hasInvention) {
-      documents.push('Patent Form 1 (Application) & Form 2 (Complete Specification with Process Claims)');
-      documents.push('Comparative Synergy Assay Report (Combination Index < 1)');
+      documents.push(
+        "Patent Form 1 (Application) & Form 2 (Complete Specification with Process Claims)",
+      );
+      documents.push(
+        "Comparative Synergy Assay Report (Combination Index < 1)",
+      );
     }
     if (criteria.usesBiologicalResource) {
-      documents.push('NBA Form III Application Dossier with Botanical Invoices and Sourcing Details');
+      documents.push(
+        "NBA Form III Application Dossier with Botanical Invoices and Sourcing Details",
+      );
     }
     if (hasBrand || hasLogo) {
-      documents.push('Form TM-A (Trade Marks Application) with User Affidavit & Power of Attorney');
+      documents.push(
+        "Form TM-A (Trade Marks Application) with User Affidavit & Power of Attorney",
+      );
     }
     if (hasLogo) {
-      documents.push('Form XIV (Copyright Application) with No Objection Certificate (NOC)');
+      documents.push(
+        "Form XIV (Copyright Application) with No Objection Certificate (NOC)",
+      );
     }
     if (hasDesign) {
-      documents.push('Design Application Form 1 with 4-Angle Orthographic Representation Sheets (Front, Side, Top, Isometric)');
+      documents.push(
+        "Design Application Form 1 with 4-Angle Orthographic Representation Sheets (Front, Side, Top, Isometric)",
+      );
     }
     if (hasPlant) {
-      documents.push('Form PV-1 (PPV&FR) with Distinctiveness, Uniformity, Stability (DUS) Test Dossier');
+      documents.push(
+        "Form PV-1 (PPV&FR) with Distinctiveness, Uniformity, Stability (DUS) Test Dossier",
+      );
     }
 
     // Chronological Next Steps
     const steps: string[] = [
-      '1. Conduct IP India Public Search for identical or similar registered Trademarks in Classes 5, 3, and 35.',
-      '2. If using Indian biological materials, submit NBA Form III application immediately before filing patents.',
-      '3. File Provisional Patent Specification for novel extraction processes and synergistic formulation ratios.',
-      '4. File Form TM-A online for the coined brand name and artistic device logo.',
-      '5. File Design Application Form 1 with Kolkata Design Office before any commercial market release.',
-      '6. Implement strict employee and third-party Non-Disclosure Agreements (NDAs) to protect extraction SOP trade secrets.'
+      "1. Conduct IP India Public Search for identical or similar registered Trademarks in Classes 5, 3, and 35.",
+      "2. If using Indian biological materials, submit NBA Form III application immediately before filing patents.",
+      "3. File Provisional Patent Specification for novel extraction processes and synergistic formulation ratios.",
+      "4. File Form TM-A online for the coined brand name and artistic device logo.",
+      "5. File Design Application Form 1 with Kolkata Design Office before any commercial market release.",
+      "6. Implement strict employee and third-party Non-Disclosure Agreements (NDAs) to protect extraction SOP trade secrets.",
     ];
 
     return {
@@ -351,57 +427,68 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
       why_relevant: whyRelevant,
       potential_protection: Array.from(protectionsSet),
       important_considerations: considerations,
-      relevant_authority: 'Office of the CGPDTM (Patents, Designs & Trademarks), National Biodiversity Authority (NBA), & Copyright Office',
+      relevant_authority:
+        "Office of the CGPDTM (Patents, Designs & Trademarks), National Biodiversity Authority (NBA), & Copyright Office",
       documents_to_prepare: documents,
       possible_next_steps: steps,
-      sources: baseResult.sources && baseResult.sources.length > 0 ? baseResult.sources : [
-        {
-          index: 1,
-          chunk_id: 'CHUNK-PAT-001',
-          document_id: 'DOC-PATENTS-ACT-1970',
-          title: 'The Patents Act, 1970 — Section 3(p) & 3(e)',
-          authority: 'Office of the CGPDTM',
-          section: 'Section 3(p) & Section 3(e)',
-          source: 'Official Gazette of India',
-          excerpt: 'Inventions which are traditional knowledge or mere admixtures without unexpected synergistic efficacy are barred from patentability.'
-        },
-        {
-          index: 2,
-          chunk_id: 'CHUNK-BD-001',
-          document_id: 'DOC-BIOLOGICAL-DIVERSITY-ACT-2002',
-          title: 'Biological Diversity Act, 2002 — Section 6(1)',
-          authority: 'National Biodiversity Authority',
-          section: 'Section 6(1)',
-          source: 'Gazette of India',
-          excerpt: 'No person shall apply for any intellectual property right in or outside India based on Indian biological resources without prior approval of the NBA.'
-        },
-        {
-          index: 3,
-          chunk_id: 'CHUNK-TM-001',
-          document_id: 'DOC-TRADEMARKS-ACT-1999',
-          title: 'The Trade Marks Act, 1999 — Section 9 & 11',
-          authority: 'Trade Marks Registry, CGPDTM',
-          section: 'Section 9(1)(b) & Section 11',
-          source: 'Trade Marks Journal',
-          excerpt: 'Marks which are devoid of any distinctive character or consist exclusively of descriptive botanical terms shall be refused registration.'
-        },
-        {
-          index: 4,
-          chunk_id: 'CHUNK-DES-001',
-          document_id: 'DOC-DESIGNS-ACT-2000',
-          title: 'The Designs Act, 2000 — Section 4 & Section 5',
-          authority: 'Design Wing, CGPDTM Kolkata',
-          section: 'Section 4 & Section 5',
-          source: 'Official Gazette of India',
-          excerpt: 'A design shall not be registered if it is not new or original, or has been disclosed to the public in India or abroad prior to filing date.'
-        }
-      ],
-      disclaimer: 'This statutory guidance is provided for decision-support and does not constitute formal legal counsel. Formal filing should be supervised by a registered Patent/Trademark Agent.'
+      sources:
+        baseResult.sources && baseResult.sources.length > 0
+          ? baseResult.sources
+          : [
+              {
+                index: 1,
+                chunk_id: "CHUNK-PAT-001",
+                document_id: "DOC-PATENTS-ACT-1970",
+                title: "The Patents Act, 1970 — Section 3(p) & 3(e)",
+                authority: "Office of the CGPDTM",
+                section: "Section 3(p) & Section 3(e)",
+                source: "Official Gazette of India",
+                excerpt:
+                  "Inventions which are traditional knowledge or mere admixtures without unexpected synergistic efficacy are barred from patentability.",
+              },
+              {
+                index: 2,
+                chunk_id: "CHUNK-BD-001",
+                document_id: "DOC-BIOLOGICAL-DIVERSITY-ACT-2002",
+                title: "Biological Diversity Act, 2002 — Section 6(1)",
+                authority: "National Biodiversity Authority",
+                section: "Section 6(1)",
+                source: "Gazette of India",
+                excerpt:
+                  "No person shall apply for any intellectual property right in or outside India based on Indian biological resources without prior approval of the NBA.",
+              },
+              {
+                index: 3,
+                chunk_id: "CHUNK-TM-001",
+                document_id: "DOC-TRADEMARKS-ACT-1999",
+                title: "The Trade Marks Act, 1999 — Section 9 & 11",
+                authority: "Trade Marks Registry, CGPDTM",
+                section: "Section 9(1)(b) & Section 11",
+                source: "Trade Marks Journal",
+                excerpt:
+                  "Marks which are devoid of any distinctive character or consist exclusively of descriptive botanical terms shall be refused registration.",
+              },
+              {
+                index: 4,
+                chunk_id: "CHUNK-DES-001",
+                document_id: "DOC-DESIGNS-ACT-2000",
+                title: "The Designs Act, 2000 — Section 4 & Section 5",
+                authority: "Design Wing, CGPDTM Kolkata",
+                section: "Section 4 & Section 5",
+                source: "Official Gazette of India",
+                excerpt:
+                  "A design shall not be registered if it is not new or original, or has been disclosed to the public in India or abroad prior to filing date.",
+              },
+            ],
+      disclaimer:
+        "This statutory guidance is provided for decision-support and does not constitute formal legal counsel. Formal filing should be supervised by a registered Patent/Trademark Agent.",
     };
   };
 
   // Get metadata for selected assets
-  const selectedAssetDetails = assetOptions.filter(opt => selectedAssets.includes(opt.type));
+  const selectedAssetDetails = assetOptions.filter((opt) =>
+    selectedAssets.includes(opt.type),
+  );
 
   return (
     <div className="w-full px-3 sm:px-5 lg:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8 max-w-7xl mx-auto">
@@ -412,20 +499,30 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
           <span>Interactive IPR Decision Tree & Statutory Navigator</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-serif font-bold text-slate-900">
-          {t('ipr.title', 'IPR Navigator')}
+          {t("ipr.title", "IPR Navigator")}
         </h1>
         <p className="text-xs sm:text-sm text-slate-600 max-w-3xl leading-relaxed">
-          {t('ipr.subtitle', 'Identify statutory protection mechanisms for your AYUSH asset, assess Section 3(p) traditional knowledge and Section 3(e) admixture obstacles, and plan required filings across IP India and the National Biodiversity Authority.')}
+          {t(
+            "ipr.subtitle",
+            "Identify statutory protection mechanisms for your AYUSH asset, assess Section 3(p) traditional knowledge and Section 3(e) admixture obstacles, and plan required filings across IP India and the National Biodiversity Authority.",
+          )}
         </p>
       </div>
+{error && (
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Main Grid: Left inputs & Right Paginated Answer */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-        
         {/* Left Column: Asset Selection (Multi-select) & Dynamic Criteria */}
         <div className="lg:col-span-5 space-y-6">
-          <div id="ipr-asset-selection-card" className="p-4 sm:p-5 md:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-5">
-            
+          <div
+            id="ipr-asset-selection-card"
+            className="p-4 sm:p-5 md:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-5"
+          >
             {/* Step 1: Multi-Select Asset Options */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -434,7 +531,8 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                     1. What are you trying to protect?
                   </h3>
                   <p className="text-[11px] text-emerald-800 font-medium mt-0.5">
-                    Select one or multiple assets to formulate an integrated IP portfolio
+                    Select one or multiple assets to formulate an integrated IP
+                    portfolio
                   </p>
                 </div>
                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-900 font-bold border border-emerald-200 shrink-0">
@@ -444,17 +542,19 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
 
               {/* Quick Preset Buttons */}
               <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-[10px] text-slate-600 font-medium">Presets:</span>
+                <span className="text-[10px] text-slate-600 font-medium">
+                  Presets:
+                </span>
                 <button
                   type="button"
-                  onClick={() => handleSelectPreset('product')}
+                  onClick={() => handleSelectPreset("product")}
                   className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
                 >
                   Full Product Launch
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleSelectPreset('brand')}
+                  onClick={() => handleSelectPreset("brand")}
                   className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
                 >
                   Brand & Design
@@ -475,12 +575,12 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                   return (
                     <div
                       key={opt.type}
-                      id={`ipr-asset-option-${opt.type.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+                      id={`ipr-asset-option-${opt.type.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
                       onClick={() => handleToggleAsset(opt.type)}
                       className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
                         isSelected
-                          ? 'border-emerald-700 bg-emerald-50/60 ring-1 ring-emerald-700 shadow-2xs'
-                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
+                          ? "border-emerald-700 bg-emerald-50/60 ring-1 ring-emerald-700 shadow-2xs"
+                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/80"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -496,7 +596,9 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                             )}
                           </div>
                           <div>
-                            <span className={`text-xs font-semibold block ${isSelected ? 'text-emerald-950 font-bold' : 'text-slate-800'}`}>
+                            <span
+                              className={`text-xs font-semibold block ${isSelected ? "text-emerald-950 font-bold" : "text-slate-800"}`}
+                            >
                               {opt.label}
                             </span>
                             <span className="inline-block text-[9px] font-semibold uppercase px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200 mt-0.5">
@@ -526,7 +628,7 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                   Currently Selected Assets ({selectedAssets.length}):
                 </span>
                 <div className="flex flex-wrap gap-1">
-                  {selectedAssets.map(asset => (
+                  {selectedAssets.map((asset) => (
                     <span
                       key={asset}
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-emerald-200 text-[11px] text-emerald-900 font-medium shadow-2xs"
@@ -548,21 +650,32 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
               <div className="space-y-2.5 text-xs">
                 <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 cursor-pointer transition-colors">
                   <div className="pr-2">
-                    <span className="text-slate-800 font-medium block">Uses Indian Biological Resources?</span>
-                    <span className="text-[10px] text-slate-500">Triggers National Biodiversity Authority (NBA) approval</span>
+                    <span className="text-slate-800 font-medium block">
+                      Uses Indian Biological Resources?
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      Triggers National Biodiversity Authority (NBA) approval
+                    </span>
                   </div>
                   <input
                     type="checkbox"
                     checked={usesBiologicalResource}
-                    onChange={(e) => setUsesBiologicalResource(e.target.checked)}
+                    onChange={(e) =>
+                      setUsesBiologicalResource(e.target.checked)
+                    }
                     className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-700 shrink-0"
                   />
                 </label>
 
                 <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 cursor-pointer transition-colors">
                   <div className="pr-2">
-                    <span className="text-slate-800 font-medium block">Derived from Classical Traditional Knowledge?</span>
-                    <span className="text-[10px] text-slate-500">Triggers Section 3(p) Traditional Knowledge exclusion check</span>
+                    <span className="text-slate-800 font-medium block">
+                      Derived from Classical Traditional Knowledge?
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      Triggers Section 3(p) Traditional Knowledge exclusion
+                      check
+                    </span>
                   </div>
                   <input
                     type="checkbox"
@@ -575,8 +688,13 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                 {hasFormulationOrProcess && (
                   <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-emerald-50/40 hover:bg-emerald-50/60 cursor-pointer transition-colors">
                     <div className="pr-2">
-                      <span className="text-emerald-950 font-medium block">Has Empirical Synergism Data?</span>
-                      <span className="text-[10px] text-emerald-700">Crucial to overcome Section 3(e) mere admixture rejection</span>
+                      <span className="text-emerald-950 font-medium block">
+                        Has Empirical Synergism Data?
+                      </span>
+                      <span className="text-[10px] text-emerald-700">
+                        Crucial to overcome Section 3(e) mere admixture
+                        rejection
+                      </span>
                     </div>
                     <input
                       type="checkbox"
@@ -589,8 +707,12 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
 
                 <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 cursor-pointer transition-colors">
                   <div className="pr-2">
-                    <span className="text-slate-800 font-medium block">Already Disclosed, Published, or Marketed?</span>
-                    <span className="text-[10px] text-slate-500">Novelty bar for Patent & Industrial Design registrations</span>
+                    <span className="text-slate-800 font-medium block">
+                      Already Disclosed, Published, or Marketed?
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      Novelty bar for Patent & Industrial Design registrations
+                    </span>
                   </div>
                   <input
                     type="checkbox"
@@ -626,12 +748,17 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                 {loading ? (
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Analyzing {selectedAssets.length} Selected Assets...</span>
+                    <span>
+                      Analyzing {selectedAssets.length} Selected Assets...
+                    </span>
                   </div>
                 ) : (
                   <>
                     <Compass className="w-4 h-4 text-amber-300" />
-                    <span>Evaluate Statutory Pathways ({selectedAssets.length} Assets)</span>
+                    <span>
+                      Evaluate Statutory Pathways ({selectedAssets.length}{" "}
+                      Assets)
+                    </span>
                   </>
                 )}
               </button>
@@ -651,7 +778,10 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                   Select your innovation assets to view statutory guidance
                 </h3>
                 <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                  You can select multiple assets (e.g. Process + Brand + Packaging) to synthesize an integrated IP portfolio. The answer will be neatly organized across 4 guided pages so you can navigate step-by-step.
+                  You can select multiple assets (e.g. Process + Brand +
+                  Packaging) to synthesize an integrated IP portfolio. The
+                  answer will be neatly organized across 4 guided pages so you
+                  can navigate step-by-step.
                 </p>
               </div>
 
@@ -672,7 +802,6 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
             </div>
           ) : (
             <div className="space-y-4 animate-in fade-in duration-150">
-              
               {/* Pagination Top Stepper Navigation Tabs */}
               <div className="bg-white border border-slate-200 rounded-2xl p-2.5 shadow-xs">
                 <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2 mb-1.5 border-b border-slate-100 text-xs">
@@ -696,18 +825,26 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                     onClick={() => handlePageChange(1)}
                     className={`p-2 rounded-xl text-left transition-all flex items-center gap-2 ${
                       currentPage === 1
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/70'
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/70"
                     }`}
                   >
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                      currentPage === 1 ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'
-                    }`}>
+                    <div
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                        currentPage === 1
+                          ? "bg-emerald-700 text-white"
+                          : "bg-slate-200 text-slate-700"
+                      }`}
+                    >
                       <Shield className="w-3.5 h-3.5" />
                     </div>
                     <div className="min-w-0">
-                      <span className="text-[10px] block opacity-75 leading-none">Step 1</span>
-                      <span className="text-xs font-semibold truncate block">IP Strategy</span>
+                      <span className="text-[10px] block opacity-75 leading-none">
+                        Step 1
+                      </span>
+                      <span className="text-xs font-semibold truncate block">
+                        IP Strategy
+                      </span>
                     </div>
                   </button>
 
@@ -716,18 +853,26 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                     onClick={() => handlePageChange(2)}
                     className={`p-2 rounded-xl text-left transition-all flex items-center gap-2 ${
                       currentPage === 2
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/70'
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/70"
                     }`}
                   >
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                      currentPage === 2 ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-700'
-                    }`}>
+                    <div
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                        currentPage === 2
+                          ? "bg-amber-600 text-white"
+                          : "bg-slate-200 text-slate-700"
+                      }`}
+                    >
                       <AlertCircle className="w-3.5 h-3.5" />
                     </div>
                     <div className="min-w-0">
-                      <span className="text-[10px] block opacity-75 leading-none">Step 2</span>
-                      <span className="text-xs font-semibold truncate block">Constraints</span>
+                      <span className="text-[10px] block opacity-75 leading-none">
+                        Step 2
+                      </span>
+                      <span className="text-xs font-semibold truncate block">
+                        Constraints
+                      </span>
                     </div>
                   </button>
 
@@ -736,18 +881,26 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                     onClick={() => handlePageChange(3)}
                     className={`p-2 rounded-xl text-left transition-all flex items-center gap-2 ${
                       currentPage === 3
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/70'
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/70"
                     }`}
                   >
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                      currentPage === 3 ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'
-                    }`}>
+                    <div
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                        currentPage === 3
+                          ? "bg-emerald-700 text-white"
+                          : "bg-slate-200 text-slate-700"
+                      }`}
+                    >
                       <FileText className="w-3.5 h-3.5" />
                     </div>
                     <div className="min-w-0">
-                      <span className="text-[10px] block opacity-75 leading-none">Step 3</span>
-                      <span className="text-xs font-semibold truncate block">Filings & Steps</span>
+                      <span className="text-[10px] block opacity-75 leading-none">
+                        Step 3
+                      </span>
+                      <span className="text-xs font-semibold truncate block">
+                        Filings & Steps
+                      </span>
                     </div>
                   </button>
 
@@ -756,18 +909,26 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                     onClick={() => handlePageChange(4)}
                     className={`p-2 rounded-xl text-left transition-all flex items-center gap-2 ${
                       currentPage === 4
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/70'
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/70"
                     }`}
                   >
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                      currentPage === 4 ? 'bg-teal-700 text-white' : 'bg-slate-200 text-slate-700'
-                    }`}>
+                    <div
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                        currentPage === 4
+                          ? "bg-teal-700 text-white"
+                          : "bg-slate-200 text-slate-700"
+                      }`}
+                    >
                       <BookOpen className="w-3.5 h-3.5" />
                     </div>
                     <div className="min-w-0">
-                      <span className="text-[10px] block opacity-75 leading-none">Step 4</span>
-                      <span className="text-xs font-semibold truncate block">Citations</span>
+                      <span className="text-[10px] block opacity-75 leading-none">
+                        Step 4
+                      </span>
+                      <span className="text-xs font-semibold truncate block">
+                        Citations
+                      </span>
                     </div>
                   </button>
                 </div>
@@ -775,7 +936,6 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
 
               {/* Paginated Main Card View Container */}
               <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden min-h-[440px] flex flex-col justify-between">
-                
                 {/* PAGE 1: Recommended Primary Protection & Complementary Layers */}
                 {currentPage === 1 && (
                   <div className="p-6 sm:p-7 space-y-6 animate-in fade-in duration-200">
@@ -810,7 +970,10 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                     <div className="space-y-3">
                       <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                         <Layers className="w-4 h-4 text-emerald-700" />
-                        <span>Protection Mechanism Breakdown for Selected Assets ({selectedAssetDetails.length})</span>
+                        <span>
+                          Protection Mechanism Breakdown for Selected Assets (
+                          {selectedAssetDetails.length})
+                        </span>
                       </h3>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -828,7 +991,8 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                               </span>
                             </div>
                             <p className="text-[11px] text-slate-600 leading-tight">
-                              <strong>Key Mechanism:</strong> {asset.primaryMechanism}
+                              <strong>Key Mechanism:</strong>{" "}
+                              {asset.primaryMechanism}
                             </p>
                             <div className="pt-1 text-[10px] text-slate-500 flex items-center gap-1">
                               <FileText className="w-3 h-3 text-slate-400" />
@@ -878,7 +1042,16 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                         <span>Section 3(p) Traditional Knowledge Bar</span>
                       </div>
                       <p className="text-xs text-amber-900/90 leading-relaxed">
-                        Under Indian patent jurisprudence (The Patents Act, 1970, Section 3(p)), traditional knowledge or any modification that does not exhibit substantial unexpected inventive step is non-patentable. To overcome this, focus your patent claims strictly on <strong>novel extraction protocols</strong> or provide <strong>empirical combination assays (CI &lt; 1)</strong>.
+                        Under Indian patent jurisprudence (The Patents Act,
+                        1970, Section 3(p)), traditional knowledge or any
+                        modification that does not exhibit substantial
+                        unexpected inventive step is non-patentable. To overcome
+                        this, focus your patent claims strictly on{" "}
+                        <strong>novel extraction protocols</strong> or provide{" "}
+                        <strong>
+                          empirical combination assays (CI &lt; 1)
+                        </strong>
+                        .
                       </p>
                     </div>
 
@@ -911,7 +1084,11 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                         Commercial Advantage Tip:
                       </span>
                       <p>
-                        Even if composition claims face Section 3(p) objections, obtaining a registered Trademark under Class 5 guarantees exclusive commercial rights to the brand name for 10 years (renewable indefinitely), effectively preventing counterfeits.
+                        Even if composition claims face Section 3(p) objections,
+                        obtaining a registered Trademark under Class 5
+                        guarantees exclusive commercial rights to the brand name
+                        for 10 years (renewable indefinitely), effectively
+                        preventing counterfeits.
                       </p>
                     </div>
                   </div>
@@ -942,7 +1119,8 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                           {result.relevant_authority}
                         </h4>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                          Direct regulatory jurisdiction for filing, examination, and statutory opposition proceedings.
+                          Direct regulatory jurisdiction for filing,
+                          examination, and statutory opposition proceedings.
                         </p>
                       </div>
                     </div>
@@ -951,7 +1129,10 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                     <div className="space-y-3">
                       <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                         <FileCheck2 className="w-4 h-4 text-emerald-700" />
-                        <span>Statutory Forms & Filings to Prepare ({result.documents_to_prepare.length})</span>
+                        <span>
+                          Statutory Forms & Filings to Prepare (
+                          {result.documents_to_prepare.length})
+                        </span>
                       </h3>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -1012,12 +1193,16 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                         <span>Authoritative Gazette & Statute Citations</span>
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Select any statutory provision below to open the official legal reference directly.
+                        Select any statutory provision below to open the
+                        official legal reference directly.
                       </p>
 
                       <div className="space-y-2.5">
                         {result.sources.map((s) => {
-                          const linkInfo = getSectionLink(s.section, s.document_id);
+                          const linkInfo = getSectionLink(
+                            s.section,
+                            s.document_id,
+                          );
                           const sourceUrl = s.url || linkInfo.url;
                           return (
                             <a
@@ -1033,17 +1218,21 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                                   <span className="w-5 h-5 rounded bg-emerald-100 text-emerald-800 text-[10px] flex items-center justify-center font-semibold">
                                     [{s.index}]
                                   </span>
-                                  <span>{s.section} — {s.title}</span>
+                                  <span>
+                                    {s.section} — {s.title}
+                                  </span>
                                 </span>
                                 <span className="text-[10px] text-slate-600 bg-white px-2 py-0.5 rounded-full border border-slate-200 font-medium">
-                                  {s.authority.split(',')[0]}
+                                  {s.authority.split(",")[0]}
                                 </span>
                               </div>
                               <div className="text-[11px] text-slate-600 italic font-serif leading-relaxed line-clamp-2 pl-6">
                                 "{s.excerpt}"
                               </div>
                               <div className="mt-1.5 pl-6 pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-xs">
-                                <span className="text-[10px] text-slate-400 font-medium">Official Reference</span>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  Official Reference
+                                </span>
                                 <span className="inline-flex items-center gap-1 font-semibold text-emerald-800 group-hover:text-emerald-950 group-hover:underline">
                                   <span>Open Official Section</span>
                                   <ExternalLink className="w-3.5 h-3.5 text-emerald-700 transition-transform group-hover:translate-x-0.5" />
@@ -1064,17 +1253,18 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
 
                 {/* Bottom Stepper Navigation Bar (Prev / Page Indicators / Next) */}
                 <div className="p-3 sm:p-4 md:p-5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2.5">
-                  
                   {/* Previous Button */}
                   <button
                     type="button"
                     id="ipr-navigator-prev-btn"
-                    onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                    onClick={() =>
+                      handlePageChange(Math.max(1, currentPage - 1))
+                    }
                     disabled={currentPage === 1}
                     className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
                       currentPage === 1
-                        ? 'text-slate-300 bg-slate-100 cursor-not-allowed'
-                        : 'text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 cursor-pointer shadow-2xs'
+                        ? "text-slate-300 bg-slate-100 cursor-not-allowed"
+                        : "text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 cursor-pointer shadow-2xs"
                     }`}
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
@@ -1087,7 +1277,7 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                       Page {currentPage} of {totalPages}
                     </span>
                     <div className="flex items-center gap-1.5">
-                      {[1, 2, 3, 4].map(pageNum => (
+                      {[1, 2, 3, 4].map((pageNum) => (
                         <button
                           key={pageNum}
                           type="button"
@@ -1095,8 +1285,8 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                           aria-label={`Jump to page ${pageNum}`}
                           className={`w-2.5 h-2.5 rounded-full transition-all ${
                             currentPage === pageNum
-                              ? 'w-6 bg-slate-900 rounded-full'
-                              : 'bg-slate-300 hover:bg-slate-400'
+                              ? "w-6 bg-slate-900 rounded-full"
+                              : "bg-slate-300 hover:bg-slate-400"
                           }`}
                         />
                       ))}
@@ -1108,7 +1298,9 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                     <button
                       type="button"
                       id="ipr-navigator-next-btn"
-                      onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                      onClick={() =>
+                        handlePageChange(Math.min(totalPages, currentPage + 1))
+                      }
                       className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
                     >
                       <span>Next Page</span>
@@ -1125,14 +1317,14 @@ export const IPRNavigatorView: React.FC<IPRNavigatorViewProps> = ({ onOpenCitati
                     </button>
                   )}
                 </div>
-
               </div>
-
             </div>
           )}
         </div>
-
       </div>
     </div>
   );
 };
+function setError(arg0: any) {
+  throw new Error("Function not implemented.");
+}

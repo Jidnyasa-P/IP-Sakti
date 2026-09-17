@@ -1,30 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { Header, ActiveTab } from './components/Header';
-import { LandingView } from './components/LandingView';
-import { ChatView } from './components/ChatView';
-import { ProductAnalyzerView } from './components/ProductAnalyzerView';
-import { IPRNavigatorView } from './components/IPRNavigatorView';
-import { TraditionalKnowledgeView } from './components/TraditionalKnowledgeView';
-import { ResearchView } from './components/ResearchView';
-import { WorkspaceView } from './components/WorkspaceView';
-import { AdminView } from './components/AdminView';
-import { LoginView } from './components/LoginView';
-import { RegisterView } from './components/RegisterView';
-import { ProfileView } from './components/ProfileView';
-import { ExpertAdvisoryView } from './components/ExpertAdvisoryView';
-import { CitationModal } from './components/CitationModal';
-import { GuidedTour } from './components/GuidedTour';
-import { Citation, normalizeRole } from './types';
-import { Shield, ExternalLink } from 'lucide-react';
-import { LanguageProvider, useTranslation } from './context/LanguageContext';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { ExpertAdvisoryProvider } from './context/ExpertAdvisoryContext';
-import { ThemeProvider } from './context/ThemeContext';
+import React, { useState, useEffect } from "react";
+import { Header, ActiveTab } from "./components/Header";
+import { LandingView } from "./components/LandingView";
+import { ChatView } from "./components/ChatView";
+import { ProductAnalyzerView } from "./components/ProductAnalyzerView";
+import { IPRNavigatorView } from "./components/IPRNavigatorView";
+import { TraditionalKnowledgeView } from "./components/TraditionalKnowledgeView";
+import { ResearchView } from "./components/ResearchView";
+import { WorkspaceView } from "./components/WorkspaceView";
+import { AdminView } from "./components/AdminView";
+import { LoginView } from "./components/LoginView";
+import { RegisterView } from "./components/RegisterView";
+import { ProfileView } from "./components/ProfileView";
+import { ExpertAdvisoryView } from "./components/ExpertAdvisoryView";
+import { CitationModal } from "./components/CitationModal";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { GuidedTour } from "./components/GuidedTour";
+import { Citation, normalizeRole } from "./types";
+import { Shield, ExternalLink } from "lucide-react";
+import { LanguageProvider, useTranslation } from "./context/LanguageContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ExpertAdvisoryProvider } from "./context/ExpertAdvisoryContext";
+import { ThemeProvider } from "./context/ThemeContext";
 
-const TOUR_STORAGE_KEY = 'ipsakti_guided_tour_status';
+const TOUR_STORAGE_KEY = "ipsakti_guided_tour_status";
 
 function AppContent() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('landing');
+  const [activeTab, setActiveTab] = useState<ActiveTab>("landing");
   const { currentLanguage, setLanguage, t } = useTranslation();
   const [activeCitation, setActiveCitation] = useState<Citation | null>(null);
   const { isLoggedIn, currentUser } = useAuth();
@@ -45,34 +46,40 @@ function AppContent() {
 
   const handleCompleteTour = () => {
     try {
-      localStorage.setItem(TOUR_STORAGE_KEY, 'completed');
+      localStorage.setItem(TOUR_STORAGE_KEY, "completed");
     } catch (e) {
-      console.warn('Failed to save tour status:', e);
+      console.warn("Failed to save tour status:", e);
     }
     setIsTourActive(false);
     if (!isLoggedIn) {
-      setActiveTab('landing');
+      setActiveTab("landing");
     }
   };
 
   const handleSkipTour = () => {
     try {
-      localStorage.setItem(TOUR_STORAGE_KEY, 'skipped');
+      localStorage.setItem(TOUR_STORAGE_KEY, "skipped");
     } catch (e) {
-      console.warn('Failed to save tour status:', e);
+      console.warn("Failed to save tour status:", e);
     }
     setIsTourActive(false);
     if (!isLoggedIn) {
-      setActiveTab('landing');
+      setActiveTab("landing");
     }
   };
 
-  const isExpert = isLoggedIn && currentUser && normalizeRole(currentUser.role) === 'Expert';
+  const isExpert =
+    isLoggedIn && currentUser && normalizeRole(currentUser.role) === "Expert";
 
   // Strict restriction: Ensure Expert is always routed to the expert advisory workspace (when tour not active)
   useEffect(() => {
-    if (isExpert && !isTourActive && activeTab !== 'expert' && activeTab !== 'profile') {
-      setActiveTab('expert');
+    if (
+      isExpert &&
+      !isTourActive &&
+      activeTab !== "expert" &&
+      activeTab !== "profile"
+    ) {
+      setActiveTab("expert");
     }
   }, [isExpert, isTourActive, activeTab]);
 
@@ -80,66 +87,84 @@ function AppContent() {
   const renderCurrentView = () => {
     // Public views always accessible when logged out, unless guided tour is active
     if (!isLoggedIn && !isTourActive) {
-      if (activeTab === 'login') {
-        return <LoginView setActiveTab={setActiveTab} targetTabAfterLogin="chat" />;
+      if (activeTab === "login") {
+        return (
+          <LoginView setActiveTab={setActiveTab} targetTabAfterLogin="chat" />
+        );
       }
-      if (activeTab === 'register') {
+      if (activeTab === "register") {
         return <RegisterView setActiveTab={setActiveTab} />;
       }
-      return <LandingView setActiveTab={setActiveTab} onOpenWalkthrough={handleStartTour} />;
+      return (
+        <LandingView
+          setActiveTab={setActiveTab}
+          onOpenWalkthrough={handleStartTour}
+        />
+      );
     }
 
     // Role-specific enforcement: Legal Expert only sees flagged low-confidence queries
     if (isExpert && !isTourActive) {
-      if (activeTab === 'profile') {
+      if (activeTab === "profile") {
         return <ProfileView setActiveTab={setActiveTab} />;
       }
-      return <ExpertAdvisoryView onOpenCitation={(cite) => setActiveCitation(cite)} />;
+      return (
+        <ExpertAdvisoryView
+          onOpenCitation={(cite) => setActiveCitation(cite)}
+        />
+      );
     }
 
     // Standard views for Practitioners, Researchers, Organizations & Admins
     switch (activeTab) {
-      case 'landing':
-        return <LandingView setActiveTab={setActiveTab} onOpenWalkthrough={handleStartTour} />;
-      case 'chat':
+      case "landing":
+        return (
+          <LandingView
+            setActiveTab={setActiveTab}
+            onOpenWalkthrough={handleStartTour}
+          />
+        );
+      case "chat":
         return (
           <ChatView
             language={currentLanguage}
             onOpenCitation={(cite) => setActiveCitation(cite)}
           />
         );
-      case 'product':
+      case "product":
         return (
           <ProductAnalyzerView
             onOpenCitation={(cite) => setActiveCitation(cite)}
           />
         );
-      case 'ipr':
+      case "ipr":
         return (
           <IPRNavigatorView
             onOpenCitation={(cite) => setActiveCitation(cite)}
           />
         );
-      case 'tk':
+      case "tk":
         return (
           <TraditionalKnowledgeView
             onOpenCitation={(cite) => setActiveCitation(cite)}
           />
         );
-      case 'research':
+      case "research":
         return (
-          <ResearchView
+          <ResearchView onOpenCitation={(cite) => setActiveCitation(cite)} />
+        );
+      case "workspace":
+        return <WorkspaceView setActiveTab={setActiveTab} />;
+      case "admin":
+        return <AdminView />;
+      case "profile":
+        return <ProfileView setActiveTab={setActiveTab} />;
+      case "expert":
+        return (
+          <ExpertAdvisoryView
             onOpenCitation={(cite) => setActiveCitation(cite)}
           />
         );
-      case 'workspace':
-        return <WorkspaceView setActiveTab={setActiveTab} />;
-      case 'admin':
-        return <AdminView />;
-      case 'profile':
-        return <ProfileView setActiveTab={setActiveTab} />;
-      case 'expert':
-        return <ExpertAdvisoryView onOpenCitation={(cite) => setActiveCitation(cite)} />;
       default:
         return <LandingView setActiveTab={setActiveTab} />;
     }
@@ -159,7 +184,9 @@ function AppContent() {
 
       {/* Main Viewport Container */}
       <div className="flex-1 w-full pb-20 lg:pb-0">
-        {renderCurrentView()}
+        <ErrorBoundary key={activeTab} onReset={() => setActiveTab("landing")}>
+          {renderCurrentView()}
+        </ErrorBoundary>
       </div>
 
       {/* Citation Inspector Modal */}
@@ -185,10 +212,15 @@ function AppContent() {
               <Shield className="w-3.5 h-3.5" />
             </div>
             <span className="font-serif font-bold text-slate-800 dark:text-slate-200 text-sm">
-              {t('brand.name', 'IP-SAKTI')} {t('brand.badge', 'Sahayak')}
+              {t("brand.name", "IP-SAKTI")} {t("brand.badge", "Sahayak")}
             </span>
             <span className="text-slate-400 dark:text-slate-600">|</span>
-            <span className="truncate">{t('footer.brand_subtitle', 'AYUSH & Traditional Knowledge IPR Research Platform')}</span>
+            <span className="truncate">
+              {t(
+                "footer.brand_subtitle",
+                "AYUSH & Traditional Knowledge IPR Research Platform",
+              )}
+            </span>
           </div>
 
           {/* Official Statutory Portal Links */}
@@ -241,7 +273,10 @@ function AppContent() {
           </div>
 
           <div className="text-slate-400 dark:text-slate-500 text-[10px]">
-            {t('footer.statutory_notice', 'Decision-support repository grounded in Indian statutory acts.')}
+            {t(
+              "footer.statutory_notice",
+              "Decision-support repository grounded in Indian statutory acts.",
+            )}
           </div>
         </div>
       </footer>

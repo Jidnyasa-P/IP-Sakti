@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
@@ -28,6 +29,15 @@ async def analyze_product(body: ProductAnalyzeRequest, current_user: dict = Depe
     # writeup in one call -- see ip_sakti_rag/app/pipeline.py::analyze_product.
     result = await rag_client.analyze_product(product)
     result["user_id"] = current_user["id"]
+    # CHANGED: ip_sakti_rag's ProductAnalysisResult schema doesn't include
+    # created_at (it's an ip_sakti_rag-internal model, not the persisted
+    # Mongo document), but frontend/src/types.ts's ProductAnalysisResult
+    # declares created_at as required. It was silently missing from every
+    # response before this fix -- harmless if nothing reads it, but worth
+    # having correct since new_product_analysis() below stores it in Mongo
+    # anyway and callers may reasonably expect the API response to match
+    # what list_products()/get_product() return later.
+    result["created_at"] = datetime.now(timezone.utc).isoformat()
 
     db[PRODUCTS_COLLECTION].insert_one(new_product_analysis(
         id=result["id"],
@@ -94,10 +104,12 @@ async def _handle_abs(body: TKABSRequest, user_id: str, db) -> dict:
     result = await rag_client.analyze_tk_abs(body.model_dump())
 
     record_id = f"TKABS-{uuid.uuid4().hex[:10]}"
+    # CHANGED: same created_at gap as analyze_product above.
+    created_at = datetime.now(timezone.utc).isoformat()
     db[TK_ABS_COLLECTION].insert_one(new_tk_abs_analysis(
         id=record_id, user_id=user_id, request=body.model_dump(), result=result,
     ))
-    return {**result, "id": record_id}
+    return {**result, "id": record_id, "user_id": user_id, "created_at": created_at}
 
 
 @router.post("/api/abs/analyze")
