@@ -1,0 +1,111 @@
+## =============================================================================
+## IP-SAKTI — root .gitignore
+## Covers: frontend/ (Node/Vite/React), backend/ (Python/FastAPI),
+## ip_sakti_rag_model/ (Python RAG module), and shared data/secrets.
+## =============================================================================
+
+# --- Secrets / environment files (NEVER commit these) ---
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+!**/.env.example
+
+# =============================================================================
+# Python (backend/, ip_sakti_rag_model/)
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+pip-wheel-metadata/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+
+# --- Local databases / persisted app state (regenerable, not source) ---
+backend/data/ip_sakti.db
+backend/data/vector_index.json
+backend/data/knowledge_graph.json
+*.sqlite3
+*.db
+
+# --- RAG module: regenerable local storage (rebuild via scripts/ingest.py) ---
+ip_sakti_rag_model/data/qdrant_local/
+ip_sakti_rag_model/data/processed/*.jsonl
+ip_sakti_rag_model/data/documents/*.pdf
+ip_sakti_rag_model/data/documents/*.html
+ip_sakti_rag_model/data/documents/*.txt
+!ip_sakti_rag_model/data/documents/manifest.json
+!ip_sakti_rag_model/data/documents/manifest.example.json
+!ip_sakti_rag_model/data/documents/.gitkeep
+!ip_sakti_rag_model/data/processed/.gitkeep
+!ip_sakti_rag_model/data/qdrant_local/.gitkeep
+
+# --- Downloaded ML models / caches (sentence-transformers, HF, tesseract) ---
+.cache/
+huggingface_cache/
+sentence_transformers_cache/
+*.pt
+*.onnx
+
+# =============================================================================
+# Node / Vite / React (frontend/)
+# =============================================================================
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+frontend/build/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.yarn/
+.pnp.*
+
+# =============================================================================
+# Docker
+# =============================================================================
+*.pid
+
+# =============================================================================
+# Editor / OS
+# =============================================================================
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# =============================================================================
+# Logs
+# =============================================================================
+*.log
+logs/
+backend/logs/
+
+# =============================================================================
+# Misc local scratch
+# =============================================================================
+*.tmp
+*.bak
+.tmp/
