@@ -1,0 +1,218 @@
+{
+  "DOC-BD-AMENDMENT-ACT-2023": {
+    "chunk_count": 58,
+    "filename": "NBA Act.pdf",
+    "sha256": "03af902a2b3ea88b100b60cf59e7ae067fa25f9d445368b9078dce1ad8a53892",
+    "version": 1
+  },
+  "DOC-BD-RULES-2024": {
+    "chunk_count": 113,
+    "filename": "NBA Rules.pdf",
+    "sha256": "33ec189d783e1124cb9c7f027ea9fabcae850bbb3df1a6753cdebc7fe776f4d1",
+    "version": 1
+  },
+  "DOC-BD-RULES-AMENDMENT-2025": {
+    "chunk_count": 6,
+    "filename": "NBA Rules Amendment.pdf",
+    "sha256": "a32a3bcac48955f0285e7a5c589880e6bfa00ac9f5d53c3d969616761d4dc63a",
+    "version": 1
+  },
+  "DOC-BUDAPEST-TREATY": {
+    "chunk_count": 54,
+    "filename": "WIPO Budapest Treaty.pdf",
+    "sha256": "aefecadb3b9f6330bc1b430d79f58a2e58b84a9e25dcc17ebbb37123490d7b05",
+    "version": 1
+  },
+  "DOC-COPYRIGHT-ACT-1957": {
+    "chunk_count": 159,
+    "filename": "IP India Copyright Act.pdf",
+    "sha256": "8c70b510270272bde44cc0a48809a4af2ff282d26b5da627b57e49d7a3738e54",
+    "version": 1
+  },
+  "DOC-COSMETICS-RULES-2020": {
+    "chunk_count": 445,
+    "filename": "CDSCO Cosmetics Rules 2020.pdf",
+    "sha256": "baf622fd41acd2bd42333ceba332362a9223c60b32cb8544ad408b5ae57e6e0f",
+    "version": 1
+  },
+  "DOC-DESIGNS-ACT-2000": {
+    "chunk_count": 53,
+    "filename": "IP India Designs Act.pdf",
+    "sha256": "e392e657bba992c763a4442d5cfe2d3ca089682590ae5bfa35a35c0381adc79f",
+    "version": 1
+  },
+  "DOC-DMRA-1954": {
+    "chunk_count": 105,
+    "filename": "India Code Drug and Magic Remedies.pdf",
+    "sha256": "9dd51c69a283ade12f47e84e33454f5cedfd27e197c9554de785eb55627ab74f",
+    "version": 1
+  },
+  "DOC-DMRA-AMENDMENT-1963": {
+    "chunk_count": 14,
+    "filename": "India Code Drug and Magic Remedies Amendment.pdf",
+    "sha256": "e3d95b0cc6f75821c7e72126a77cf67d21446ee2987a7ce6984fa1fc2c882a6b",
+    "version": 1
+  },
+  "DOC-DPDP-ACT-2023": {
+    "chunk_count": 57,
+    "filename": "Meity DPDP Act.pdf",
+    "sha256": "4deb23981d3010c8225a2ff6149e7243dc2268455b299e283afebdd7b72a7d15",
+    "version": 1
+  },
+  "DOC-DPDP-RULES-2025": {
+    "chunk_count": 96,
+    "filename": "Meity DPDP Rules.pdf",
+    "sha256": "eabc7d05e013144615d78ddc0e8b9c9aac1920e814f4fad38ce6560951f5aa08",
+    "version": 1
+  },
+  "DOC-DRUGS-COSMETICS-ACT-1940": {
+    "chunk_count": 211,
+    "filename": "CDSCO Drugs and Cosmetics Act.pdf",
+    "sha256": "56fdd3838e9f39da3593ad488d3db537f05139a4e112bdba693f8874139aa9cc",
+    "version": 1
+  },
+  "DOC-DRUGS-RULES-1945": {
+    "chunk_count": 805,
+    "filename": "CDSCO Drugs Rules 1945.pdf",
+    "sha256": "fb5b7675a9a0e9cb539fa0131875922f1bdd290389a192aa1a67d0b9d871eeb7",
+    "version": 1
+  },
+  "DOC-FSSAI-AYURVEDA-AAHAR-2022": {
+    "chunk_count": 142,
+    "filename": "FSSAI Regulation Ayurveda Aahara.pdf",
+    "sha256": "1ae8cfc632fad0a775316a84999a48adb6cf4b47d05bd4faa75f5190c511f699",
+    "version": 1
+  },
+  "DOC-GI-ACT-1999": {
+    "chunk_count": 93,
+    "filename": "IP India GI Act.pdf",
+    "sha256": "049515caf90026ce4d4ce34bed2059d2502326f8795f9c1da2afa60fcaff12fc",
+    "version": 1
+  },
+  "DOC-HAGUE-ACT-1960": {
+    "chunk_count": 69,
+    "filename": "WIPO Hague Treaty.pdf",
+    "sha256": "c0a2cac6047613c24a40b8fab6ad95c04cb917bb42ea5b46fe4ca0229a95bfad",
+    "version": 1
+  },
+  "DOC-HAGUE-GENEVA-ACT-1999": {
+    "chunk_count": 101,
+    "filename": "Geneva Act.pdf",
+    "sha256": "bd3f3f15af991b9e61b7a0790838497f3049f3fa4996ad348941da0409575c16",
+    "version": 1
+  },
+  "DOC-JAN-VISHWAS-AMENDMENT-ACT-2023": {
+    "chunk_count": 79,
+    "filename": "IP India GI Act Amendment.pdf",
+    "sha256": "23cb77f3b4905932d5ca94179eac97e48e27b01b2a1b70a7e57d3900b0ed1222",
+    "version": 1
+  },
+  "DOC-MADRID-AGREEMENT-1891": {
+    "chunk_count": 73,
+    "filename": "WIPO Madrid Treaty.pdf",
+    "sha256": "e43d4e1c50bf0ba139d640cb9063718c414a4c903904eca534ecadc721d22d8d",
+    "version": 1
+  },
+  "DOC-MADRID-PROTOCOL-1989": {
+    "chunk_count": 82,
+    "filename": "Madrid Protocol.pdf",
+    "sha256": "a78966dbaaf9c632ecf96495ce4952c72b7986b558ed10c39d65a94cc06f8db8",
+    "version": 1
+  },
+  "DOC-NAGOYA-PROTOCOL": {
+    "chunk_count": 52,
+    "filename": "CBD Nagoya Protocol.pdf",
+    "sha256": "cdbd496bd361317d3b7237124177974bebac4cc800cf1974896bc19234cce856",
+    "version": 1
+  },
+  "DOC-NDCT-RULES-2019": {
+    "chunk_count": 648,
+    "filename": "CDSCO NEW DRUGS AND CLINICAL TRIALS RULES 2019.pdf",
+    "sha256": "f8a1b791f1416ff2cf5d9ef1c136326e168d55d9d9d4d4f9a5a9067b8c7e220f",
+    "version": 1
+  },
+  "DOC-PATENT-RULES-2020-AMENDMENT": {
+    "chunk_count": 58,
+    "filename": "IP India Rules - 2.pdf",
+    "sha256": "f5b4f8806714c8820838eb00cc06290d51e5e7696d0a8b8d08c02bb731b8a760",
+    "version": 1
+  },
+  "DOC-PATENT-RULES-2024-AMENDMENT": {
+    "chunk_count": 38,
+    "filename": "IP India Rules - 1.pdf",
+    "sha256": "2c7c546b595ce1137f08cbd977f9e17ba1668cbf78e9c2fd124ef8961158abe2",
+    "version": 1
+  },
+  "DOC-PATENTS-ACT-1970": {
+    "chunk_count": 613,
+    "filename": "IP India Patents.pdf",
+    "sha256": "d57084888c69d70b16ed6a52a612363a526994203effa58880a26faaaa6e0678",
+    "version": 1
+  },
+  "DOC-PPVFR-ACT-2001": {
+    "chunk_count": 234,
+    "filename": "PPV_FR_Act.pdf",
+    "sha256": "50ceaac03457397e295aee8c7c96b0c6c985a204dd20bb6f9e6b044aa3145036",
+    "version": 1
+  },
+  "DOC-PPVFR-BROCHURE-2018": {
+    "chunk_count": 15,
+    "filename": "PPV_FR.pdf",
+    "sha256": "1e2cce312ca3cc02be655486c4dd49d509e336eab5be3dd21647d828d1740b02",
+    "version": 1
+  },
+  "DOC-PPVFR-REGISTRY-VOL1": {
+    "chunk_count": 285,
+    "filename": "PPV Plant Authority Act Vol 1.pdf",
+    "sha256": "3f8079194a5b1786ee3cd5c26389237f81391c6cf5447d65dfac02a7e4db637e",
+    "version": 1
+  },
+  "DOC-PPVFR-REGISTRY-VOL2": {
+    "chunk_count": 2262,
+    "filename": "PPV Plant Authority Act Vol 2.pdf",
+    "sha256": "b53713634b7e5e33b6ab89d8dcbf3594b4393e87d8eee9fa6575d6f13aba6b1a",
+    "version": 1
+  },
+  "DOC-TRADE-MARKS-ACT-1999": {
+    "chunk_count": 168,
+    "filename": "IP India Trademark Act.pdf",
+    "sha256": "07aa58f3262a4d764c087577b2d49c7de0f4f49a392818aa9bc38c0dba620f1f",
+    "version": 1
+  },
+  "DOC-TRADE-MARKS-AMENDMENT-2010": {
+    "chunk_count": 23,
+    "filename": "IP India Trademark Act Amendment.pdf",
+    "sha256": "9c5c10609b24eee3e3c7399a81f84b439b949d3315ed43de1ca458570130c8f0",
+    "version": 1
+  },
+  "DOC-TRADE-MARKS-RULES-2017": {
+    "chunk_count": 241,
+    "filename": "IP India Trademark Rules.pdf",
+    "sha256": "b858aa6874a4373be03b1ee3a7a926f9f7b79dc7a15dbffdc2109cf6c3a33e92",
+    "version": 1
+  },
+  "DOC-TRADEMARK-NEW-ELEMENTS-NOTE": {
+    "chunk_count": 2,
+    "filename": "IP India Trademark Act New Elements.pdf",
+    "sha256": "f7fbf4f4736048999ebe16a49a06b2f58646b38638108d2ed7fd1280e28c97dc",
+    "version": 1
+  },
+  "DOC-WIPO-GRATK-TREATY-2024": {
+    "chunk_count": 39,
+    "filename": "WIPO GRATK Treaty.pdf",
+    "sha256": "2f2b4f11cd98276de5dff0967b5d1ce924fbcd0909f73e6cc9bb54d93cdbc4bd",
+    "version": 1
+  },
+  "DOC-WIPO-PCT": {
+    "chunk_count": 177,
+    "filename": "WIPO PCT Treaty.pdf",
+    "sha256": "5a406afd0c360749d3af10e3d403dd679e5c371a61004c799283543c61fd08a6",
+    "version": 1
+  },
+  "DOC-WIPO-PLT-2000": {
+    "chunk_count": 77,
+    "filename": "WIPO Patent Law Treaty.pdf",
+    "sha256": "a7c5d8b0b0b7589aecbc02f55d8671ec61d3957248049fb518c6cd888288c454",
+    "version": 1
+  }
+}

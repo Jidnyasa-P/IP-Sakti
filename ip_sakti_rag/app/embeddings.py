@@ -1,160 +1,95 @@
-"""Gemini embeddings with a conservative free-tier rate limiter."""
+"""
+Local, free, multilingual embeddings via fastembed (Qdrant's own ONNX-based
+embedding library) — replaces the Gemini API embedder.
+
+WHY THIS CHANGE: Gemini's gemini-embedding-001 free tier is capped at
+1,000 requests/day (RPD), on top of 100 RPM / 30,000 TPM (Google AI Studio,
+checked Sept 2026 — Google no longer publishes a single canonical number in
+its docs, so re-verify at https://ai.google.dev/gemini-api/docs/rate-limits
+if this ever seems off). A corpus of 36 real statutory PDFs chunked at
+paragraph/section granularity produces far more than 1,000 chunks, so a full
+ingest run was guaranteed to hit the daily cap partway through, no matter
+how well-behaved the RPM-side rate limiter (the deque-based one previously
+in this file) was — that limiter only prevented 429s *within* a day, it
+had no way to get around the 1,000/day ceiling itself.
+
+fastembed runs the embedding model as a local ONNX file: no network call,
+no API key, no rate limit of any kind, no per-request cost — it is
+genuinely unlimited, not just "generous". The trade-off is RAM: the model
+(~450MB on disk) has to be loaded into memory, which matters if you deploy
+this service on a RAM-constrained host (see the free-tier RAM note in
+EMBEDDINGS_MIGRATION_AND_INGESTION_GUIDE.md — this is the real cost of
+"unlimited", there's no way around needing RAM for a local model).
+
+BREAKING CHANGE: gemini-embedding-001 produced 768-dim vectors; this model
+produces 384-dim vectors. These are not compatible — you cannot mix vectors
+from the two models in one Qdrant collection, and a query embedded with one
+model against a corpus embedded with the other returns meaningless
+similarity scores. The existing `ip_sakti_chunks` Qdrant collection
+(partially populated from the old Gemini attempts) MUST be deleted and the
+full corpus re-ingested from scratch after this change. See the migration
+guide for the exact commands.
+
+MODEL CHOICE, VERIFIED against the real library (not assumed from memory):
+`intfloat/multilingual-e5-small` — my first instinct — turned out not to be
+in fastembed's actual supported-model catalog at all (only the 2.24GB
+`multilingual-e5-large` is, which is too large for a RAM-constrained free
+host). I checked `TextEmbedding.list_supported_models()` against the real
+installed `fastembed==0.8.0` package to find every genuinely-supported
+multilingual option, sorted by size. The smallest real one is this model:
+`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` — 0.22GB,
+384-dim, ~50 languages including Hindi and Marathi, and — unlike the E5
+family — it does NOT need "query: "/"passage: " prefixes on the text, so
+there's one less way to silently degrade retrieval quality by getting a
+prefix convention wrong.
+"""
 from __future__ import annotations
 
-import time
-from collections import deque
-
-from google import genai
-from google.genai import types
+from fastembed import TextEmbedding
 
 from app.config import settings
 
-EMBED_MODEL = "gemini-embedding-001"
-EMBED_DIM = 768
+EMBED_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"  # 384-dim, ~50 languages incl. Hindi & Marathi
+EMBED_DIM = 384
 
-# Keep API batches small because legal chunks contain substantially
-# more tokens than simple test strings.
-_BATCH_SIZE = 10
+# fastembed batches internally and is CPU-bound, not network-bound, so this
+# just controls how much text is held in memory per call, not a rate limit.
+_BATCH_SIZE = 32
 
-# Conservative request/content limiter.
-_MAX_EMBEDDINGS_PER_WINDOW = 60
-_WINDOW_SECONDS = 60.0
-
-_request_times: deque[float] = deque()
-_client: genai.Client | None = None
+_model: TextEmbedding | None = None
 
 
-def _get_client() -> genai.Client:
-    global _client
-
-    if _client is None:
-        if not settings.LLM_API_KEY:
-            raise RuntimeError(
-                "LLM_API_KEY is not set. It is required for Gemini embeddings "
-                "and answer generation."
-            )
-
-        _client = genai.Client(api_key=settings.LLM_API_KEY)
-
-    return _client
-
-
-def _wait_for_rate_limit(num_embeddings: int) -> None:
-    while True:
-        now = time.monotonic()
-
-        while (
-            _request_times
-            and now - _request_times[0] >= _WINDOW_SECONDS
-        ):
-            _request_times.popleft()
-
-        if len(_request_times) + num_embeddings <= _MAX_EMBEDDINGS_PER_WINDOW:
-            return
-
-        wait_for = _WINDOW_SECONDS - (now - _request_times[0])
-
-        print(
-            f"[embed] Rate-limit pause: waiting "
-            f"{wait_for:.1f}s before the next Gemini batch..."
-        )
-
-        time.sleep(max(wait_for, 0.1))
-
-
-def _record_embeddings(num_embeddings: int) -> None:
-    now = time.monotonic()
-
-    for _ in range(num_embeddings):
-        _request_times.append(now)
-
-
-def _embed_batch(
-    texts: list[str],
-    task_type: str,
-) -> list[list[float]]:
-    if not texts:
-        return []
-
-    _wait_for_rate_limit(len(texts))
-
-    print(
-        f"[embed] Gemini batch: "
-        f"{len(texts)} embeddings"
-    )
-
-    try:
-        result = _get_client().models.embed_content(
-            model=EMBED_MODEL,
-            contents=texts,
-            config=types.EmbedContentConfig(
-                task_type=task_type,
-                output_dimensionality=EMBED_DIM,
-            ),
-        )
-
-    except Exception as exc:
-        message = str(exc)
-
-        if "429" in message or "RESOURCE_EXHAUSTED" in message:
-            raise RuntimeError(
-                "Gemini embedding quota/rate limit reached. "
-                "The current batch was not saved. "
-                "Wait for the quota to reset or use a project with "
-                "available Gemini Embedding quota, then run "
-                "`python scripts/ingest.py` again. "
-                "Previously completed batches are preserved."
-            ) from exc
-
-        raise
-
-    embeddings = [embedding.values for embedding in result.embeddings]
-
-    if len(embeddings) != len(texts):
-        raise RuntimeError(
-            f"Gemini returned {len(embeddings)} embeddings for "
-            f"{len(texts)} input texts."
-        )
-
-    _record_embeddings(len(texts))
-
-    return embeddings
+def _get_model() -> TextEmbedding:
+    global _model
+    if _model is None:
+        cache_dir = settings.fastembed_cache_dir
+        print(f"[embed] Loading {EMBED_MODEL} (fastembed/ONNX, local, cache: {cache_dir}) ...")
+        _model = TextEmbedding(model_name=EMBED_MODEL, cache_dir=cache_dir)
+        print("[embed] Model loaded.")
+    return _model
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
+    """Batch-embed corpus chunks at ingest time. No prefix needed (see
+    module docstring) — raw chunk text goes in as-is."""
     if not texts:
         return []
 
+    model = _get_model()
     out: list[list[float]] = []
 
     for i in range(0, len(texts), _BATCH_SIZE):
         batch = texts[i : i + _BATCH_SIZE]
-
-        print(
-            f"[embed] Processing embeddings "
-            f"{i + 1}-{i + len(batch)} / {len(texts)}"
-        )
-
-        out.extend(
-            _embed_batch(
-                batch,
-                task_type="RETRIEVAL_DOCUMENT",
-            )
-        )
-
-        # Small pause between batches to avoid sending many
-        # embedding requests back-to-back.
-        if i + _BATCH_SIZE < len(texts):
-            time.sleep(2)
+        print(f"[embed] Embedding {i + 1}-{i + len(batch)} / {len(texts)} (local — no rate limit)")
+        out.extend(vec.tolist() for vec in model.embed(batch))
 
     return out
 
 
 def embed_query(text: str) -> list[float]:
-    return _embed_batch(
-        [text],
-        task_type="RETRIEVAL_QUERY",
-    )[0]
+    model = _get_model()
+    vec = next(iter(model.embed([text])))
+    return vec.tolist()
 
 
 def get_embedding_dimension() -> int:

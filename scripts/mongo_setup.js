@@ -5,17 +5,20 @@ const dbName = process.env.MONGODB_DB_NAME || "ip_sakti";
 const database = db.getSiblingDB(dbName);
 
 // -----------------------------------------------------------------------
-// 1. NEW: legal_corpus_chunks — canonical, full-text chunk store.
+// 1. NEW: ip_sakti_chunks — canonical, full-text chunk store.
 //    audit_logs / chat_messages / product_analyses should store only
 //    {chunk_id, index} going forward and look the rest up from here,
 //    instead of copy-pasting title/authority/excerpt into every record.
 // -----------------------------------------------------------------------
-database.createCollection("legal_corpus_chunks");
-database.legal_corpus_chunks.createIndex({ document_id: 1 });
-database.legal_corpus_chunks.createIndex({ authority: 1 });
-database.legal_corpus_chunks.createIndex({ language: 1 });
-database.legal_corpus_chunks.createIndex({ qdrant_point_id: 1 }, { unique: true, sparse: true });
-database.legal_corpus_chunks.createIndex({ full_text: "text", title: "text" });
+database.createCollection("ip_sakti_chunks");
+database.ip_sakti_chunks.createIndex({ document_id: 1 });
+database.ip_sakti_chunks.createIndex({ authority: 1 });
+database.ip_sakti_chunks.createIndex({ language: 1 });
+database.ip_sakti_chunks.createIndex(
+  { qdrant_point_id: 1 },
+  { unique: true, sparse: true },
+);
+database.ip_sakti_chunks.createIndex({ full_text: "text", title: "text" });
 
 // -----------------------------------------------------------------------
 // 2. NEW: legal_sources — one row per Act/Regulation, tracks currency
@@ -55,23 +58,22 @@ database.users.createIndex({ email: 1 }, { unique: true });
 //    drops `role`. Update your app code to stop reading/writing `role`
 //    before running this.
 // -----------------------------------------------------------------------
-database.users.updateMany(
-  { role: { $exists: true } },
-  [
-    {
-      $set: {
-        roles: {
-          $cond: [
-            { $in: ["$role", { $ifNull: ["$roles", []] }] },
-            "$roles",
-            { $concatArrays: [{ $ifNull: ["$roles", []] }, ["$role"]] },
-          ],
-        },
+database.users.updateMany({ role: { $exists: true } }, [
+  {
+    $set: {
+      roles: {
+        $cond: [
+          { $in: ["$role", { $ifNull: ["$roles", []] }] },
+          "$roles",
+          { $concatArrays: [{ $ifNull: ["$roles", []] }, ["$role"]] },
+        ],
       },
     },
-    { $unset: "role" },
-  ]
-);
+  },
+  { $unset: "role" },
+]);
 
-print("Mongo setup complete: legal_corpus_chunks + legal_sources created, " +
-      "indexes applied, users.role migrated into users.roles.");
+print(
+  "Mongo setup complete: ip_sakti_chunks + legal_sources created, " +
+    "indexes applied, users.role migrated into users.roles.",
+);

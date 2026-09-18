@@ -1,6 +1,4 @@
 {
-  "_comment": "Every field below was read directly from the text of the corresponding uploaded PDF (see chat for the 3 flagged exceptions: PPV compendiums, Hague 1960/Madrid 1891 vs current instruments, Trademark 'New Elements' note). 'effective_date' is left as a note where the document itself defers commencement to a separate notification not contained in the file — verify that separately if you need the exact in-force date.",
-
   "IP India Patents.pdf": {
     "id": "DOC-PATENTS-ACT-1970",
     "title": "The Patents Act, 1970",

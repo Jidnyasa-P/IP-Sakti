@@ -8,7 +8,7 @@ import os
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
-COLLECTION = os.environ.get("QDRANT_COLLECTION", "legal_corpus_chunks")
+COLLECTION = os.environ.get("QDRANT_COLLECTION", "ip_sakti_chunks")
 EMBED_DIM = 768  # text-embedding-004 output size
 
 client = QdrantClient(
