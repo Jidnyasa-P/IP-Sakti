@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 data/qdrant_local/
+# FastEmbed local model cache
+.fastembed_cache/

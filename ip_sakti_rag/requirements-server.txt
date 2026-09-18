@@ -28,14 +28,13 @@ python-dotenv==1.2.3
 pymongo==4.10.1
 
 # Local embeddings (fastembed/ONNX) — versions from a real pip install, Sept 2026.
-fastembed==0.8.0
+fastembed==0.5.1
 onnxruntime==1.24.4
-tokenizers==0.23.2
-huggingface_hub==1.32.0
+tokenizers==0.21.0
+huggingface-hub==0.26.2
 loguru==0.7.3
-mmh3==5.3.0
+mmh3==4.1.0
 py_rust_stemmers==0.1.8
-
 
 # Embeddings (ingest + query), generation, and the Gemini-mode reranker —
 # all through the one unified SDK.

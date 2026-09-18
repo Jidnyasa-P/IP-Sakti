@@ -34,8 +34,7 @@ class LLMClient:
         self._client = None
         if self.available:
             try:
-                import google.generativeai as genai
-
+                from google import genai  # type: ignore[import]  # optional dependency
                 genai.configure(api_key=settings.LLM_API_KEY)
                 self._client = genai.GenerativeModel(settings.LLM_MODEL)
             except Exception as exc:  # pragma: no cover - optional dependency path
