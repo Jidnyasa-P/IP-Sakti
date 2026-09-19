@@ -10,10 +10,13 @@ see app/retrieval/hybrid.py). If your existing .env still has
 EMBEDDING_MODEL / RERANKER_ENABLED / RERANKER_MODEL lines, they're now
 harmless no-ops (extra="ignore" below) — fine to leave or remove.
 
-CHANGED AGAIN: embeddings remain the already-ingested FastEmbed model/vector
-space, but inference is moved to a separate embedding service so the Render
-RAG process does not load the ONNX model into its RAM. LLM_API_KEY remains
-for answer generation and the optional Gemini reranker only.
+CHANGED AGAIN: embeddings moved off the Gemini API onto a local fastembed
+model (see app/embeddings.py for why — Gemini's free-tier daily request cap
+was blocking full-corpus ingestion). Added `fastembed_cache_dir` so the
+downloaded ONNX model file has a predictable, configurable location instead
+of fastembed's own default (which varies by OS). LLM_API_KEY is now used
+for generation (and the Gemini-mode reranker, if enabled) only — no longer
+for embeddings.
 """
 from __future__ import annotations
 
@@ -27,19 +30,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # LLM (generation + optional Gemini-mode reranker). Not used for embeddings.
+    # LLM (generation + optional Gemini-mode reranker). No longer used for
+    # embeddings — see app/embeddings.py (local fastembed model instead).
     LLM_API_KEY: str | None = None
     # gemini-2.0-flash was shut down 2026-06-01 — see .env.example for the
     # current recommended model and its own shutdown-date caveat. This
     # default is only used if LLM_MODEL isn't set in .env/Render env vars.
     LLM_MODEL: str = "gemini-3.1-flash-lite"
 
-    # Embeddings: inference is hosted outside Render. The deployed service
-    # must expose /embed and use the SAME 384-D FastEmbed model that created
-    # the existing Qdrant collection.
-    embedding_service_url: str | None = None
-    embedding_service_token: str | None = None
-    embedding_service_timeout: int = 120
+    # Embeddings (local, free, unlimited — see app/embeddings.py)
+    fastembed_cache_dir: str = "./.fastembed_cache"
 
     # Qdrant
     qdrant_local_path: str = "./data/qdrant_local"

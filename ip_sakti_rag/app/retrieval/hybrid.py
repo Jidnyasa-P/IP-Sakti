@@ -1,5 +1,5 @@
 """
-Hybrid retrieval: semantic search (Qdrant, remote 384-D FastEmbed embeddings) + lexical BM25
+Hybrid retrieval: semantic search (Qdrant, Gemini embeddings) + lexical BM25
 search, fused with Reciprocal Rank Fusion (RRF).
 
 RRF (not a learned cross-encoder reranker) is used deliberately: it's a pure
@@ -108,7 +108,7 @@ class HybridRetriever:
             latency_ms=int((time.monotonic() - started) * 1000),
         )
 
-    # -- semantic (Qdrant + remote query embedding) -----------------------
+    # -- semantic (Qdrant + Gemini query embedding) --------------------
     def _semantic_search(
         self, query: str, top_k: int, topic_filter: str | None, authority_filter: str | None
     ) -> list[tuple[str, float]]:
@@ -117,8 +117,8 @@ class HybridRetriever:
         try:
             query_vector = embed_query(query)
         except Exception:
-            # If the embedding service is unavailable, degrade to BM25-only
-            # rather than failing the whole request.
+            # No LLM_API_KEY, Gemini quota/network error, etc. — degrade to
+            # BM25-only rather than failing the whole request.
             return []
         hits = self._vector_index.search(query_vector, top_k=top_k, query_filter=_build_qdrant_filter(topic_filter, authority_filter))
         return [(chunk.chunk_id, score) for chunk, score in hits]
