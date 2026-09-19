@@ -12,6 +12,33 @@ interface CitationModalProps {
 export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose }) => {
   const [docDetails, setDocDetails] = useState<{ metadata: DocumentMetadata; chunks: DocumentChunk[] } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [sourcePdfLoading, setSourcePdfLoading] = useState(false);
+
+  // NEW: opens the real ingested source PDF. Uses authFetch + a blob URL
+  // rather than a plain <a href> -- a normal browser navigation to a
+  // protected URL can't attach the Authorization header, so a direct link
+  // to this endpoint would just 401 (the same bug class fixed elsewhere in
+  // this app: see PATCHES.md from the last round of fixes).
+  const handleViewSourcePdf = async (documentId: string) => {
+    setSourcePdfLoading(true);
+    try {
+      const res = await authFetch(`/api/documents/${documentId}/source`);
+      if (!res.ok) {
+        throw new Error(`Source PDF not available (HTTP ${res.status})`);
+      }
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      // Revoke after a delay rather than immediately -- the new tab needs
+      // the blob URL to still be valid by the time it finishes loading it.
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (err) {
+      console.error('Failed to open source PDF:', err);
+      alert('Could not open the source PDF. It may not have been ingested yet, or the RAG service may be temporarily unavailable.');
+    } finally {
+      setSourcePdfLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!citation) return;
@@ -85,16 +112,33 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
               )}
             </div>
 
-            <a
-              href={officialUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-xs shadow-2xs transition-colors shrink-0"
-              title={`Visit official statutory portal: ${sectionLinkInfo.authority}`}
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Official Cited Section</span>
-            </a>
+            <div className="flex flex-wrap gap-2 shrink-0">
+              {/* NEW: links to the actual PDF we ingested -- proves this
+                  citation traces to a specific file we indexed, not just a
+                  description of one. Separate from the official government
+                  link below, per request for "verification link to the
+                  docx and website both". */}
+              <button
+                type="button"
+                onClick={() => handleViewSourcePdf(citation.document_id)}
+                disabled={sourcePdfLoading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-800 disabled:opacity-60 text-white font-semibold text-xs shadow-2xs transition-colors"
+                title="Open the actual PDF this citation was indexed from"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>{sourcePdfLoading ? 'Loading PDF...' : 'View Source PDF'}</span>
+              </button>
+              <a
+                href={officialUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-xs shadow-2xs transition-colors"
+                title={`Visit official statutory portal: ${sectionLinkInfo.authority}`}
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Official Government Source</span>
+              </a>
+            </div>
           </div>
 
           {/* Cited Passage */}

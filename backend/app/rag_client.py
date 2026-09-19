@@ -93,6 +93,26 @@ async def get_document(document_id: str) -> dict | None:
         return None
 
 
+async def get_document_source_bytes(document_id: str) -> tuple[bytes, str, str] | None:
+    """
+    NEW: proxies the actual source PDF from ip_sakti_rag, for the
+    CitationModal's "View Source PDF" link. Returns (content, media_type,
+    filename) or None if not found -- separate from _request() since that
+    helper always calls .json(), which would choke on binary PDF bytes.
+    """
+    url = f"{settings.rag_service_url.rstrip('/')}/api/documents/{document_id}/source"
+    try:
+        async with httpx.AsyncClient(timeout=settings.rag_service_timeout_seconds) as client:
+            resp = await client.get(url, headers=_headers())
+        resp.raise_for_status()
+        content_disposition = resp.headers.get("content-disposition", "")
+        filename = content_disposition.split("filename=")[-1].strip('"') if "filename=" in content_disposition else f"{document_id}.pdf"
+        return resp.content, resp.headers.get("content-type", "application/pdf"), filename
+    except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+        logger.error(f"RAG service source fetch for {document_id} failed: {exc}")
+        return None
+
+
 async def get_telemetry() -> dict:
     return await _request("GET", "/api/rag/telemetry")
 

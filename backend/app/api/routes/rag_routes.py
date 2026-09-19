@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import asdict
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 from app.api.deps import get_current_user
 from app.database.session import get_db
@@ -31,6 +31,22 @@ async def document_details(document_id: str, current_user: dict = Depends(get_cu
     if not details:
         raise HTTPException(status_code=404, detail="Document not found.")
     return details
+
+
+@router.get("/api/documents/{document_id}/source")
+async def document_source(document_id: str, current_user: dict = Depends(get_current_user)):
+    """NEW: streams the real ingested source PDF back to the browser, for
+    CitationModal's "View Source PDF" link -- proof the citation traces to
+    an actual file, not just a description of one."""
+    result = await rag_client.get_document_source_bytes(document_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Source file not found.")
+    content, media_type, filename = result
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 # NOTE: there is no live document-ingest endpoint anymore. ip_sakti_rag

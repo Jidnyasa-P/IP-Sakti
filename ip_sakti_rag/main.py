@@ -129,6 +129,39 @@ def document_detail(document_id: str, x_internal_secret: str | None = Header(def
     return doc
 
 
+@app.get("/api/documents/{document_id}/source")
+def document_source(document_id: str, x_internal_secret: str | None = Header(default=None)):
+    """
+    NEW: serves the actual ingested source file (usually a PDF) for a
+    citation's "view original document" link -- distinct from the
+    "official cited section" link in sectionLinks.tsx, which points at an
+    external government site. This one proves the citation traces back to
+    a specific file YOU ingested, not a third-party page that may change.
+
+    Looks up the filename via manifest.json's {filename: {id: ...}} shape
+    (DocumentMetadata itself doesn't store the original filename) and
+    streams it straight from disk -- no extra storage, no extra cost, it's
+    already sitting in data/documents/.
+    """
+    _check_secret(x_internal_secret)
+    manifest_path = settings.documents_dir / "manifest.json"
+    if not manifest_path.exists():
+        raise HTTPException(status_code=404, detail="No document manifest found.")
+
+    import json
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    filename = next((fn for fn, meta in manifest.items() if meta.get("id") == document_id), None)
+    if not filename:
+        raise HTTPException(status_code=404, detail="Document not found in manifest.")
+
+    file_path = settings.documents_dir / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Source file is listed in the manifest but missing on disk.")
+
+    from fastapi.responses import FileResponse
+    return FileResponse(path=str(file_path), media_type="application/pdf", filename=filename)
+
+
 @app.get("/api/rag/telemetry")
 def telemetry(x_internal_secret: str | None = Header(default=None)):
     _check_secret(x_internal_secret)
