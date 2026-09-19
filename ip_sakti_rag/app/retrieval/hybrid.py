@@ -6,6 +6,21 @@ RRF (not a learned cross-encoder reranker) is used deliberately: it's a pure
 rank-combination formula with nothing to load into memory, which keeps this
 service inside Render's free-tier 512MB RAM limit. See app/embeddings.py and
 app/config.py for the same reasoning applied to embeddings/config.
+
+FIXED: `_reciprocal_rank_fusion` previously returned the RAW RRF score
+(1/(_RRF_K+rank+1) summed across retrievers), which tops out at
+2/(_RRF_K+1) ~= 0.033 for a chunk ranked #1 by both retrievers. That raw
+value was being fed straight into `top_fused_score` and then into
+app/safety/confidence.py's `compute_confidence()`, which compares it
+against `confidence_high_threshold = 0.45` / `moderate = 0.28` / `low =
+0.15` -- thresholds written for a 0-1-scaled score. Since 0.033 never
+clears even the LOW threshold, every query was landing in the "Insufficient
+evidence" bucket and getting floored at the minimum displayed score of 5%,
+regardless of how good the actual retrieval was. This is what produced the
+"Confidence Score: 5%" you saw even on a query that pulled 5 clearly
+relevant, on-topic citations. Now normalized to a real 0-1 scale (divided
+by the theoretical max), which is directly comparable to those existing
+thresholds without needing to touch confidence.py at all.
 """
 from __future__ import annotations
 
@@ -20,6 +35,7 @@ from app.retrieval.vector_index import VectorIndex
 from app.schemas import Citation, DocumentChunk, DocumentMetadata, Language
 
 _RRF_K = 60  # standard RRF constant — de-emphasizes rank-1-vs-rank-2 noise
+_MAX_RRF_SCORE = 2.0 / (_RRF_K + 1)  # score of a chunk ranked #1 by BOTH retrievers -- used to normalize to 0-1
 _EXCERPT_CHARS = 400
 
 
@@ -160,10 +176,11 @@ def _reciprocal_rank_fusion(
 ) -> list[tuple[str, float, float | None, float | None]]:
     """
     Inputs: [(chunk_id, raw_score)] per retriever, best-first.
-    Output: [(chunk_id, fused_rrf_score, semantic_raw_score, keyword_raw_score)],
-    best-first. A chunk found by only one retriever is still included (its
-    other raw score is None) — it just scores lower via RRF than a chunk
-    both retrievers agreed on.
+    Output: [(chunk_id, normalized_fused_score, semantic_raw_score, keyword_raw_score)],
+    best-first, normalized_fused_score on a 0-1 scale (see _MAX_RRF_SCORE).
+    A chunk found by only one retriever is still included (its other raw
+    score is None) — it just scores lower than a chunk both retrievers
+    agreed on.
     """
     sem_rank = {cid: i for i, (cid, _) in enumerate(semantic_hits)}
     kw_rank = {cid: i for i, (cid, _) in enumerate(keyword_hits)}
@@ -177,7 +194,8 @@ def _reciprocal_rank_fusion(
             rrf_score += 1.0 / (_RRF_K + sem_rank[cid] + 1)
         if cid in kw_rank:
             rrf_score += 1.0 / (_RRF_K + kw_rank[cid] + 1)
-        fused.append((cid, rrf_score, sem_score_map.get(cid), kw_score_map.get(cid)))
+        normalized_score = min(1.0, rrf_score / _MAX_RRF_SCORE)
+        fused.append((cid, normalized_score, sem_score_map.get(cid), kw_score_map.get(cid)))
 
     fused.sort(key=lambda x: x[1], reverse=True)
     return fused

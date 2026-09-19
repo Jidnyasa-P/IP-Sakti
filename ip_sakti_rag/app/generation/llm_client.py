@@ -1,16 +1,30 @@
 """
 Pluggable LLM client.
 
-If LLM_API_KEY is set and valid, calls Google's Gemini free-tier API
-(same provider the existing frontend prototype already uses in
-`server/gemini.ts`, for consistency). If not set (or the call fails/times
-out), falls back to a fully offline, deterministic, evidence-templated
-answer — mirroring the "resilience engine" already designed into the
-existing prototype, so the whole system still works with zero API keys
-and zero cost for a demo.
+If LLM_API_KEY is set and valid, calls Google's Gemini API. If not set (or
+the call fails/times out), falls back to a fully offline, deterministic,
+evidence-templated answer -- mirroring the "resilience engine" already
+designed into the existing prototype, so the whole system still works with
+zero API keys and zero cost for a demo.
+
+FIXED: this file was calling `genai.configure(...)` and
+`genai.GenerativeModel(...)` -- that's the OLD, deprecated
+`google-generativeai` SDK's API shape. But `from google import genai`
+actually imports the NEW, unified `google-genai` package (the one pinned in
+requirements-server.txt, and the same one app/embeddings.py already uses
+correctly) -- and that package's `genai` module has neither `.configure()`
+nor `.GenerativeModel`. Every real Gemini call was throwing an
+AttributeError, silently caught by the `except Exception` below, which set
+`self.available = False` and made every single request fall through to
+`offline_grounded_synthesis` -- regardless of whether LLM_API_KEY was
+valid. That's why every answer looked like a raw, unstructured dump of
+retrieved chunk text with "no live LLM reasoning was applied" tacked on:
+that message is `offline_grounded_synthesis`'s own fallback text, and it
+was running on every single query, not just when the key was actually
+missing.
 
 Swap in another provider (Groq, local Ollama, etc.) by adding another
-branch here — nothing else in the pipeline needs to change.
+branch here -- nothing else in the pipeline needs to change.
 """
 from __future__ import annotations
 
@@ -34,23 +48,26 @@ class LLMClient:
         self._client = None
         if self.available:
             try:
-                from google import genai  # type: ignore[import]  # optional dependency
-                genai.configure(api_key=settings.LLM_API_KEY)
-                self._client = genai.GenerativeModel(settings.LLM_MODEL)
+                from google import genai  # unified SDK -- see module docstring
+
+                self._client = genai.Client(api_key=settings.LLM_API_KEY)
             except Exception as exc:  # pragma: no cover - optional dependency path
-                print(f"[llm_client] Gemini unavailable, using offline fallback: {exc}")
+                print(f"[llm_client] Gemini client init failed, using offline fallback: {exc}")
                 self.available = False
 
     def generate_json(self, prompt: str, timeout_s: float = 12.0) -> dict:
         if self.available and self._client is not None:
             try:
-                response = self._client.generate_content(
-                    prompt,
-                    generation_config={"response_mime_type": "application/json"},
-                    request_options={"timeout": timeout_s},
+                from google.genai import types  # unified SDK -- see module docstring
+
+                response = self._client.models.generate_content(
+                    model=settings.LLM_MODEL,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                    ),
                 )
-                text = response.text
-                return _safe_parse_json(text)
+                return _safe_parse_json(response.text)
             except Exception as exc:
                 print(f"[llm_client] Gemini call failed, falling back offline: {exc}")
         return {}  # signal to caller: use offline synthesis
@@ -69,8 +86,9 @@ def offline_grounded_synthesis(query: str, language: str, chunks: list[DocumentC
     """
     Deterministic fallback: builds a templated, citation-grounded answer
     directly from retrieved chunk text, with no LLM call at all. Used when no
-    LLM key is configured, or the LLM call fails — the platform must never go
-    fully silent just because a paid/rate-limited API is unavailable.
+    LLM key is configured, or the LLM call genuinely fails -- the platform
+    must never go fully silent just because a paid/rate-limited API is
+    unavailable. Now that LLMClient actually works, this should be rare.
     """
     if not chunks:
         return {

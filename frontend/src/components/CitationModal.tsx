@@ -18,7 +18,7 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
   // rather than a plain <a href> -- a normal browser navigation to a
   // protected URL can't attach the Authorization header, so a direct link
   // to this endpoint would just 401 (the same bug class fixed elsewhere in
-  // this app: see PATCHES.md from the last round of fixes).
+  // this app: see PATCHES.md from an earlier round of fixes).
   const handleViewSourcePdf = async (documentId: string) => {
     setSourcePdfLoading(true);
     try {
@@ -46,12 +46,6 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
     authFetch(`/api/documents/${citation.document_id}`)
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
-        // Was previously called with a plain fetch() (no auth header) --
-        // the backend's 401 error body ({"detail": "..."}) got set as
-        // docDetails as if it were real data. The `docDetails?.metadata`
-        // check below happened to render nothing in that case rather than
-        // crashing, so this always silently failed instead of ever
-        // showing the extended document info.
         setDocDetails(data);
         setLoading(false);
       })
@@ -65,6 +59,21 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
 
   const sectionLinkInfo = getSectionLink(citation.section, citation.document_id);
   const officialUrl = citation.url || sectionLinkInfo.url;
+
+  // FIXED: this used to always render `citation.excerpt`, which is
+  // deliberately truncated to 400 characters server-side (see
+  // ip_sakti_rag/app/retrieval/hybrid.py's _EXCERPT_CHARS) -- that's the
+  // right length for the small inline citation card in a chat message, but
+  // not for this modal, whose whole point is to let someone read the full
+  // cited passage. `/api/documents/{document_id}` (already being fetched
+  // above for the metadata section) returns every chunk for that document
+  // with its COMPLETE, untruncated chunk_text -- so instead of a second
+  // network call, we just find the one matching this citation's chunk_id
+  // and prefer its full text, falling back to the short excerpt only while
+  // that request is still loading or if it fails.
+  const fullChunk = docDetails?.chunks.find(c => c.chunk_id === citation.chunk_id);
+  const passageText = fullChunk?.chunk_text ?? citation.excerpt;
+  const isFullText = Boolean(fullChunk?.chunk_text);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
@@ -113,11 +122,10 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
             </div>
 
             <div className="flex flex-wrap gap-2 shrink-0">
-              {/* NEW: links to the actual PDF we ingested -- proves this
-                  citation traces to a specific file we indexed, not just a
-                  description of one. Separate from the official government
-                  link below, per request for "verification link to the
-                  docx and website both". */}
+              {/* Links to the actual PDF we ingested (verification that this
+                  citation traces to a specific file we indexed) and to the
+                  official government source -- two separate, distinct
+                  verification links as requested. */}
               <button
                 type="button"
                 onClick={() => handleViewSourcePdf(citation.document_id)}
@@ -143,12 +151,20 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
 
           {/* Cited Passage */}
           <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3.5 sm:p-4">
-            <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-              <FileText className="w-4 h-4 text-emerald-700" />
-              Retrieved Statutory Passage
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <FileText className="w-4 h-4 text-emerald-700" />
+                Retrieved Statutory Passage
+              </div>
+              {loading && !fullChunk && (
+                <span className="text-[11px] text-slate-400 italic">Loading full section text...</span>
+              )}
+              {!loading && !isFullText && (
+                <span className="text-[11px] text-amber-600 italic">Showing short excerpt only -- full section unavailable</span>
+              )}
             </div>
-            <div className="text-slate-800 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-serif">
-              "{citation.excerpt}"
+            <div className="text-slate-800 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-serif max-h-72 overflow-y-auto">
+              "{passageText}"
             </div>
           </div>
 
