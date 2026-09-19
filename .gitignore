@@ -45,9 +45,7 @@ backend/data/knowledge_graph.json
 
 # --- RAG module: regenerable local storage (rebuild via scripts/ingest.py) ---
 ip_sakti_rag_model/data/qdrant_local/
-ip_sakti_rag_model/data/documents/*.pdf
 ip_sakti_rag_model/data/documents/*.html
-ip_sakti_rag_model/data/documents/*.txt
 !ip_sakti_rag_model/data/documents/manifest.json
 !ip_sakti_rag_model/data/documents/manifest.example.json
 !ip_sakti_rag_model/data/documents/.gitkeep
