@@ -49,9 +49,25 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    """Never leak stack traces, secrets, or internal details to the client (Section 29)."""
+    """Never leak stack traces, secrets, or internal details to the client (Section 29).
+
+    CHANGED: manually attach the CORS header here too. CORSMiddleware only
+    adds Access-Control-Allow-Origin to responses that come back out through
+    the normal middleware chain — a response built by an exception handler
+    can bypass that in some Starlette/FastAPI versions, which makes the
+    browser report a *CORS* error even though the real problem is a 500
+    happening server-side. Without this, you'd see "blocked by CORS policy"
+    in the console for the exact same failures this handler is supposed to
+    turn into a clean error message, which is confusing to debug from the
+    frontend side alone.
+    """
     logger.error(f"Unhandled error on {request.method} {request.url.path}: {exc}\n{traceback.format_exc()}")
-    return JSONResponse(status_code=500, content={"error": "Internal server error. Please try again."})
+    origin = request.headers.get("origin")
+    headers = {}
+    if origin and origin in (settings.frontend_origin, "http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000"):
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(status_code=500, content={"error": "Internal server error. Please try again."}, headers=headers)
 
 
 app.include_router(health.router, tags=["health"])

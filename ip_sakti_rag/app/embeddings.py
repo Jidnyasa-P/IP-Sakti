@@ -64,7 +64,14 @@ def _get_model() -> TextEmbedding:
     if _model is None:
         cache_dir = settings.fastembed_cache_dir
         print(f"[embed] Loading {EMBED_MODEL} (fastembed/ONNX, local, cache: {cache_dir}) ...")
-        _model = TextEmbedding(model_name=EMBED_MODEL, cache_dir=cache_dir)
+        # threads=1: caps onnxruntime's internal thread pool. Render's free
+        # tier gives you 0.1 shared vCPU — onnxruntime's default of "one
+        # thread per core" tries to spin up several threads regardless, and
+        # each one carries its own memory overhead (thread stacks + duplicated
+        # execution-plan buffers) for no real speed benefit on a fractional
+        # CPU. This is a real, if modest, RAM saving, not a full fix for an
+        # actual OOM on its own — see RENDER_502_TROUBLESHOOTING.md.
+        _model = TextEmbedding(model_name=EMBED_MODEL, cache_dir=cache_dir, threads=1)
         print("[embed] Model loaded.")
     return _model
 
