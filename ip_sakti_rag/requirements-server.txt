@@ -28,6 +28,7 @@ python-dotenv==1.2.3
 pymongo==4.10.1
 
 # Local embeddings (fastembed/ONNX) — versions from a real pip install, Sept 2026.
+fastembed==0.5.1
 tokenizers==0.21.0
 huggingface-hub==0.26.2
 loguru==0.7.3
