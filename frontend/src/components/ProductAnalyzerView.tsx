@@ -17,7 +17,6 @@ import { Citation, ProductAnalysisResult, ProductInformation } from "../types";
 import { DisclaimerBanner } from "./DisclaimerBanner";
 import { useTranslation } from "../context/LanguageContext";
 import { exportProductAnalysisToPDF } from "../utils/pdfGenerator";
-import { getSectionLink } from "../utils/sectionLinks";
 import { authFetch } from "./auth/authStorage";
 
 interface ProductAnalyzerViewProps {
@@ -814,16 +813,20 @@ export const ProductAnalyzerView: React.FC<ProductAnalyzerViewProps> = ({
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {result.evidence.map((ev) => {
-                    const linkInfo = getSectionLink(ev.section, ev.document_id);
-                    const evUrl = ev.url || linkInfo.url;
                     return (
-                      <a
+                      /* CHANGED: was a direct <a href> straight to an external
+                         site. Now opens the same CitationModal chat citations
+                         already use (App.tsx already wires `onOpenCitation`
+                         into this component -- it just wasn't being called
+                         anywhere) -- full retrieved section text, plus BOTH
+                         the source-PDF and official-website links, instead
+                         of jumping straight to one external link. */
+                      <button
+                        type="button"
                         key={ev.chunk_id}
-                        href={evUrl}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        title={`Open official statutory text: ${ev.section} (${linkInfo.authority})`}
-                        className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group flex flex-col justify-between space-y-2 shadow-2xs hover:shadow-xs"
+                        onClick={() => onOpenCitation(ev)}
+                        title={`View full cited section: ${ev.section} (${ev.authority})`}
+                        className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group flex flex-col justify-between space-y-2 shadow-2xs hover:shadow-xs text-left w-full"
                       >
                         <div>
                           <div className="flex items-center justify-between text-xs font-bold text-slate-900 group-hover:text-emerald-950 mb-1">
@@ -843,11 +846,11 @@ export const ProductAnalyzerView: React.FC<ProductAnalyzerViewProps> = ({
                             Official Reference
                           </span>
                           <span className="inline-flex items-center gap-1 font-semibold text-xs text-emerald-800 group-hover:text-emerald-950 group-hover:underline">
-                            <span>Open Official Section</span>
+                            <span>View Full Citation</span>
                             <ExternalLink className="w-3.5 h-3.5 text-emerald-700 transition-transform group-hover:translate-x-0.5" />
                           </span>
                         </div>
-                      </a>
+                      </button>
                     );
                   })}
                 </div>

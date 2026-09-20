@@ -16,7 +16,6 @@ import { Citation, TKABSQuery, TKABSResult } from "../types";
 import { DisclaimerBanner } from "./DisclaimerBanner";
 import { useTranslation } from "../context/LanguageContext";
 import { exportTKABSToPDF } from "../utils/pdfGenerator";
-import { getSectionLink } from "../utils/sectionLinks";
 import { authFetch } from "./auth/authStorage";
 
 interface TraditionalKnowledgeViewProps {
@@ -475,16 +474,18 @@ export const TraditionalKnowledgeView: React.FC<
               </h4>
               <div className="space-y-2.5">
                 {result.sources.map((s) => {
-                  const linkInfo = getSectionLink(s.section, s.document_id);
-                  const sourceUrl = s.url || linkInfo.url;
                   return (
-                    <a
+                    /* CHANGED: opens the shared CitationModal (App.tsx already
+                       wires `onOpenCitation` into this component) instead of
+                       jumping straight to an external link -- full retrieved
+                       section text + both the source-PDF and official-website
+                       links, same as chat citations. */
+                    <button
+                      type="button"
                       key={s.chunk_id}
-                      href={sourceUrl}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      title={`Open official statutory text: ${s.section} (${linkInfo.authority})`}
-                      className="block p-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group space-y-2 shadow-2xs hover:shadow-xs"
+                      onClick={() => onOpenCitation(s)}
+                      title={`View full cited section: ${s.section} (${s.authority})`}
+                      className="block p-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group space-y-2 shadow-2xs hover:shadow-xs text-left w-full"
                     >
                       <div className="flex items-center justify-between text-xs font-bold text-slate-800 group-hover:text-emerald-900 mb-1">
                         <span>
@@ -502,11 +503,11 @@ export const TraditionalKnowledgeView: React.FC<
                           Official Reference
                         </span>
                         <span className="inline-flex items-center gap-1 font-semibold text-emerald-800 group-hover:text-emerald-950 group-hover:underline">
-                          <span>Open Official Section</span>
+                          <span>View Full Citation</span>
                           <ExternalLink className="w-3.5 h-3.5 text-emerald-700 transition-transform group-hover:translate-x-0.5" />
                         </span>
                       </div>
-                    </a>
+                    </button>
                   );
                 })}
               </div>

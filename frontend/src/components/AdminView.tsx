@@ -98,6 +98,26 @@ export const AdminView: React.FC = () => {
     }
   };
 
+  // NEW: `loading` was already tracked correctly (set true/false around
+  // the fetch) but never actually rendered anywhere -- the page just sat
+  // there showing empty document/telemetry sections until data arrived,
+  // indistinguishable from a frozen/broken page. Now shows an actual
+  // spinner while that's happening.
+  if (loading && documents.length === 0 && !telemetry) {
+    return (
+      <div className="w-full px-3 sm:px-5 lg:px-6 py-20 flex flex-col items-center justify-center gap-4 text-center">
+        <div className="w-10 h-10 border-4 border-emerald-700 border-t-transparent rounded-full animate-spin" />
+        <div className="space-y-1 max-w-sm">
+          <p className="text-sm font-semibold text-slate-700">Loading admin console...</p>
+          <p className="text-xs text-slate-400">
+            This can take up to a minute or two the first time, if the backend has
+            been idle for a while and needs to wake back up.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full px-3 sm:px-5 lg:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
       {/* Header */}

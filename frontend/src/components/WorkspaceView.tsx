@@ -26,12 +26,19 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
   const [products, setProducts] = useState<ProductAnalysisResult[]>([]);
   const [savedResearch, setSavedResearch] = useState<any[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<'conversations' | 'products' | 'bookmarks'>('conversations');
+  // NEW: this view had no loading state at all -- while the 3 parallel
+  // fetches were in flight (which can take a while on free-tier hosting,
+  // see the message below), the page just showed empty "no items found"
+  // messages, which looks identical to a broken/frozen page. Now shows an
+  // actual spinner instead.
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadWorkspaceData();
   }, []);
 
   const loadWorkspaceData = async () => {
+    setIsLoading(true);
     try {
       const [convRes, prodRes, savedRes] = await Promise.all([
         authFetch('/api/conversations').catch(() => null),
@@ -57,6 +64,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
       setSavedResearch(Array.isArray(savedData) ? savedData : []);
     } catch (e) {
       console.warn('Failed to load workspace data:', e);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -83,6 +92,24 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
     downloadAnchor.click();
     downloadAnchor.remove();
   };
+
+  // NEW: shown instead of the whole page while the 3 workspace fetches are
+  // in flight. See the note in the message itself for why this can take a
+  // while -- worth setting the expectation rather than leaving it silent.
+  if (isLoading) {
+    return (
+      <div className="w-full px-3 sm:px-5 lg:px-6 py-20 flex flex-col items-center justify-center gap-4 text-center">
+        <div className="w-10 h-10 border-4 border-emerald-700 border-t-transparent rounded-full animate-spin" />
+        <div className="space-y-1 max-w-sm">
+          <p className="text-sm font-semibold text-slate-700">Loading your workspace...</p>
+          <p className="text-xs text-slate-400">
+            This can take up to a minute or two the first time, if the backend has
+            been idle for a while and needs to wake back up.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full px-3 sm:px-5 lg:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">

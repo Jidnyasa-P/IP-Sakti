@@ -13,7 +13,6 @@ import {
 import { Citation, DocumentChunk, DocumentMetadata } from '../types';
 import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
-import { getSectionLink } from '../utils/sectionLinks';
 import { authFetch } from './auth/authStorage';
 
 interface ResearchViewProps {
@@ -310,16 +309,36 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
 
             {selectedDocId && selectedDocChunks.length > 0 ? (
               <div className="space-y-3 max-h-[calc(100vh-14rem)] overflow-y-auto pr-1">
-                {selectedDocChunks.map((chunk) => {
-                  const linkInfo = getSectionLink(chunk.section, chunk.document_id);
+                {selectedDocChunks.map((chunk, idx) => {
+                  // CHANGED: opens the shared CitationModal instead of
+                  // jumping straight to an external link. This view works
+                  // with raw DocumentChunk objects (browsing the indexed
+                  // corpus directly), not Citation objects like the other
+                  // views -- so build a Citation-shaped object from the
+                  // chunk's own fields (all present on DocumentChunk) before
+                  // handing it to onOpenCitation. `excerpt` uses the full
+                  // chunk_text here since that's already what this list
+                  // fetched; the modal will also independently look up the
+                  // full text by chunk_id as a fallback, same as everywhere
+                  // else.
+                  const asCitation: Citation = {
+                    index: idx + 1,
+                    chunk_id: chunk.chunk_id,
+                    document_id: chunk.document_id,
+                    title: chunk.title,
+                    authority: chunk.authority,
+                    section: chunk.section,
+                    source: chunk.source,
+                    excerpt: chunk.chunk_text,
+                    page: chunk.page,
+                  };
                   return (
-                    <a
+                    <button
+                      type="button"
                       key={chunk.chunk_id}
-                      href={linkInfo.url}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      title={`Open official statutory text: ${chunk.section} (${linkInfo.authority})`}
-                      className="block p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group space-y-2 shadow-2xs hover:shadow-xs"
+                      onClick={() => onOpenCitation(asCitation)}
+                      title={`View full cited section: ${chunk.section} (${chunk.authority})`}
+                      className="block p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group space-y-2 shadow-2xs hover:shadow-xs text-left w-full"
                     >
                       <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-900 group-hover:text-emerald-950">
                         <span className="line-clamp-1">{chunk.section}</span>
@@ -333,11 +352,11 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
                       <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
                         <span className="text-[10px] text-slate-400 font-medium">{chunk.authority.split(',')[0]}</span>
                         <span className="inline-flex items-center gap-1 font-semibold text-emerald-800 group-hover:text-emerald-950 group-hover:underline">
-                          <span>Open Official Section</span>
+                          <span>View Full Citation</span>
                           <ExternalLink className="w-3.5 h-3.5 text-emerald-700 transition-transform group-hover:translate-x-0.5" />
                         </span>
                       </div>
-                    </a>
+                    </button>
                   );
                 })}
               </div>
