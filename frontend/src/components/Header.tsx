@@ -144,442 +144,526 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <>
       {/* Primary Top Header */}
-      <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs transition-all">
-        <div className="w-full px-3 sm:px-4 lg:px-4 xl:px-6">
-          <div className="flex flex-wrap items-center justify-between min-h-[3.5rem] sm:min-h-[4rem] h-auto py-1 sm:py-1.5 gap-y-1.5 gap-x-2">
-            {/* Logo & Brand */}
-            <div
-              id="brand-logo-btn"
-              onClick={() => handleNavClick(isExpert ? "expert" : "landing")}
-              className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none min-w-0 shrink-0 order-1"
-            >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 min-w-[2rem] sm:min-w-[2.25rem] aspect-square rounded-lg sm:rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 flex items-center justify-center text-amber-300 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
-                <Shield className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-              </div>
-              <div className="min-w-0 flex items-center">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <span className="font-serif font-semibold text-base sm:text-lg xl:text-xl tracking-tight text-slate-900 leading-none whitespace-nowrap">
-                    {t("brand.name", "IP-SAKTI")}
-                  </span>
-                  <span className="hidden xl:inline-block text-[11px] font-semibold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300 uppercase tracking-wider shrink-0 whitespace-nowrap leading-tight">
-                    {isExpert
-                      ? "Legal Advisor Console"
-                      : t("brand.badge", "Sahayak")}
-                  </span>
+      {/* Primary Top Header */}
+<header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs transition-all">
+  <div className="w-full px-3 sm:px-4 lg:px-6 xl:px-8">
+
+    {/* ========================================================= */}
+    {/* TOP ROW — Logo + Right Utilities                         */}
+    {/* ========================================================= */}
+
+    <div className="flex items-center justify-between min-h-[3.5rem] sm:min-h-[4rem] py-1 sm:py-1.5 gap-2">
+
+      {/* Logo & Brand */}
+      <div
+        id="brand-logo-btn"
+        onClick={() => handleNavClick(isExpert ? "expert" : "landing")}
+        className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none min-w-0 shrink-0"
+      >
+        <div className="w-8 h-8 sm:w-9 sm:h-9 min-w-[2rem] sm:min-w-[2.25rem] aspect-square rounded-lg sm:rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 flex items-center justify-center text-amber-300 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+          <Shield className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+        </div>
+
+        <div className="min-w-0 flex items-center">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="font-serif font-semibold text-base sm:text-lg xl:text-xl tracking-tight text-slate-900 leading-none whitespace-nowrap">
+              {t("brand.name", "IP-SAKTI")}
+            </span>
+
+            <span className="hidden sm:inline-block text-[11px] font-semibold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300 uppercase tracking-wider shrink-0 whitespace-nowrap leading-tight">
+              {isExpert
+                ? "Legal Advisor Console"
+                : t("brand.badge", "Sahayak")}
+            </span>
+          </div>
+        </div>
+      </div>
+
+
+      {/* ========================================================= */}
+      {/* RIGHT SIDE UTILITIES                                      */}
+      {/* ========================================================= */}
+
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+
+        {/* ------------------------------------------------------- */}
+        {/* Language Switcher                                      */}
+        {/* ------------------------------------------------------- */}
+
+        <div className="relative">
+          <button
+            type="button"
+            id="language-selector-btn"
+            onClick={() => setLangDropdownOpen(!langDropdownOpen)}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 xl:px-3 xl:py-2 rounded-lg border text-xs font-medium transition-all shrink-0 ${
+              language !== "en"
+                ? "border-emerald-300 bg-emerald-50/80 text-emerald-900 font-semibold shadow-2xs"
+                : "border-slate-200 hover:bg-slate-50 text-slate-700"
+            }`}
+            title="Switch Language / भाषा बदलें"
+          >
+            <Globe
+              className={`w-4 h-4 sm:w-[18px] sm:h-[18px] shrink-0 ${
+                language !== "en"
+                  ? "text-emerald-700"
+                  : "text-slate-500"
+              }`}
+            />
+
+            <span className="font-semibold hidden sm:inline">
+              {currentLang.native}
+            </span>
+
+            <span className="font-semibold inline sm:hidden uppercase">
+              {currentLang.code}
+            </span>
+
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:inline-block shrink-0" />
+          </button>
+
+          {langDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-1">
+
+              <div className="px-3 pb-2 border-b border-slate-100">
+                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  22 Eighth Schedule Languages / भाषा
+                </div>
+
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+
+                  <input
+                    type="text"
+                    value={langSearchTerm}
+                    onChange={(e) => setLangSearchTerm(e.target.value)}
+                    placeholder="Search language / भाषा खोजें..."
+                    className="w-full pl-8 pr-2.5 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-emerald-700"
+                  />
                 </div>
               </div>
-            </div>
 
-            {/* Desktop Navigation Tabs */}
-            {(isLoggedIn || isTourActive) && (
-              <nav className="hidden lg:flex flex-wrap items-center justify-center gap-1 xl:gap-1.5 order-3 2xl:order-2 w-full 2xl:w-auto mt-0.5 2xl:mt-0 pt-1.5 2xl:pt-0 border-t 2xl:border-t-0 border-slate-100 dark:border-slate-800 shrink-0">
-                {navItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      id={`nav-${item.id}-btn`}
-                      onClick={() => handleNavClick(item.id)}
-                      className={`flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1.5 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-all shrink-0 ${
-                        isActive
-                          ? "bg-slate-900 text-white shadow-2xs"
-                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                      }`}
-                    >
-                      <Icon
-                        className={`w-3.5 h-3.5 xl:w-4 xl:h-4 shrink-0 ${isActive ? "text-amber-300" : "text-slate-500"}`}
-                      />
-                      <span className="whitespace-nowrap">{item.label}</span>
-                      {item.badge && (
-                        <span
-                          className={`hidden xl:inline-block text-[10px] px-1.5 py-0.2 rounded font-medium uppercase tracking-wider ${isActive ? "bg-slate-800 text-amber-200 border border-amber-400/30" : "bg-emerald-100 text-emerald-800"}`}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </nav>
-            )}
+              <div className="max-h-64 overflow-y-auto divide-y divide-slate-50 p-1">
+                {filteredLanguages.map((l) => (
+                  <button
+                    key={l.code}
+                    type="button"
+                    onClick={() => {
+                      setLanguage(l.code);
+                      setLangDropdownOpen(false);
+                      setLangSearchTerm("");
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left rounded-lg transition-colors cursor-pointer ${
+                      language === l.code
+                        ? "bg-emerald-50 text-emerald-950 font-semibold"
+                        : "hover:bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-sm leading-tight">
+                        {l.native}
+                      </span>
 
-            {/* Right Utilities: Language, Admin, Role Badge & Mobile Menu Button */}
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 order-2 2xl:order-3">
-              {/* Language Switcher */}
-              <div className="relative">
-                <button
-                  type="button"
-                  id="language-selector-btn"
-                  onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-                  className={`flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 xl:px-3 xl:py-1.5 rounded-lg border text-xs font-medium transition-all shrink-0 ${
-                    language !== "en"
-                      ? "border-emerald-300 bg-emerald-50/80 text-emerald-900 font-semibold shadow-2xs"
-                      : "border-slate-200 hover:bg-slate-50 text-slate-700"
-                  }`}
-                  title="Switch Language / भाषा बदलें"
-                >
-                  <Globe
-                    className={`w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 ${language !== "en" ? "text-emerald-700" : "text-slate-500"}`}
-                  />
-                  <span className="font-semibold hidden xl:inline">
-                    {currentLang.native}
-                  </span>
-                  <span className="font-semibold inline xl:hidden uppercase">
-                    {currentLang.code}
-                  </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden xl:inline-block shrink-0" />
-                </button>
-
-                {langDropdownOpen && (
-                  <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-1">
-                    <div className="px-3 pb-2 border-b border-slate-100">
-                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-                        22 Eighth Schedule Languages / भाषा
-                      </div>
-                      <div className="relative">
-                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="text"
-                          value={langSearchTerm}
-                          onChange={(e) => setLangSearchTerm(e.target.value)}
-                          placeholder="Search language / भाषा खोजें..."
-                          className="w-full pl-8 pr-2.5 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-emerald-700"
-                        />
-                      </div>
+                      <span className="text-[11px] text-slate-500">
+                        {l.label}
+                      </span>
                     </div>
-                    <div className="max-h-64 overflow-y-auto divide-y divide-slate-50 p-1">
-                      {filteredLanguages.map((l) => (
-                        <button
-                          key={l.code}
-                          type="button"
-                          onClick={() => {
-                            setLanguage(l.code);
-                            setLangDropdownOpen(false);
-                            setLangSearchTerm("");
-                          }}
-                          className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left rounded-lg transition-colors cursor-pointer ${
-                            language === l.code
-                              ? "bg-emerald-50 text-emerald-950 font-semibold"
-                              : "hover:bg-slate-50 text-slate-700"
-                          }`}
-                        >
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-sm leading-tight">
-                              {l.native}
-                            </span>
-                            <span className="text-[11px] text-slate-500">
-                              {l.label}
-                            </span>
-                          </div>
-                          {language === l.code && (
-                            <Check className="w-4 h-4 text-emerald-700 shrink-0" />
-                          )}
-                        </button>
-                      ))}
-                      {filteredLanguages.length === 0 && (
-                        <div className="p-3 text-center text-xs text-slate-400">
-                          No language found matching "{langSearchTerm}"
-                        </div>
-                      )}
-                    </div>
+
+                    {language === l.code && (
+                      <Check className="w-4 h-4 text-emerald-700 shrink-0" />
+                    )}
+                  </button>
+                ))}
+
+                {filteredLanguages.length === 0 && (
+                  <div className="p-3 text-center text-xs text-slate-400">
+                    No language found matching "{langSearchTerm}"
                   </div>
                 )}
               </div>
-
-              {/* Notification Bell */}
-<div className="relative shrink-0">
-  {/* Bell Button */}
-  <button
-    type="button"
-    id="notification-bell-btn"
-    onClick={() => setNotificationOpen(!notificationOpen)}
-    aria-label="Notifications"
-    aria-expanded={notificationOpen}
-    title="Notifications"
-    className={`relative flex items-center justify-center p-2 sm:p-2.5 rounded-lg border transition-all cursor-pointer shrink-0 ${
-      notificationOpen
-        ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900"
-    }`}
-  >
-    <Bell className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-
-    {/* Unread notification indicator */}
-    <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500 ring-2 ring-white" />
-  </button>
-
-  {/* Notification Dropdown */}
-  {notificationOpen && (
-    <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-1.5rem)] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-1">
-
-      {/* Dropdown Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-900">
-            Notifications
-          </h3>
-
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            Your latest updates
-          </p>
+            </div>
+          )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setNotificationOpen(false)}
-          aria-label="Close notifications"
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
 
-      {/* Recent Notifications */}
-      <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
+        {/* ------------------------------------------------------- */}
+        {/* Notification Bell — LOGGED IN ONLY                    */}
+        {/* ------------------------------------------------------- */}
 
-        {/* Notification 1 */}
-        <button
-          type="button"
-          className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
-        >
-          <div className="flex gap-3">
-            <span className="w-2 h-2 mt-1.5 rounded-full bg-emerald-600 shrink-0" />
+        {isLoggedIn && (
+          <div className="relative shrink-0">
 
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-slate-900">
-                Welcome to IP-SAKTI Sahayak
-              </p>
+            <button
+              type="button"
+              id="notification-bell-btn"
+              onClick={() => setNotificationOpen(!notificationOpen)}
+              aria-label="Notifications"
+              aria-expanded={notificationOpen}
+              title="Notifications"
+              className={`relative flex items-center justify-center p-2 sm:p-2.5 rounded-lg border transition-all cursor-pointer shrink-0 ${
+                notificationOpen
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                  : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Bell className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
 
-              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                Your account has been successfully created.
-              </p>
+              {/* Unread notification indicator */}
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500 ring-2 ring-white" />
+            </button>
 
-              <span className="text-[10px] text-slate-400 mt-1 block">
-                Just now
-              </span>
-            </div>
-          </div>
-        </button>
+            {/* Notification Dropdown */}
+            {notificationOpen && (
+              <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-1.5rem)] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-1">
 
-        {/* Notification 2 */}
-        <button
-          type="button"
-          className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
-        >
-          <div className="flex gap-3">
-            <span className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 shrink-0" />
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Notifications
+                    </h3>
 
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-slate-900">
-                New guidance available
-              </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Your latest updates
+                    </p>
+                  </div>
 
-              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                New information is available for your recent query.
-              </p>
-
-              <span className="text-[10px] text-slate-400 mt-1 block">
-                10 minutes ago
-              </span>
-            </div>
-          </div>
-        </button>
-
-        {/* Notification 3 */}
-        <button
-          type="button"
-          className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
-        >
-          <div className="flex gap-3">
-            <span className="w-2 h-2 mt-1.5 rounded-full bg-amber-500 shrink-0" />
-
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-slate-900">
-                System update
-              </p>
-
-              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                IP-SAKTI Sahayak has received a new system update.
-              </p>
-
-              <span className="text-[10px] text-slate-400 mt-1 block">
-                1 hour ago
-              </span>
-            </div>
-          </div>
-        </button>
-
-      </div>
-
-      {/* Dropdown Footer */}
-      <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50">
-        <button
-          type="button"
-          onClick={() => {
-            // Close notification dropdown
-            setNotificationOpen(false);
-
-            // Redirect/switch to My Workspace
-            setActiveTab("workspace");
-          }}
-          className="w-full text-center text-xs font-semibold text-emerald-800 hover:text-emerald-950 transition-colors"
-        >
-          View all notifications
-        </button>
-      </div>
-    </div>
-  )}
-</div>
-
-              {/* Working Dark / Light Mode Toggle */}
-              <button
-                type="button"
-                id="theme-toggle-btn"
-                onClick={toggleTheme}
-                aria-label={
-                  isDark ? "Switch to light mode" : "Switch to dark mode"
-                }
-                title={
-                  isDark
-                    ? "Switch to Light Mode / लाइट मोड चालू करें"
-                    : "Switch to Dark Mode / डार्क मोड चालू करें"
-                }
-                className={`flex items-center gap-1.5 px-2 py-1.5 xl:px-2.5 xl:py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer shadow-2xs select-none shrink-0 ${
-                  isDark
-                    ? "border-amber-400/40 bg-slate-800 text-amber-300 hover:bg-slate-750 hover:border-amber-400 focus:ring-2 focus:ring-amber-400/50"
-                    : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-300 focus:ring-2 focus:ring-emerald-600/30"
-                }`}
-              >
-                {isDark ? (
-                  <>
-                    <Sun className="w-4 h-4 text-amber-400 shrink-0 transition-transform duration-300 hover:rotate-45" />
-                    <span className="hidden 2xl:inline font-semibold">
-                      Light
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Moon className="w-4 h-4 text-slate-600 shrink-0 transition-transform duration-300 hover:-rotate-12" />
-                    <span className="hidden 2xl:inline font-semibold">
-                      Dark
-                    </span>
-                  </>
-                )}
-              </button>
-
-              {/* How to Use / Walkthrough Button (Desktop/Tablet) */}
-              {onOpenWalkthrough && (
-                <button
-                  type="button"
-                  id="header-walkthrough-btn"
-                  onClick={onOpenWalkthrough}
-                  title="How to Use IP-SAKTI Sahayak / उपयोग मार्गदर्शिका"
-                  className="flex items-center gap-1.5 px-2 py-1.5 xl:px-2.5 xl:py-1.5 rounded-lg border border-emerald-300/80 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-950 font-medium text-xs transition-all cursor-pointer shadow-2xs shrink-0 select-none"
-                >
-                  <HelpCircle className="w-4 h-4 text-emerald-800 shrink-0" />
-                  <span className="hidden xl:inline font-semibold whitespace-nowrap">
-                    How to Use
-                  </span>
-                </button>
-              )}
-
-              {/* Admin Button (Desktop/Tablet) - Hidden for Expert */}
-              {isLoggedIn && !isExpert && currentUser?.role === "ADMIN" && (
-                <button
-                  type="button"
-                  id="admin-nav-btn"
-                  onClick={() => handleNavClick("admin")}
-                  title={t("nav.admin", "Admin & Telemetry")}
-                  className={`p-1.5 xl:p-2 rounded-xl transition-colors border shrink-0 ${
-                    activeTab === "admin"
-                      ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-slate-200"
-                  }`}
-                >
-                  <Settings className="w-4 h-4 xl:w-4.5 xl:h-4.5" />
-                </button>
-              )}
-
-              {/* User Profile / Auth Button (Desktop) */}
-              {isLoggedIn && currentUser ? (
-                <div className="hidden md:flex items-center gap-1.5 pl-1.5 xl:pl-2 border-l border-slate-200 shrink-0">
                   <button
                     type="button"
-                    id="user-profile-header-btn"
-                    onClick={() => handleNavClick("profile")}
-                    className={`flex items-center gap-1.5 xl:gap-2 px-2 xl:px-2.5 py-1.5 rounded-xl border transition-all shrink-0 ${
-                      activeTab === "profile"
-                        ? "bg-emerald-50 border-emerald-300 text-emerald-950 font-semibold ring-1 ring-emerald-700 shadow-2xs"
-                        : "border-slate-200 hover:bg-slate-50 text-slate-700"
-                    }`}
-                    title="View Account Profile"
+                    onClick={() => setNotificationOpen(false)}
+                    aria-label="Close notifications"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                   >
-                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 flex items-center justify-center font-bold text-xs overflow-hidden shrink-0">
-                      {currentUser.photo_url ? (
-                        <img
-                          src={currentUser.photo_url}
-                          alt={currentUser.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span>{currentUser.name.charAt(0).toUpperCase()}</span>
-                      )}
-                    </div>
-                    <div className="text-left text-xs leading-tight min-w-0">
-                      <div className="font-semibold text-slate-900 truncate max-w-[65px] lg:max-w-[85px] xl:max-w-[110px]">
-                        {currentUser.name}
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Recent Notifications */}
+                <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
+
+                  <button
+                    type="button"
+                    className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex gap-3">
+                      <span className="w-2 h-2 mt-1.5 rounded-full bg-emerald-600 shrink-0" />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-slate-900">
+                          Welcome to IP-SAKTI Sahayak
+                        </p>
+
+                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                          Your account has been successfully created.
+                        </p>
+
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          Just now
+                        </span>
                       </div>
                     </div>
-                    <span className="hidden 2xl:inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200 shrink-0">
-                      {normalizeRole(currentUser.role)}
-                    </span>
                   </button>
-                </div>
-              ) : (
-                <div className="hidden md:flex items-center gap-1.5 xl:gap-2 pl-1.5 xl:pl-2 border-l border-slate-200 shrink-0">
-                  <button
-                    type="button"
-                    id="header-login-btn"
-                    onClick={() => handleNavClick("login")}
-                    className={`flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shrink-0 ${
-                      activeTab === "login"
-                        ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
-                        : "border-slate-300 hover:bg-slate-100 text-slate-700"
-                    }`}
-                  >
-                    <LogIn className="w-3.5 h-3.5" />
-                    <span>Sign In</span>
-                  </button>
-                  <button
-                    type="button"
-                    id="header-register-btn"
-                    onClick={() => handleNavClick("register")}
-                    className={`flex items-center gap-1 px-2.5 xl:px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shrink-0 ${
-                      activeTab === "register"
-                        ? "bg-emerald-800 text-white border-emerald-800 shadow-2xs"
-                        : "bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100"
-                    }`}
-                  >
-                    <span>Register</span>
-                  </button>
-                </div>
-              )}
 
-              {/* Prominent Mobile Hamburger Menu Button (Guaranteed visible on mobile and compact screens) */}
-              <button
-                type="button"
-                id="mobile-menu-toggle-btn"
-                onClick={() => setMobileMenuOpen(true)}
-                className="lg:hidden p-2 sm:p-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center justify-center shadow-xs shrink-0"
-                aria-label="Open Navigation Menu"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex gap-3">
+                      <span className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 shrink-0" />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-slate-900">
+                          New guidance available
+                        </p>
+
+                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                          New information is available for your recent query.
+                        </p>
+
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          10 minutes ago
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex gap-3">
+                      <span className="w-2 h-2 mt-1.5 rounded-full bg-amber-500 shrink-0" />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-slate-900">
+                          System update
+                        </p>
+
+                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                          IP-SAKTI Sahayak has received a new system update.
+                        </p>
+
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          1 hour ago
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+
+                </div>
+
+                {/* Footer */}
+                <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotificationOpen(false);
+                      setActiveTab("workspace");
+                    }}
+                    className="w-full text-center text-xs font-semibold text-emerald-800 hover:text-emerald-950 transition-colors"
+                  >
+                    View all notifications
+                  </button>
+                </div>
+
+              </div>
+            )}
           </div>
-        </div>
-      </header>
+        )}
+
+
+        {/* ------------------------------------------------------- */}
+        {/* Dark / Light Mode                                     */}
+        {/* ------------------------------------------------------- */}
+
+        <button
+          type="button"
+          id="theme-toggle-btn"
+          onClick={toggleTheme}
+          aria-label={
+            isDark
+              ? "Switch to light mode"
+              : "Switch to dark mode"
+          }
+          title={
+            isDark
+              ? "Switch to Light Mode / लाइट मोड चालू करें"
+              : "Switch to Dark Mode / डार्क मोड चालू करें"
+          }
+          className={`flex items-center gap-1.5 px-2 py-1.5 xl:px-2.5 xl:py-2 rounded-lg border text-xs font-medium transition-all cursor-pointer shadow-2xs select-none shrink-0 ${
+            isDark
+              ? "border-amber-400/40 bg-slate-800 text-amber-300 hover:bg-slate-750 hover:border-amber-400"
+              : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-300"
+          }`}
+        >
+          {isDark ? (
+            <>
+              <Sun className="w-4 h-4 text-amber-400 shrink-0" />
+
+              <span className="hidden 2xl:inline font-semibold">
+                Light
+              </span>
+            </>
+          ) : (
+            <>
+              <Moon className="w-4 h-4 text-slate-600 shrink-0" />
+
+              <span className="hidden 2xl:inline font-semibold">
+                Dark
+              </span>
+            </>
+          )}
+        </button>
+
+
+        {/* ------------------------------------------------------- */}
+        {/* How to Use                                             */}
+        {/* ------------------------------------------------------- */}
+
+        {onOpenWalkthrough && (
+          <button
+            type="button"
+            id="header-walkthrough-btn"
+            onClick={onOpenWalkthrough}
+            title="How to Use IP-SAKTI Sahayak / उपयोग मार्गदर्शिका"
+            className="flex items-center gap-1.5 px-2 py-1.5 xl:px-3 xl:py-2 rounded-lg border border-emerald-300/80 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-950 font-medium text-xs transition-all cursor-pointer shadow-2xs shrink-0 select-none"
+          >
+            <HelpCircle className="w-4 h-4 text-emerald-800 shrink-0" />
+
+            <span className="hidden xl:inline font-semibold whitespace-nowrap">
+              How to Use
+            </span>
+          </button>
+        )}
+
+
+        {/* ------------------------------------------------------- */}
+        {/* Admin — Logged In Only                                  */}
+        {/* ------------------------------------------------------- */}
+
+        {isLoggedIn &&
+          !isExpert &&
+          currentUser?.role === "ADMIN" && (
+            <button
+              type="button"
+              id="admin-nav-btn"
+              onClick={() => handleNavClick("admin")}
+              title={t("nav.admin", "Admin & Telemetry")}
+              className={`p-1.5 xl:p-2 rounded-xl transition-colors border shrink-0 ${
+                activeTab === "admin"
+                  ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-slate-200"
+              }`}
+            >
+              <Settings className="w-4 h-4 xl:w-[18px] xl:h-[18px]" />
+            </button>
+          )}
+
+
+        {/* ------------------------------------------------------- */}
+        {/* User Profile / Login                                   */}
+        {/* ------------------------------------------------------- */}
+
+        {isLoggedIn && currentUser ? (
+          <div className="hidden md:flex items-center gap-1.5 pl-1.5 xl:pl-2 border-l border-slate-200 shrink-0">
+
+            <button
+              type="button"
+              id="user-profile-header-btn"
+              onClick={() => handleNavClick("profile")}
+              className={`flex items-center gap-1.5 xl:gap-2 px-2 xl:px-3 py-1.5 rounded-xl border transition-all shrink-0 ${
+                activeTab === "profile"
+                  ? "bg-emerald-50 border-emerald-300 text-emerald-950 font-semibold ring-1 ring-emerald-700 shadow-2xs"
+                  : "border-slate-200 hover:bg-slate-50 text-slate-700"
+              }`}
+              title="View Account Profile"
+            >
+              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 flex items-center justify-center font-bold text-xs overflow-hidden shrink-0">
+
+                {currentUser.photo_url ? (
+                  <img
+                    src={currentUser.photo_url}
+                    alt={currentUser.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span>
+                    {currentUser.name.charAt(0).toUpperCase()}
+                  </span>
+                )}
+
+              </div>
+
+              <div className="text-left text-xs leading-tight min-w-0">
+                <div className="font-semibold text-slate-900 truncate max-w-[65px] lg:max-w-[100px] xl:max-w-[120px]">
+                  {currentUser.name}
+                </div>
+              </div>
+
+              <span className="hidden 2xl:inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200 shrink-0">
+                {normalizeRole(currentUser.role)}
+              </span>
+            </button>
+
+          </div>
+        ) : (
+          <div className="hidden md:flex items-center gap-1.5 xl:gap-2 pl-1.5 xl:pl-2 border-l border-slate-200 shrink-0">
+
+            <button
+              type="button"
+              id="header-login-btn"
+              onClick={() => handleNavClick("login")}
+              className={`flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shrink-0 ${
+                activeTab === "login"
+                  ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                  : "border-slate-300 hover:bg-slate-100 text-slate-700"
+              }`}
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </button>
+
+            <button
+              type="button"
+              id="header-register-btn"
+              onClick={() => handleNavClick("register")}
+              className={`flex items-center gap-1 px-2.5 xl:px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shrink-0 ${
+                activeTab === "register"
+                  ? "bg-emerald-800 text-white border-emerald-800 shadow-2xs"
+                  : "bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100"
+              }`}
+            >
+              <span>Register</span>
+            </button>
+
+          </div>
+        )}
+
+
+        {/* Mobile Hamburger */}
+        <button
+          type="button"
+          id="mobile-menu-toggle-btn"
+          onClick={() => setMobileMenuOpen(true)}
+          className="lg:hidden p-2 sm:p-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center justify-center shadow-xs shrink-0"
+          aria-label="Open Navigation Menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+      </div>
+    </div>
+
+
+    {/* ========================================================= */}
+    {/* DESKTOP SECOND NAVIGATION ROW                             */}
+    {/* ONLY LOGGED-IN USERS                                     */}
+    {/* ========================================================= */}
+
+    {isLoggedIn && (
+      <nav
+        className="hidden lg:flex items-center justify-center gap-3 xl:gap-5 2xl:gap-7 min-h-[4.25rem] border-t border-slate-100"
+        aria-label="Primary Navigation"
+      >
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+
+          return (
+            <button
+              key={item.id}
+              id={`nav-${item.id}-btn`}
+              onClick={() => handleNavClick(item.id)}
+              className={`flex items-center gap-2 px-2 py-2 rounded-lg text-sm xl:text-base font-medium transition-all shrink-0 ${
+                isActive
+                  ? "text-emerald-800 font-semibold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Icon
+                className={`w-4 h-4 xl:w-5 xl:h-5 shrink-0 ${
+                  isActive
+                    ? "text-emerald-700"
+                    : "text-slate-500"
+                }`}
+              />
+
+              <span className="whitespace-nowrap">
+                {item.label}
+              </span>
+
+              {item.badge && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+    )}
+
+  </div>
+</header>
 
       {/* Mobile Slide-Out Drawer Menu */}
       {mobileMenuOpen && (
@@ -902,11 +986,14 @@ export const Header: React.FC<HeaderProps> = ({
       )}
 
       {/* Persistent Mobile Bottom Navigation Bar (Guarantees instant 1-tap navigation on all mobile phones) */}
-      <nav
-        id="mobile-bottom-nav"
-        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 py-1 px-1 sm:px-2 flex justify-around items-center shadow-lg"
-        aria-label="Mobile Bottom Navigation"
-      >
+      {/* Persistent Mobile Bottom Navigation Bar
+    Only visible for logged-in users */}
+{isLoggedIn && (
+  <nav
+    id="mobile-bottom-nav"
+    className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 py-1 px-1 sm:px-2 flex justify-around items-center shadow-lg"
+    aria-label="Mobile Bottom Navigation"
+  >
         <button
           type="button"
           onClick={() => handleNavClick("landing")}
@@ -994,6 +1081,7 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         </button>
       </nav>
+      )}
     </>
   );
 };
