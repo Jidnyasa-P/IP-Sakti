@@ -31,11 +31,3 @@ reportlab==4.2.5
 # Testing
 pytest==8.3.4
 pytest-asyncio==0.25.0
-
-# --- Chatbot uploads (documents / images) ---
-# pypdf: PDF text extraction (same library ip_sakti_rag uses for ingestion).
-# Pillow: verifies uploaded images are real images and bounds their size.
-# Optional OCR for images (not pinned; needs the tesseract binary):
-#   pip install pytesseract   (ip_sakti_rag already uses pytesseract)
-pypdf==5.1.0
-Pillow==11.0.0

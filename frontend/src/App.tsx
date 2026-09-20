@@ -31,14 +31,9 @@ function AppContent() {
   const { isLoggedIn, currentUser } = useAuth();
 
   // First-time visitor guided tour auto-discovery state
-  const [isTourActive, setIsTourActive] = useState<boolean>(() => {
-    try {
-      const status = localStorage.getItem(TOUR_STORAGE_KEY);
-      return !status; // Launches tour for first-time users
-    } catch {
-      return false;
-    }
-  });
+  // The site always opens directly on the Home/Landing page.
+  // The walkthrough is available from the Home page but does not block first load.
+  const [isTourActive, setIsTourActive] = useState<boolean>(false);
 
   const handleStartTour = () => {
     setIsTourActive(true);
@@ -71,18 +66,6 @@ function AppContent() {
   const isExpert =
     isLoggedIn && currentUser && normalizeRole(currentUser.role) === "Expert";
 
-  // Strict restriction: Ensure Expert is always routed to the expert advisory workspace (when tour not active)
-  useEffect(() => {
-    if (
-      isExpert &&
-      !isTourActive &&
-      activeTab !== "expert" &&
-      activeTab !== "profile"
-    ) {
-      setActiveTab("expert");
-    }
-  }, [isExpert, isTourActive, activeTab]);
-
   // Helper to render current active view
   const renderCurrentView = () => {
     // Public views always accessible when logged out, unless guided tour is active
@@ -105,6 +88,14 @@ function AppContent() {
 
     // Role-specific enforcement: Legal Expert only sees flagged low-confidence queries
     if (isExpert && !isTourActive) {
+      if (activeTab === "landing") {
+        return (
+          <LandingView
+            setActiveTab={setActiveTab}
+            onOpenWalkthrough={handleStartTour}
+          />
+        );
+      }
       if (activeTab === "profile") {
         return <ProfileView setActiveTab={setActiveTab} />;
       }

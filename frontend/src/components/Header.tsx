@@ -84,6 +84,11 @@ export const Header: React.FC<HeaderProps> = ({
 
   const standardNavItems = [
     {
+      id: "landing" as ActiveTab,
+      label: "Home",
+      icon: Home,
+    },
+    {
       id: "chat" as ActiveTab,
       label: t("nav.chat", "Sahayak"),
       icon: Sparkles,
