@@ -8,7 +8,8 @@ import {
   ExternalLink,
   Download,
   Clock,
-  Sparkles
+  Sparkles,
+  Bell,
 } from 'lucide-react';
 import { Conversation, ProductAnalysisResult } from '../types';
 import { ActiveTab } from './Header';
@@ -25,13 +26,13 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [products, setProducts] = useState<ProductAnalysisResult[]>([]);
   const [savedResearch, setSavedResearch] = useState<any[]>([]);
-  const [activeSubTab, setActiveSubTab] = useState<'conversations' | 'products' | 'bookmarks'>('conversations');
   // NEW: this view had no loading state at all -- while the 3 parallel
   // fetches were in flight (which can take a while on free-tier hosting,
   // see the message below), the page just showed empty "no items found"
   // messages, which looks identical to a broken/frozen page. Now shows an
   // actual spinner instead.
   const [isLoading, setIsLoading] = useState(true);
+  const [activeSubTab, setActiveSubTab] = useState<'conversations' | 'products' | 'bookmarks' | 'notifications'>('conversations');
 
   useEffect(() => {
     loadWorkspaceData();
@@ -179,6 +180,20 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
           <Bookmark className="w-4 h-4" />
           <span>Bookmarked Provisions ({savedResearch.length})</span>
         </button>
+
+        <button
+  type="button"
+  onClick={() => setActiveSubTab('notifications')}
+  className={`pb-3 border-b-2 transition-colors flex items-center gap-2 ${
+    activeSubTab === 'notifications'
+      ? 'border-emerald-700 text-slate-900 font-bold'
+      : 'border-transparent text-slate-500 hover:text-slate-800'
+  }`}
+>
+  <Bell className="w-4 h-4" />
+
+  <span>Notifications ({Notification.length})</span>
+</button>
       </div>
 
       {/* Tab Content */}
@@ -316,6 +331,162 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
             )}
           </div>
         )}
+
+        {activeSubTab === 'notifications' && (
+  <div className="mt-6">
+
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-slate-200">
+        <div className="flex items-center gap-3">
+
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+            <Bell className="w-5 h-5 text-emerald-700" />
+          </div>
+
+          <div>
+            <h2 className="text-base font-bold text-slate-900">
+              Notifications
+            </h2>
+
+            <p className="text-xs text-slate-500 mt-0.5">
+              Stay updated with your latest notifications
+            </p>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Notifications List */}
+      <div className="divide-y divide-slate-100">
+
+        {/* Notification 1 */}
+        <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
+          <div className="flex gap-3">
+
+            <span className="w-2 h-2 mt-1.5 rounded-full bg-emerald-600 shrink-0" />
+
+            <div className="flex-1 min-w-0">
+
+              <h3 className="text-sm font-semibold text-slate-900">
+                Welcome to IP-SAKTI Sahayak
+              </h3>
+
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                Your account has been successfully created.
+              </p>
+
+              <p className="text-[10px] text-slate-400 mt-2">
+                Just now
+              </p>
+
+            </div>
+          </div>
+        </div>
+
+        {/* Notification 2 */}
+        <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
+          <div className="flex gap-3">
+
+            <span className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 shrink-0" />
+
+            <div className="flex-1 min-w-0">
+
+              <h3 className="text-sm font-semibold text-slate-900">
+                New guidance available
+              </h3>
+
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                New information is available for your recent query.
+              </p>
+
+              <p className="text-[10px] text-slate-400 mt-2">
+                10 minutes ago
+              </p>
+
+            </div>
+          </div>
+        </div>
+
+        {/* Notification 3 */}
+        <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
+          <div className="flex gap-3">
+
+            <span className="w-2 h-2 mt-1.5 rounded-full bg-amber-500 shrink-0" />
+
+            <div className="flex-1 min-w-0">
+
+              <h3 className="text-sm font-semibold text-slate-900">
+                System update
+              </h3>
+
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                IP-SAKTI Sahayak has received a new system update.
+              </p>
+
+              <p className="text-[10px] text-slate-400 mt-2">
+                1 hour ago
+              </p>
+
+            </div>
+          </div>
+        </div>
+
+        {/* Notification 4 */}
+        <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
+          <div className="flex gap-3">
+
+            <span className="w-2 h-2 mt-1.5 rounded-full bg-purple-500 shrink-0" />
+
+            <div className="flex-1 min-w-0">
+
+              <h3 className="text-sm font-semibold text-slate-900">
+                Expert guidance request updated
+              </h3>
+
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                Your expert guidance request has been updated.
+              </p>
+
+              <p className="text-[10px] text-slate-400 mt-2">
+                2 hours ago
+              </p>
+
+            </div>
+          </div>
+        </div>
+
+        {/* Notification 5 */}
+        <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
+          <div className="flex gap-3">
+
+            <span className="w-2 h-2 mt-1.5 rounded-full bg-orange-500 shrink-0" />
+
+            <div className="flex-1 min-w-0">
+
+              <h3 className="text-sm font-semibold text-slate-900">
+                New FAQ available
+              </h3>
+
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                New frequently asked questions have been added.
+              </p>
+
+              <p className="text-[10px] text-slate-400 mt-2">
+                Yesterday
+              </p>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+)}
       </div>
 
       <DisclaimerBanner />

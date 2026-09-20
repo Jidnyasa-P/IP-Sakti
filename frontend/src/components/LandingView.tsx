@@ -130,7 +130,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ setActiveTab, onOpenWa
                 className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs sm:text-sm transition-all shadow-2xs flex items-center justify-center gap-2 group cursor-pointer"
               >
                 <LogIn className="w-4 h-4 text-amber-300" />
-                <span>Sign In to Access Tabs</span>
+                <span>Sign In</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </button>
 
@@ -141,7 +141,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ setActiveTab, onOpenWa
                 className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-medium text-xs sm:text-sm transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
               >
                 <UserPlus className="w-4 h-4 text-emerald-800" />
-                <span>Create New Profile</span>
+                <span>Register</span>
               </button>
 
               {onOpenWalkthrough && (
