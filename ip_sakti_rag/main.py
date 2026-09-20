@@ -54,6 +54,9 @@ class ChatRequest(BaseModel):
     message: str | None = None
     conversation_id: str | None = None
     language: str | None = None
+    # "india" | "international" -- the toggle's value, enforced server-side
+    # by app/safety/scope_guard.py (see app/pipeline.py's answer_query).
+    jurisdiction: str | None = None
 
 
 class FeedbackRequest(BaseModel):
@@ -78,7 +81,7 @@ def chat(payload: ChatRequest, x_internal_secret: str | None = Header(default=No
     query = (payload.query or payload.message or "").strip()
     if not query:
         raise HTTPException(status_code=400, detail="Query is required.")
-    return rag.answer_query(query=query, language=payload.language, conversation_id=payload.conversation_id)
+    return rag.answer_query(query=query, language=payload.language, conversation_id=payload.conversation_id, jurisdiction=payload.jurisdiction)
 
 
 @app.post("/api/products/analyze")

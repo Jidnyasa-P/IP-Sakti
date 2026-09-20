@@ -34,6 +34,18 @@ class Settings(BaseSettings):
     # default is only used if LLM_MODEL isn't set in .env/Render env vars.
     LLM_MODEL: str = "gemini-3.1-flash-lite"
 
+    # Groq (OpenAI-compatible REST API, called via plain httpx — no extra SDK
+    # dependency, see app/retrieval/reranker.py and app/generation/llm_client.py).
+    # Used for two things, both optional/degrade-gracefully if unset:
+    #  1. Semantic reranking of BM25+Qdrant candidates (real relevance scores,
+    #     not a 2nd Gemini call, so it doesn't compete with generation for
+    #     Gemini's daily free-tier quota).
+    #  2. A second LLM to try for answer generation if Gemini fails, before
+    #     falling all the way back to the fully offline template.
+    # Free key: https://console.groq.com/keys
+    LLM_API_KEY: str | None = None
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+
     # Embeddings: inference is hosted outside Render. The deployed service
     # must expose /embed and use the SAME 384-D FastEmbed model that created
     # the existing Qdrant collection.
@@ -62,6 +74,11 @@ class Settings(BaseSettings):
 
     # Retrieval tuning
     top_k: int = 5
+    # Weights for the fallback (non-reranked) fused score when Groq reranking
+    # is unavailable -- see app/retrieval/hybrid.py. Should sum to ~1.0 so the
+    # result stays on the same 0-1 scale the confidence thresholds below expect.
+    semantic_weight: float = 0.6
+    keyword_weight: float = 0.4
 
     # Safety thresholds
     confidence_high_threshold: float = 0.45

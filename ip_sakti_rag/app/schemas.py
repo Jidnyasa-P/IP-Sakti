@@ -105,8 +105,12 @@ class RAGResponse(BaseModel):
     relevant_considerations: list[str] = Field(default_factory=list)
     recommended_next_steps: list[str] = Field(default_factory=list)
     disclaimer: str
-
-
+    # True when app/safety/scope_guard.py blocked this before retrieval/
+    # generation ran at all (off-topic, prompt-injection attempt, or wrong
+    # jurisdiction toggle) -- `answer` is then ONLY the warning/redirect
+    # message, not an attempted answer. Frontend should render this
+    # distinctly (no citations panel, no confidence badge).
+    scope_blocked: bool = False
 # ---------------------------------------------------------------------------
 # Product analyzer (mirrors ProductInformation / ProductAnalysisResult)
 # ---------------------------------------------------------------------------

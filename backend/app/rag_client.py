@@ -51,9 +51,9 @@ async def health() -> dict:
     return await _request("GET", "/api/health")
 
 
-async def chat(query: str, language: str | None = None, conversation_id: str | None = None) -> dict:
+async def chat(query: str, language: str | None = None, conversation_id: str | None = None, jurisdiction: str | None = None) -> dict:
     return await _request("POST", "/api/chat", json={
-        "query": query, "language": language, "conversation_id": conversation_id,
+        "query": query, "language": language, "conversation_id": conversation_id, "jurisdiction": jurisdiction,
     })
 
 

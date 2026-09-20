@@ -9,17 +9,21 @@ class ChatRequest(BaseModel):
     keyword_weight: float = 0.35
     query: Optional[str] = None
     message: Optional[str] = None  # legacy alias used by some frontend paths
-    # Jurisdiction / market context (Section 8). Optional and additive: lets
-    # the chat request carry the India/International (or Domestic (India) /
-    # Export / Both) distinction directly, now that this is no longer tied
-    # to a navbar-level toggle. Same field name/vocabulary already used by
-    # QueryRequest.target_market and ProductInformation.target_market —
-    # intentionally not introducing a second "jurisdiction" field alongside
-    # it. See app/services/jurisdiction_service.py for accepted values.
+    # Jurisdiction / market context: "india" | "international". FIXED --
+    # the frontend (ChatView.tsx) actually sends this request body key as
+    # `jurisdiction`, not `target_market`; `target_market` had no matching
+    # field here at all, so Pydantic silently dropped it on every request
+    # and the India/International toggle had zero effect on the backend.
+    # Both fields are kept (some other callers may still use
+    # target_market) -- see resolved_jurisdiction() below for which wins.
+    jurisdiction: Optional[str] = None
     target_market: Optional[str] = None
 
     def resolved_query(self) -> str:
         return (self.query or self.message or "").strip()
+
+    def resolved_jurisdiction(self) -> Optional[str]:
+        return self.jurisdiction or self.target_market
 
 
 class QueryRequest(BaseModel):

@@ -1,26 +1,33 @@
 """
 Hybrid retrieval: semantic search (Qdrant, remote 384-D FastEmbed embeddings) + lexical BM25
-search, fused with Reciprocal Rank Fusion (RRF).
+search, scored by Groq semantic reranking when available, falling back to a
+continuous weighted-normalized score otherwise.
 
-RRF (not a learned cross-encoder reranker) is used deliberately: it's a pure
-rank-combination formula with nothing to load into memory, which keeps this
-service inside Render's free-tier 512MB RAM limit. See app/embeddings.py and
-app/config.py for the same reasoning applied to embeddings/config.
+FIXED (this round): the previous scoring here was pure Reciprocal Rank
+Fusion (RRF), normalized by dividing by the theoretical max ("both
+retrievers ranked this #1"). That normalization is structurally quantized:
+a chunk ranked #1 by exactly ONE retriever (the single most common case)
+*always* normalizes to exactly 0.5 -- regardless of how strong or weak that
+match actually was -- which is why confidence looked "stuck at 50%". A
+chunk found only deep in one retriever's candidate list (or found via BM25
+only when the embedding/Qdrant call failed for that request) could still
+clear that same ~0.5 or drop to whatever the low end of the pool produced,
+landing below `confidence_low_threshold` and getting floored to the
+displayed minimum of 5% by app/safety/confidence.py -- explaining both
+reported symptoms ("stuck at 50%" and a specific "Confidence Score: 5%")
+from the SAME root cause: a rank-position-only score with no reflection of
+actual match strength.
 
-FIXED: `_reciprocal_rank_fusion` previously returned the RAW RRF score
-(1/(_RRF_K+rank+1) summed across retrievers), which tops out at
-2/(_RRF_K+1) ~= 0.033 for a chunk ranked #1 by both retrievers. That raw
-value was being fed straight into `top_fused_score` and then into
-app/safety/confidence.py's `compute_confidence()`, which compares it
-against `confidence_high_threshold = 0.45` / `moderate = 0.28` / `low =
-0.15` -- thresholds written for a 0-1-scaled score. Since 0.033 never
-clears even the LOW threshold, every query was landing in the "Insufficient
-evidence" bucket and getting floored at the minimum displayed score of 5%,
-regardless of how good the actual retrieval was. This is what produced the
-"Confidence Score: 5%" you saw even on a query that pulled 5 clearly
-relevant, on-topic citations. Now normalized to a real 0-1 scale (divided
-by the theoretical max), which is directly comparable to those existing
-thresholds without needing to touch confidence.py at all.
+Now: every candidate gets a continuous 0-1 relevance score from Groq
+(app/retrieval/reranker.py) when LLM_API_KEY is set -- a real semantic
+judgment, not a rank artifact. Without Groq, falls back to a
+weighted-normalized combination of each retriever's OWN raw score
+(an absolute-strength transform -- raw cosine similarity for semantic, a
+saturating transform for BM25's unbounded score, see _bm25_absolute below
+-- deliberately NOT pool-relative min-max normalization, which has its own
+quantization problem; see that function's docstring), which is still continuous and still reflects relative
+match strength, just without Groq's semantic read. Either way,
+`top_fused_score` is a real, continuous, comparable-to-thresholds number.
 """
 from __future__ import annotations
 
@@ -29,18 +36,40 @@ from dataclasses import dataclass, field
 
 from rank_bm25 import BM25Okapi
 
+from app.config import settings
 from app.embeddings import embed_query
 from app.language import detect_intent, detect_language
+from app.retrieval import reranker
 from app.retrieval.vector_index import VectorIndex
 from app.schemas import Citation, DocumentChunk, DocumentMetadata, Language
 
-_RRF_K = 60  # standard RRF constant — de-emphasizes rank-1-vs-rank-2 noise
-_MAX_RRF_SCORE = 2.0 / (_RRF_K + 1)  # score of a chunk ranked #1 by BOTH retrievers -- used to normalize to 0-1
 _EXCERPT_CHARS = 400
 
 
 def _tokenize(text: str) -> list[str]:
     return [t for t in text.lower().split() if t]
+
+
+# Saturating transform constant for BM25's raw, unbounded score -> 0-1.
+# FIXED: this used to be per-query min-max normalization, which by
+# construction always maps whichever candidate scored highest *within this
+# query's own candidate pool* to exactly 1.0 -- so with only one signal
+# available (e.g. Qdrant/embedding unavailable that request), EVERY query's
+# top fused score collapsed to exactly `keyword_weight` (0.4), regardless of
+# whether the actual BM25 match was strong (score ~20+, a clear topical hit)
+# or barely-there (score ~5, an unrelated query that merely matched a
+# common word somewhere in the corpus) -- both landed at the identical
+# 0.4000. Measured against this corpus's real BM25 score distribution
+# (see git history / PR description for the calibration query): on-topic
+# legal queries score roughly 15-25, unrelated/weak queries roughly 4-6.
+# raw / (raw + BM25_SATURATION_K) with K=10 maps those to ~0.6-0.7 vs
+# ~0.3-0.4 respectively -- reflects ABSOLUTE match strength, continuous,
+# not quantized to the pool's own best-vs-worst spread.
+_BM25_SATURATION_K = 10.0
+
+
+def _bm25_absolute(raw_score: float) -> float:
+    return raw_score / (raw_score + _BM25_SATURATION_K)
 
 
 @dataclass
@@ -51,6 +80,7 @@ class RetrievalResult:
     detected_language: Language = "en"
     detected_intent: str = "GENERAL_AYUSH_IP_RESEARCH"
     latency_ms: int = 0
+    reranked_by_groq: bool = False
 
 
 class HybridRetriever:
@@ -85,16 +115,45 @@ class HybridRetriever:
         semantic_hits = self._semantic_search(query, candidate_k, topic_filter, authority_filter)
         keyword_hits = self._keyword_search(query, candidate_k, topic_filter, authority_filter)
 
-        fused = _reciprocal_rank_fusion(semantic_hits, keyword_hits)[:top_k]
+        sem_score_map = dict(semantic_hits)
+        kw_score_map = dict(keyword_hits)
+        candidate_ids = list(dict.fromkeys([cid for cid, _ in semantic_hits] + [cid for cid, _ in keyword_hits]))
+        candidates = [self._by_id[cid] for cid in candidate_ids if cid in self._by_id]
+
+        # Fallback score: continuous, weighted, normalized within this pool.
+        # Absolute-strength scores, not pool-relative rank (see
+        # _bm25_absolute's docstring above for why that distinction matters).
+        # Qdrant's cosine similarity is already a meaningful ~0-1 measure on
+        # its own -- clipped to [0,1] since cosine can technically go
+        # negative for a very poor match.
+        sem_abs = {cid: max(0.0, min(1.0, s)) for cid, s in sem_score_map.items()}
+        kw_abs = {cid: _bm25_absolute(s) for cid, s in kw_score_map.items()}
+        fallback_scores = {
+            c.chunk_id: settings.semantic_weight * sem_abs.get(c.chunk_id, 0.0)
+            + settings.keyword_weight * kw_abs.get(c.chunk_id, 0.0)
+            for c in candidates
+        }
+
+        # Order candidates by the fallback score first so Groq only sees the
+        # most promising ones (reranker.py caps how many it will send anyway).
+        candidates.sort(key=lambda c: fallback_scores.get(c.chunk_id, 0.0), reverse=True)
+
+        groq_scores = reranker.rerank(query, candidates) if candidates else None
+        reranked = groq_scores is not None
+        final_scores = groq_scores if reranked else fallback_scores
+
+        ordered = sorted(candidates, key=lambda c: final_scores.get(c.chunk_id, 0.0), reverse=True)[:top_k]
 
         top_chunks: list[DocumentChunk] = []
         citations: list[Citation] = []
-        for i, (chunk_id, fused_score, sem_score, kw_score) in enumerate(fused, start=1):
-            base = self._by_id.get(chunk_id)
-            if base is None:
-                continue
+        for i, base in enumerate(ordered, start=1):
+            score = round(final_scores.get(base.chunk_id, 0.0), 4)
             chunk = base.model_copy(
-                update={"score": round(fused_score, 4), "semantic_score": sem_score, "keyword_score": kw_score}
+                update={
+                    "score": score,
+                    "semantic_score": sem_score_map.get(base.chunk_id),
+                    "keyword_score": kw_score_map.get(base.chunk_id),
+                }
             )
             top_chunks.append(chunk)
             excerpt = chunk.chunk_text[:_EXCERPT_CHARS]
@@ -118,10 +177,11 @@ class HybridRetriever:
         return RetrievalResult(
             top_chunks=top_chunks,
             citations=citations,
-            top_fused_score=fused[0][1] if fused else 0.0,
+            top_fused_score=(final_scores.get(ordered[0].chunk_id, 0.0) if ordered else 0.0),
             detected_language=detected_language,
             detected_intent=detected_intent,
             latency_ms=int((time.monotonic() - started) * 1000),
+            reranked_by_groq=reranked,
         )
 
     # -- semantic (Qdrant + remote query embedding) -----------------------
@@ -168,34 +228,3 @@ def _build_qdrant_filter(topic_filter: str | None, authority_filter: str | None)
     if authority_filter:
         conditions.append(qmodels.FieldCondition(key="authority", match=qmodels.MatchValue(value=authority_filter)))
     return qmodels.Filter(must=conditions) if conditions else None
-
-
-def _reciprocal_rank_fusion(
-    semantic_hits: list[tuple[str, float]],
-    keyword_hits: list[tuple[str, float]],
-) -> list[tuple[str, float, float | None, float | None]]:
-    """
-    Inputs: [(chunk_id, raw_score)] per retriever, best-first.
-    Output: [(chunk_id, normalized_fused_score, semantic_raw_score, keyword_raw_score)],
-    best-first, normalized_fused_score on a 0-1 scale (see _MAX_RRF_SCORE).
-    A chunk found by only one retriever is still included (its other raw
-    score is None) — it just scores lower than a chunk both retrievers
-    agreed on.
-    """
-    sem_rank = {cid: i for i, (cid, _) in enumerate(semantic_hits)}
-    kw_rank = {cid: i for i, (cid, _) in enumerate(keyword_hits)}
-    sem_score_map = dict(semantic_hits)
-    kw_score_map = dict(keyword_hits)
-
-    fused = []
-    for cid in set(sem_rank) | set(kw_rank):
-        rrf_score = 0.0
-        if cid in sem_rank:
-            rrf_score += 1.0 / (_RRF_K + sem_rank[cid] + 1)
-        if cid in kw_rank:
-            rrf_score += 1.0 / (_RRF_K + kw_rank[cid] + 1)
-        normalized_score = min(1.0, rrf_score / _MAX_RRF_SCORE)
-        fused.append((cid, normalized_score, sem_score_map.get(cid), kw_score_map.get(cid)))
-
-    fused.sort(key=lambda x: x[1], reverse=True)
-    return fused

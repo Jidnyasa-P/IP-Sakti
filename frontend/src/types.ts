@@ -247,6 +247,12 @@ export interface StructuredChatMessage {
   feedback_notes?: string;
   language?: Language;
   jurisdiction?: Jurisdiction;
+  // True when the backend's scope guard blocked this before retrieval/
+  // generation ran (off-topic, prompt injection, or wrong jurisdiction
+  // toggle) -- `answer`/`content` is then only the warning/redirect
+  // message. Rendered as a plain warning bubble, not the full
+  // citations/confidence "grounded opinion" card. See ChatView.tsx.
+  scope_blocked?: boolean;
 }
 
 export interface Conversation {

@@ -838,6 +838,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     // Removed that attempt entirely; goes straight to the real endpoint below.
     // (streamingText/setStreamingText are left in place for a future real
     // streaming endpoint -- see README's "honest gaps" section.)
+    let requestFailed = false;
     {
       try {
         const syncRes = await authFetch("/api/chat", {
@@ -853,139 +854,41 @@ export const ChatView: React.FC<ChatViewProps> = ({
         if (syncRes.ok) {
           const syncData = await syncRes.json();
           assistantMsg = syncData.message || syncData;
+        } else {
+          requestFailed = true;
         }
       } catch (syncErr) {
         console.warn("Direct chat endpoint notice:", syncErr);
+        requestFailed = true;
       }
     }
 
-    // 3. Fallback grounded synthesis if backend was completely offline
+    // FIXED: this used to silently swap in a hardcoded, fully fabricated
+    // "95% confidence" answer with fake citations (CHUNK-WIPO-001 etc. --
+    // ids that don't exist in the real corpus) whenever the real backend
+    // call failed or returned no content. For a legal/compliance tool,
+    // showing made-up citations at fake high confidence is actively
+    // misleading, not a harmless demo fallback -- removed entirely. A
+    // failed request now surfaces as an honest, clearly-labeled error with
+    // no citations and no confidence score, never as a fabricated answer.
     if (!assistantMsg || !assistantMsg.content) {
-      if (isInternational) {
-        assistantMsg = {
-          id: `msg-a-${Date.now()}`,
-          conversation_id: targetConvId,
-          role: "assistant",
-          content:
-            "Under International Patent frameworks (Patent Cooperation Treaty PCT, USPTO, and EPO), biological and traditional formulation patentability hinges on novelty, inventive step, non-obvious synergy, and mandatory compliance with international genetic resource disclosure rules. Under 35 U.S.C. § 101 in the United States, natural botanical products or mere aggregations are patent-ineligible without markedly different structural or functional characteristics. Under Article 3 of the 2024 WIPO Treaty on Intellectual Property, Genetic Resources and Associated Traditional Knowledge and the Nagoya Protocol, international applicants must disclose country of origin and furnish evidence of Prior Informed Consent (PIC) and Access & Benefit Sharing (ABS) compliance.",
-          relevant_considerations: [
-            "USPTO 35 U.S.C. § 101: Natural product doctrine requires non-natural functional synergy or markedly different characteristics.",
-            "EPO EPC Articles 52/53: Therapeutic treatment claims barred; second medical indication formatting required.",
-            "2024 WIPO GRATK Treaty & Nagoya Protocol: Mandatory disclosure of genetic resources and traditional knowledge provenance.",
-            "PCT International Searching Authorities (ISA): Routine citations against CSIR Traditional Knowledge Digital Library (TKDL).",
-          ],
-          recommended_next_steps: [
-            "File a PCT international application to preserve priority across 157 member states.",
-            "Obtain mandatory prior domestic biodiversity approval (NBA Form III under Section 6 of Indian BD Act) before filing foreign patents.",
-            "Conduct global prior art search across USPTO Patent Public Search, EPO Espacenet, and WIPO Patentscope.",
-            "Draft claims focused on standardized bioactive fractions, bioavailability enhancers, or synergistic combinations supported by comparative assay data.",
-          ],
-          citations: [
-            {
-              index: 1,
-              chunk_id: "CHUNK-WIPO-001",
-              document_id: "DOC-WIPO-GRATK-2024",
-              title:
-                "WIPO Treaty on Intellectual Property, Genetic Resources and Associated Traditional Knowledge (2024)",
-              authority: "World Intellectual Property Organization (WIPO)",
-              section: "Article 3: Mandatory Disclosure",
-              source: "WIPO Diplomatic Conference",
-              excerpt:
-                "Under Article 3, Contracting Parties shall require patent applicants whose inventions are materially or directly based on genetic resources to disclose the country of origin and source community.",
-            },
-            {
-              index: 2,
-              chunk_id: "CHUNK-PCT-001",
-              document_id: "DOC-PCT-WIPO",
-              title: "Patent Cooperation Treaty (PCT / WIPO)",
-              authority: "WIPO International Bureau",
-              section: "Article 15: International Search & Prior Art Clearance",
-              source: "WIPO PCT Regulations",
-              excerpt:
-                "The International Searching Authority conducts prior art searches citing multilateral traditional medicine databases including CSIR-TKDL.",
-            },
-            {
-              index: 3,
-              chunk_id: "CHUNK-NAGOYA-001",
-              document_id: "DOC-CBD-NAGOYA",
-              title:
-                "Nagoya Protocol on Access to Genetic Resources and Benefit Sharing (ABS)",
-              authority:
-                "Secretariat of the Convention on Biological Diversity",
-              section:
-                "Articles 5, 6 & 15: Compliance and Fair Benefit Sharing",
-              source: "United Nations Treaty Series",
-              excerpt:
-                "Parties shall enforce compliance measures ensuring genetic resources utilized within their jurisdiction have obtained prior informed consent and mutually agreed terms.",
-            },
-          ],
-          confidence: {
-            level: "High",
-            score: 0.95,
-            reasons: [
-              "Corroborated by WIPO Treaty on Genetic Resources & Associated Traditional Knowledge (2024).",
-              "Grounded in Patent Cooperation Treaty (PCT) and Nagoya Protocol standards.",
-              "Verified against USPTO 35 U.S.C. 101/102 and EPO EPC Articles 52/53.",
-            ],
-          },
-          created_at: new Date().toISOString(),
-          language,
-          jurisdiction: "international",
-        };
-      } else {
-        assistantMsg = {
-          id: `msg-a-${Date.now()}`,
-          conversation_id: targetConvId,
-          role: "assistant",
-          content:
-            "Under Section 3(p) and Section 3(e) of the Indian Patents Act, 1970, traditional herbal formulations and combinations are strictly scrutinized against traditional knowledge codification and mere admixture exclusions. Prior approval from the National Biodiversity Authority (Form III) under Section 6 of the Biological Diversity Act, 2002 is required before patent grants for Indian biological resources.",
-          relevant_considerations: [
-            "Section 3(p) statutory bar against traditional knowledge monopolization.",
-            "Section 3(e) admixture hurdle requiring comparative synergistic efficacy data.",
-            "Mandatory NBA Form III approval under Section 6 of Biological Diversity Act, 2002.",
-          ],
-          recommended_next_steps: [
-            "Conduct clearance search in CSIR Traditional Knowledge Digital Library (TKDL).",
-            "File Form III application with the National Biodiversity Authority (NBA).",
-            "Ensure adherence to Schedule T Good Manufacturing Practices for manufacturing.",
-          ],
-          citations: [
-            {
-              index: 1,
-              chunk_id: "CHUNK-PAT-001",
-              document_id: "DOC-PATENTS-ACT-1970",
-              title: "The Patents Act, 1970 — Section 3(p)",
-              authority: "Office of the CGPDTM",
-              section: "Section 3(p)",
-              source: "Official Gazette of India",
-              excerpt:
-                "Section 3(p) establishes an absolute statutory bar against patenting any herbal medicine or formulation already recorded in traditional knowledge systems...",
-            },
-            {
-              index: 2,
-              chunk_id: "CHUNK-BD-001",
-              document_id: "DOC-BIOLOGICAL-DIVERSITY-ACT-2002",
-              title: "Biological Diversity Act, 2002 — Section 6(1)",
-              authority: "National Biodiversity Authority (NBA)",
-              section: "Section 6(1)",
-              source: "Gazette of India",
-              excerpt:
-                "No person shall apply for any intellectual property right in or outside India based on Indian biological resources without prior NBA approval...",
-            },
-          ],
-          confidence: {
-            level: "High",
-            score: 0.95,
-            reasons: [
-              "Corroborated by primary statutory provisions of The Patents Act and Biological Diversity Act.",
-            ],
-          },
-          created_at: new Date().toISOString(),
-          language,
-          jurisdiction: "india",
-        };
-      }
+      assistantMsg = {
+        id: `msg-a-${Date.now()}`,
+        conversation_id: targetConvId,
+        role: "assistant",
+        content: requestFailed
+          ? "I couldn't reach the assistant service just now. Please try again in a moment -- if this keeps happening, the backend or RAG service may be temporarily down."
+          : "I didn't get a usable response for that query. Please try rephrasing, or try again in a moment.",
+        relevant_considerations: [],
+        recommended_next_steps: [],
+        citations: [],
+        confidence: undefined,
+        created_at: new Date().toISOString(),
+        language,
+        jurisdiction: currentJur,
+      };
     }
+
 
     const finalAssistantMsg: StructuredChatMessage = {
       id: assistantMsg.id || `msg-a-${Date.now()}`,
@@ -996,14 +899,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
       relevant_considerations: assistantMsg.relevant_considerations || [],
       recommended_next_steps: assistantMsg.recommended_next_steps || [],
       citations: assistantMsg.citations || [],
-      confidence: assistantMsg.confidence || {
-        level: "High",
-        score: 0.95,
-        reasons: ["Corroborated by primary statutory legal provisions."],
-      },
+      // FIXED: this used to fabricate a fake "High / 0.95" confidence badge
+      // whenever the real response's confidence was missing/falsy, instead
+      // of just leaving it unset. Leave it undefined here -- the badge
+      // simply doesn't render rather than showing a made-up number (see
+      // renderConfidenceBadge below, which already handles `undefined`).
+      confidence: assistantMsg.confidence,
       created_at: assistantMsg.created_at || new Date().toISOString(),
       language,
       jurisdiction: currentJur,
+      scope_blocked: assistantMsg.scope_blocked,
     };
 
     const finalMessages = [...updatedWithUser, finalAssistantMsg];
@@ -1488,6 +1393,22 @@ export const ChatView: React.FC<ChatViewProps> = ({
                         {msg.content}
                       </p>
                     </div>
+                  ) : msg.scope_blocked ? (
+                    /* Scope guard blocked this query (off-topic, prompt-injection
+                       attempt, or wrong jurisdiction toggle) -- render ONLY the
+                       warning/redirect message: no citations panel, no confidence
+                       badge, no "grounded opinion" framing, since no retrieval or
+                       generation was attempted for this message at all. See
+                       ip_sakti_rag/app/safety/scope_guard.py. */
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-amber-800">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                        Outside Scope
+                      </div>
+                      <p className="text-xs text-amber-900 leading-relaxed font-normal whitespace-pre-line bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        {msg.answer || msg.content}
+                      </p>
+                    </div>
                   ) : (
                     /* Structured AI Response Design */
                     <div className="space-y-3">
@@ -1607,15 +1528,29 @@ export const ChatView: React.FC<ChatViewProps> = ({
                                 cite.section,
                                 cite.document_id,
                               );
-                              const citeUrl = cite.url || linkInfo.url;
                               return (
-                                <a
+                                /* FIXED: this was a plain <a href> straight to
+                                   one external link -- the same bug already
+                                   fixed in ProductAnalyzerView / IPRNavigatorView
+                                   / ResearchView / TraditionalKnowledgeView (see
+                                   their comments), just missed here. App.tsx
+                                   already wires `onOpenCitation` into ChatView
+                                   (see the prop above) -- it just wasn't being
+                                   called. Now opens the same CitationModal
+                                   everywhere else uses: full retrieved section
+                                   text, plus BOTH the source-PDF and official-
+                                   site links, instead of jumping straight to
+                                   one external link (which was also often
+                                   undefined/dead for citations with no
+                                   hardcoded sectionLinks.tsx entry and no
+                                   ingested `url`, making the card look
+                                   completely broken). */
+                                <button
+                                  type="button"
                                   key={cite.chunk_id}
-                                  href={citeUrl}
-                                  target="_blank"
-                                  rel="noreferrer noopener"
-                                  title={`Open authoritative statutory text: ${cite.section} (${linkInfo.authority})`}
-                                  className={`p-3 rounded-xl border text-left group transition-all flex flex-col justify-between shadow-2xs hover:shadow-xs ${
+                                  onClick={() => onOpenCitation(cite)}
+                                  title={`View full cited section: ${cite.section} (${linkInfo.authority})`}
+                                  className={`p-3 rounded-xl border text-left group transition-all flex flex-col justify-between shadow-2xs hover:shadow-xs w-full ${
                                     msg.jurisdiction === "international" ||
                                     isInternational
                                       ? "border-indigo-200/80 bg-white hover:bg-indigo-50/60 hover:border-indigo-400"
@@ -1643,7 +1578,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                                     </p>
                                   </div>
 
-                                  {/* Single action to open the working link */}
+                                  {/* Single action to open the popup with both links */}
                                   <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                                     <span className="text-[10px] text-slate-400 font-medium">
                                       Official Reference
@@ -1656,11 +1591,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
                                           : "text-emerald-800 group-hover:text-emerald-950"
                                       }`}
                                     >
-                                      <span>Open Cited Section</span>
+                                      <span>View Full Citation</span>
                                       <ExternalLink className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
                                     </span>
                                   </div>
-                                </a>
+                                </button>
                               );
                             })}
                           </div>

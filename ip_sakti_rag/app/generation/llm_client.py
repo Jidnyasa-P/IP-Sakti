@@ -116,6 +116,54 @@ def _safe_parse_json(text: str) -> dict:
         return {}
 
 
+class GroqClient:
+    """
+    Second LLM tried for answer generation if Gemini is unavailable or its
+    call fails, BEFORE falling all the way back to the fully offline
+    template (see app/generation/grounded_generator.py). Same
+    {answer, relevant_considerations, recommended_next_steps} JSON contract
+    as LLMClient.generate_json, so grounded_generator.py doesn't need to
+    know which one actually answered. Uses plain httpx against Groq's
+    OpenAI-compatible REST API -- no extra SDK dependency, same reasoning as
+    app/retrieval/reranker.py.
+    """
+
+    def __init__(self):
+        self.available = _is_key_valid(settings.LLM_API_KEY)
+        if not self.available:
+            print("[llm_client] STARTUP: LLM_API_KEY not set -- no secondary LLM if Gemini fails (offline fallback still applies).")
+
+    def generate_json(self, prompt: str, timeout_s: float = 12.0) -> dict:
+        if not self.available:
+            return {}
+        try:
+            import httpx
+
+            resp = httpx.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.LLM_API_KEY.strip()}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": settings.GROQ_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2,
+                    "response_format": {"type": "json_object"},
+                },
+                timeout=timeout_s,
+            )
+            resp.raise_for_status()
+            content = resp.json()["choices"][0]["message"]["content"]
+            parsed = _safe_parse_json(content)
+            if not parsed:
+                print(f"[llm_client] Groq response was not valid/parseable JSON. Raw (first 500 chars): {content[:500]!r}")
+            return parsed
+        except Exception:
+            print(f"[llm_client] Groq call FAILED -- falling back to offline synthesis for this request:\n{traceback.format_exc()}")
+            return {}
+
+
 def offline_grounded_synthesis(query: str, language: str, chunks: list[DocumentChunk]) -> dict:
     """
     Deterministic fallback: builds a templated, citation-grounded answer

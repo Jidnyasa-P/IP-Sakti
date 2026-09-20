@@ -25,14 +25,19 @@ def _get_owned_conversation(db, conversation_id: str, user_id: str, is_admin: bo
     return conv
 
 
-async def _handle_query(db, query: str, conversation_id: str | None, language: str, user_id: str, target_market: str | None = None) -> dict:
+async def _handle_query(db, query: str, conversation_id: str | None, language: str, user_id: str, jurisdiction: str | None = None) -> dict:
     if not query:
         raise HTTPException(status_code=400, detail="Query is required.")
 
     conv = conversation_service.get_or_create_conversation(db, conversation_id, query, language, user_id=user_id)
 
     # All retrieval + reasoning happens in the ip_sakti_rag microservice now.
-    rag_result = await rag_client.chat(query=query, language=language, conversation_id=conv["_id"])
+    # FIXED: `jurisdiction` (the India/International toggle's value) used to
+    # be accepted here as `target_market` but never actually forwarded to
+    # rag_client.chat() -- the toggle had zero effect on the backend. Now
+    # forwarded through so ip_sakti_rag's scope guard can enforce it
+    # (see ip_sakti_rag/app/safety/scope_guard.py).
+    rag_result = await rag_client.chat(query=query, language=language, conversation_id=conv["_id"], jurisdiction=jurisdiction)
 
     confidence = rag_result.get("confidence") or {}
     escalation = expert_escalation_service.evaluate_escalation(
@@ -65,6 +70,12 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
             "case_summary": escalation.case_summary,
         },
         language=rag_result.get("language"),
+        # True when ip_sakti_rag's scope guard blocked this before retrieval/
+        # generation ran (off-topic, prompt injection, or wrong jurisdiction
+        # toggle) -- see ip_sakti_rag/app/safety/scope_guard.py. `answer` is
+        # then only the warning/redirect message. Frontend renders this
+        # distinctly (see ChatView.tsx).
+        scope_blocked=bool(rag_result.get("scope_blocked")),
     )
     conversation_service.touch_conversation(db, conv)
 
@@ -96,6 +107,7 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
         "message": conversation_service.message_to_dict(assistant_msg),
         "result": rag_result,
         "escalation": escalation,
+        "scope_blocked": bool(rag_result.get("scope_blocked")),
     }
 
 
@@ -103,19 +115,20 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
 async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     query = body.resolved_query()
     outcome = await _handle_query(
-        db, query, body.conversation_id, body.language, user_id=current_user["id"], target_market=body.target_market,
+        db, query, body.conversation_id, body.language, user_id=current_user["id"], jurisdiction=body.resolved_jurisdiction(),
     )
     return {
         "conversation_id": outcome["conversation_id"],
         "message": outcome["message"],
         "retrieval_metadata": outcome["result"].get("retrieval_metadata", {}),
+        "scope_blocked": outcome["scope_blocked"],
     }
 
 
 @router.post("/api/query")
 async def query_endpoint(body: QueryRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     """Canonical SIH-spec endpoint (Section 25/26)."""
-    outcome = await _handle_query(db, body.query, body.conversation_id, body.language, user_id=current_user["id"], target_market=body.target_market)
+    outcome = await _handle_query(db, body.query, body.conversation_id, body.language, user_id=current_user["id"], jurisdiction=body.target_market)
     result = outcome["result"]
     escalation = outcome["escalation"]
     return {

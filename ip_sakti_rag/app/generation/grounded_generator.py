@@ -6,11 +6,12 @@ shape.
 """
 from __future__ import annotations
 
-from app.generation.llm_client import LLMClient, offline_grounded_synthesis
+from app.generation.llm_client import GroqClient, LLMClient, offline_grounded_synthesis
 from app.generation.prompts import build_prompt
 from app.schemas import DocumentChunk
 
 _llm_client: LLMClient | None = None
+_groq_client: GroqClient | None = None
 
 
 def get_llm_client() -> LLMClient:
@@ -18,6 +19,13 @@ def get_llm_client() -> LLMClient:
     if _llm_client is None:
         _llm_client = LLMClient()
     return _llm_client
+
+
+def get_groq_client() -> GroqClient:
+    global _groq_client
+    if _groq_client is None:
+        _groq_client = GroqClient()
+    return _groq_client
 
 
 def generate_grounded_answer(query: str, language: str, chunks: list[DocumentChunk], graph_context: dict | None = None) -> dict:
@@ -29,8 +37,14 @@ def generate_grounded_answer(query: str, language: str, chunks: list[DocumentChu
     if graph_context:
         evidence_context += "\n\n[GRAPH CONTEXT]\n" + _format_graph_context(graph_context)
 
+    prompt = build_prompt(query, language, evidence_context)
+
     client = get_llm_client()
-    result = client.generate_json(build_prompt(query, language, evidence_context)) if client.available else {}
+    result = client.generate_json(prompt) if client.available else {}
+
+    if not result or "answer" not in result:
+        groq = get_groq_client()
+        result = groq.generate_json(prompt) if groq.available else {}
 
     if not result or "answer" not in result:
         result = offline_grounded_synthesis(query, language, chunks)

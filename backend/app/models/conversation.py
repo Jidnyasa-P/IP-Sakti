@@ -47,6 +47,7 @@ def new_chat_message(
     feedback: str | None = None,
     feedback_notes: str | None = None,
     language: str = "en",
+    scope_blocked: bool = False,
     sequence: int = 0,
 ) -> dict:
     return {
@@ -67,6 +68,7 @@ def new_chat_message(
         "feedback": feedback,
         "feedback_notes": feedback_notes,
         "language": language,
+        "scope_blocked": scope_blocked,
         "created_at": datetime.now(timezone.utc),
     }
 
@@ -103,4 +105,5 @@ def message_to_dict(m: dict) -> dict:
         "feedback": m.get("feedback"),
         "feedback_notes": m.get("feedback_notes"),
         "language": m.get("language"),
+        "scope_blocked": bool(m.get("scope_blocked")),
     }
