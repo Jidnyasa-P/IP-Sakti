@@ -140,6 +140,19 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
           <Bookmark className="w-4 h-4" />
           <span>Bookmarked Provisions ({savedResearch.length})</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('bookmarks')}
+          className={`pb-3 border-b-2 transition-colors flex items-center gap-2 ${
+            activeSubTab === 'bookmarks'
+              ? 'border-emerald-700 text-slate-900 font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Bookmark className="w-4 h-4" />
+          <span>Notifications ({savedResearch.length})</span>
+        </button>
       </div>
 
       {/* Tab Content */}

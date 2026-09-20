@@ -117,7 +117,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ setActiveTab, onOpenWa
                   className="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-300 font-medium text-xs sm:text-sm transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <HelpCircle className="w-4 h-4 text-emerald-800" />
-                  <span>How to Use / Walkthrough</span>
+                  <span>How to Use</span>
                 </button>
               )}
             </>
@@ -152,7 +152,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ setActiveTab, onOpenWa
                   className="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-300 font-medium text-xs sm:text-sm transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <HelpCircle className="w-4 h-4 text-emerald-800" />
-                  <span>How to Use / Guide</span>
+                  <span>How to Use</span>
                 </button>
               )}
             </>
