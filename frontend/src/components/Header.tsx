@@ -309,10 +309,10 @@ export const Header: React.FC<HeaderProps> = ({
     <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500 ring-2 ring-white" />
   </button>
 
-  {/* Small Notification Dropdown */}
+  {/* Notification Dropdown */}
   {notificationOpen && (
     <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-1.5rem)] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-1">
-      
+
       {/* Dropdown Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
         <div>
@@ -337,7 +337,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Recent Notifications */}
       <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
-        
+
         {/* Notification 1 */}
         <button
           type="button"
@@ -417,197 +417,16 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           type="button"
           onClick={() => {
+            // Close notification dropdown
             setNotificationOpen(false);
-            setAllNotificationsOpen(true);
+
+            // Redirect/switch to My Workspace
+            setActiveTab("workspace");
           }}
           className="w-full text-center text-xs font-semibold text-emerald-800 hover:text-emerald-950 transition-colors"
         >
           View all notifications
         </button>
-      </div>
-    </div>
-  )}
-
-  {/* ========================================= */}
-  {/* ALL NOTIFICATIONS MODAL */}
-  {/* ========================================= */}
-
-  {allNotificationsOpen && (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 backdrop-blur-[2px] px-4 py-6"
-      onClick={() => setAllNotificationsOpen(false)}
-    >
-      <div
-        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-white">
-          <div className="flex items-center gap-3 min-w-0">
-            
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
-              <Bell className="w-5 h-5 text-emerald-700" />
-            </div>
-
-            <div className="min-w-0">
-              <h2 className="text-base font-bold text-slate-900">
-                All Notifications
-              </h2>
-
-              <p className="text-xs text-slate-500 mt-0.5">
-                Stay updated with your latest notifications
-              </p>
-            </div>
-          </div>
-
-          {/* Close Modal */}
-          <button
-            type="button"
-            onClick={() => setAllNotificationsOpen(false)}
-            aria-label="Close notifications"
-            title="Close"
-            className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* ========================================= */}
-        {/* SCROLLABLE NOTIFICATION LIST */}
-        {/* ========================================= */}
-
-        <div className="max-h-[65vh] overflow-y-auto divide-y divide-slate-100">
-          
-          {/* Notification 1 */}
-          <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
-            <div className="flex gap-3">
-              
-              <span className="w-2 h-2 mt-1.5 rounded-full bg-emerald-600 shrink-0" />
-
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Welcome to IP-SAKTI Sahayak
-                </h3>
-
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  Your account has been successfully created.
-                </p>
-
-                <p className="text-[10px] text-slate-400 mt-2">
-                  Just now
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Notification 2 */}
-          <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
-            <div className="flex gap-3">
-              
-              <span className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 shrink-0" />
-
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-slate-900">
-                  New guidance available
-                </h3>
-
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  New information is available for your recent query.
-                </p>
-
-                <p className="text-[10px] text-slate-400 mt-2">
-                  10 minutes ago
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Notification 3 */}
-          <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
-            <div className="flex gap-3">
-              
-              <span className="w-2 h-2 mt-1.5 rounded-full bg-amber-500 shrink-0" />
-
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-slate-900">
-                  System update
-                </h3>
-
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  IP-SAKTI Sahayak has received a new system update.
-                </p>
-
-                <p className="text-[10px] text-slate-400 mt-2">
-                  1 hour ago
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Notification 4 */}
-          <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
-            <div className="flex gap-3">
-              
-              <span className="w-2 h-2 mt-1.5 rounded-full bg-purple-500 shrink-0" />
-
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Expert guidance request updated
-                </h3>
-
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  Your expert guidance request has been updated.
-                </p>
-
-                <p className="text-[10px] text-slate-400 mt-2">
-                  2 hours ago
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Notification 5 */}
-          <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
-            <div className="flex gap-3">
-              
-              <span className="w-2 h-2 mt-1.5 rounded-full bg-orange-500 shrink-0" />
-
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-slate-900">
-                  New FAQ available
-                </h3>
-
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  New frequently asked questions have been added.
-                </p>
-
-                <p className="text-[10px] text-slate-400 mt-2">
-                  Yesterday
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Add more notifications here.
-              Once the list exceeds 65vh,
-              the notification list will scroll automatically. */}
-
-        </div>
-
-        {/* Modal Footer */}
-        <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-          <span className="text-[11px] text-slate-500">
-            Showing all notifications
-          </span>
-
-          <button
-            type="button"
-            onClick={() => setAllNotificationsOpen(false)}
-            className="px-4 py-2 rounded-lg bg-emerald-800 text-white text-xs font-semibold hover:bg-emerald-900 transition-colors"
-          >
-            Close
-          </button>
-        </div>
       </div>
     </div>
   )}
