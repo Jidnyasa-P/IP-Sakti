@@ -1,123 +1,125 @@
 """
-Semantic reranking of BM25+Qdrant candidates via Groq.
+Lightweight deterministic reranking of BM25+Qdrant candidates.
 
-Why Groq instead of a second Gemini call: Gemini's free-tier daily quota is
-already spent by answer generation (one call per chat message); adding a
-second Gemini call per query for reranking would compete with generation
-for that same quota and roughly double Gemini latency per request. Groq's
-free tier is a separate quota entirely and is fast (LPU inference), so
-reranking barely adds latency. Called via plain httpx against Groq's
-OpenAI-compatible REST API -- no extra SDK dependency (avoids repeating the
-"unreviewed heavy dependency" mistake that caused the earlier Render OOM
-build failure; see requirements-server.txt's comments).
+Render Free has a tight memory limit, so this implementation avoids loading
+or calling a second ML/LLM reranker. Instead, it combines the already-computed
+semantic (Qdrant) and lexical (BM25) relevance signals into a normalized
+weighted score.
 
-This is a genuine second opinion, not just rank fusion: given the query and
-each candidate chunk's text, Groq scores relevance 0-100 per chunk directly
--- a continuous, semantically-grounded score, unlike Reciprocal Rank
-Fusion's quantized "which retriever(s) ranked this #1" score (see hybrid.py
-for why RRF alone made confidence look "stuck" at ~50%/~5%).
-
-Degrades gracefully: if LLM_API_KEY isn't set, or the call fails/times
-out/returns unparseable output, rerank() returns None and hybrid.py falls
-back to its own weighted-normalized BM25+semantic score -- reranking is an
-accuracy improvement on top of that, never a hard dependency.
+This keeps reranking fast, deterministic, dependency-free, and reliable on
+Render Free. If candidate scores are unavailable, rerank() gracefully returns
+None so hybrid.py can keep its existing fallback behavior.
 """
 from __future__ import annotations
 
-import json
-import re
+from typing import Any
 
-import httpx
-
-from app.config import settings
 from app.schemas import DocumentChunk
 
-_TIMEOUT_S = 8.0
-_MAX_CANDIDATES = 20  # keep the prompt small -- fast + cheap + within context comfortably
-_SNIPPET_CHARS = 500
+_MAX_CANDIDATES = 20
+_SEMANTIC_WEIGHT = 0.65
+_BM25_WEIGHT = 0.35
 
 
-def _is_key_valid(key: str | None) -> bool:
-    if not key:
-        return False
-    key = key.strip().strip('"').strip("'")
-    return bool(key) and not key.upper().startswith("YOUR_")
+def _get_score(candidate: DocumentChunk, *names: str) -> float | None:
+    """Read the first available numeric score from a candidate."""
+    for name in names:
+        value: Any = getattr(candidate, name, None)
+        if isinstance(value, (int, float)):
+            return float(value)
+    return None
 
 
-def rerank(query: str, candidates: list[DocumentChunk]) -> dict[str, float] | None:
+def _min_max_normalize(values: list[float]) -> list[float]:
+    """Normalize scores to 0..1 without dividing by zero."""
+    if not values:
+        return []
+
+    low = min(values)
+    high = max(values)
+
+    if high <= low:
+        return [1.0] * len(values)
+
+    return [(value - low) / (high - low) for value in values]
+
+
+def rerank(
+    query: str,
+    candidates: list[DocumentChunk],
+) -> dict[str, float] | None:
     """
-    Returns {chunk_id: relevance_score_0_to_1} for as many of `candidates`
-    as Groq scored, or None if reranking wasn't possible this call (no key,
-    network/parse failure, empty candidate list). Never raises.
+    Return {chunk_id: relevance_score_0_to_1} using lightweight score fusion.
+
+    The query is accepted for API compatibility but does not need to be sent
+    to another model. Qdrant semantic scores and BM25 scores are normalized
+    independently and combined as:
+
+        final = 0.65 * semantic + 0.35 * BM25
+
+    Returns None when usable scores are not available.
     """
-    if (
-        not candidates
-        or settings.LLM_PROVIDER.strip().lower() != "groq"
-        or not _is_key_valid(settings.LLM_API_KEY)
-    ):
+    del query  # Kept for compatibility with the existing caller.
+
+    if not candidates:
         return None
 
     subset = candidates[:_MAX_CANDIDATES]
-    numbered = []
-    for i, c in enumerate(subset, start=1):
-        snippet = c.chunk_text.strip().replace("\n", " ")[:_SNIPPET_CHARS]
-        numbered.append(f"{i}. [{c.chunk_id}] ({c.authority} — {c.section}) {snippet}")
 
-    prompt = (
-        "You are a legal-research relevance judge. Score how relevant each numbered "
-        "passage below is to the user's query, on a 0-100 scale (100 = directly and "
-        "specifically answers the query; 0 = completely unrelated).\n\n"
-        f"Query: {query}\n\n"
-        "Passages:\n" + "\n".join(numbered) + "\n\n"
-        'Respond with ONLY a JSON object: {"scores": [{"id": "<chunk_id>", "score": <0-100>}, ...]} '
-        "covering every passage listed above, and nothing else."
-    )
+    usable: list[tuple[DocumentChunk, float | None, float | None]] = []
+    semantic_values: list[float] = []
+    bm25_values: list[float] = []
 
-    try:
-        resp = httpx.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {settings.LLM_API_KEY.strip()}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": settings.LLM_MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0,
-                "response_format": {"type": "json_object"},
-            },
-            timeout=_TIMEOUT_S,
+    for candidate in subset:
+        semantic = _get_score(
+            candidate,
+            "semantic_score",
+            "qdrant_score",
+            "similarity_score",
+            "score",
         )
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
-        parsed = _safe_parse_json(content)
-        scores = parsed.get("scores") if isinstance(parsed, dict) else None
-        if not isinstance(scores, list):
-            print(f"[reranker] Groq response missing 'scores' array, skipping rerank this call. Raw: {content[:300]!r}")
-            return None
+        bm25 = _get_score(
+            candidate,
+            "bm25_score",
+            "lexical_score",
+        )
 
-        valid_ids = {c.chunk_id for c in subset}
-        result: dict[str, float] = {}
-        for item in scores:
-            cid = item.get("id")
-            raw_score = item.get("score")
-            if cid in valid_ids and isinstance(raw_score, (int, float)):
-                result[cid] = max(0.0, min(100.0, float(raw_score))) / 100.0
+        usable.append((candidate, semantic, bm25))
 
-        if not result:
-            print("[reranker] Groq returned no usable (id, score) pairs, skipping rerank this call.")
-            return None
-        return result
+        if semantic is not None:
+            semantic_values.append(semantic)
+        if bm25 is not None:
+            bm25_values.append(bm25)
 
-    except Exception as exc:
-        print(f"[reranker] Groq rerank call failed, falling back to non-reranked scoring: {exc}")
+    if not semantic_values or not bm25_values:
+        print(
+            "[reranker] Missing semantic or BM25 scores; "
+            "falling back to existing hybrid scoring."
+        )
         return None
 
+    normalized_semantic = _min_max_normalize(
+        [semantic if semantic is not None else 0.0 for _, semantic, _ in usable]
+    )
+    normalized_bm25 = _min_max_normalize(
+        [bm25 if bm25 is not None else 0.0 for _, _, bm25 in usable]
+    )
 
-def _safe_parse_json(text: str) -> dict:
-    text = text.strip()
-    text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.MULTILINE).strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return {}
+    result: dict[str, float] = {}
+
+    for index, (candidate, _, _) in enumerate(usable):
+        final_score = (
+            _SEMANTIC_WEIGHT * normalized_semantic[index]
+            + _BM25_WEIGHT * normalized_bm25[index]
+        )
+        result[candidate.chunk_id] = max(0.0, min(1.0, final_score))
+
+    if not result:
+        return None
+
+    print(
+        "[reranker] Lightweight hybrid reranking applied "
+        f"(semantic={_SEMANTIC_WEIGHT:.2f}, bm25={_BM25_WEIGHT:.2f}, "
+        f"candidates={len(result)})."
+    )
+    return result
