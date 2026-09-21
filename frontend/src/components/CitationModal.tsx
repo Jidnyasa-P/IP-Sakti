@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { X, ExternalLink, BookOpen, ShieldCheck, FileText } from 'lucide-react';
 import { Citation, DocumentMetadata, DocumentChunk } from '../types';
-import { getSectionLink } from '../utils/sectionLinks';
 import { authFetch } from './auth/authStorage';
 
 interface CitationModalProps {
@@ -57,8 +56,10 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
 
   if (!citation) return null;
 
-  const sectionLinkInfo = getSectionLink(citation.section, citation.document_id);
-  const officialUrl = citation.url || sectionLinkInfo.url;
+  // IMPORTANT: the official citation URL must come from manifest.json only.
+  // /api/documents/{document_id} is backed by ip_sakti_rag's manifest-loaded
+  // DocumentMetadata, so this avoids any frontend-hardcoded legal URLs.
+  const officialUrl = docDetails?.metadata?.url || "";
 
   // FIXED: this used to always render `citation.excerpt`, which is
   // deliberately truncated to 400 characters server-side (see
@@ -136,16 +137,18 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
                 <FileText className="w-3.5 h-3.5" />
                 <span>{sourcePdfLoading ? 'Loading PDF...' : 'View Source PDF'}</span>
               </button>
-              <a
-                href={officialUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-xs shadow-2xs transition-colors"
-                title={`Visit official statutory portal: ${sectionLinkInfo.authority}`}
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>Official Government Source</span>
-              </a>
+              {officialUrl && (
+                <a
+                  href={officialUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-xs shadow-2xs transition-colors"
+                  title="Visit the official source recorded in manifest.json"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Official Source from Manifest</span>
+                </a>
+              )}
             </div>
           </div>
 
