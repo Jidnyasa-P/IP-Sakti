@@ -15,6 +15,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
+from fastapi import HTTPException
+
 from app.classification import classify_product
 from app.database.mongo import save_chat
 from app.config import settings
@@ -24,7 +26,6 @@ from app.jurisdiction import detect_jurisdiction
 from app.retrieval.graph import KnowledgeGraphContext
 from app.retrieval.tkdl_connector import TKDLConnector
 from app.retrieval.hybrid import HybridRetriever
-from app.safety import scope_guard
 from app.safety.abstention import apply_abstention_override, decide_abstention, get_disclaimer
 from app.safety.citation_validator import validate_citations
 from app.safety.confidence import compute_confidence
@@ -61,47 +62,8 @@ class IPSaktiRAG:
     # ------------------------------------------------------------------
     # 1. Core chat / RAG endpoint  (-> POST /api/chat, /api/chat/stream)
     # ------------------------------------------------------------------
-    def answer_query(
-        self, query: str, language: str | None = None, conversation_id: str | None = None, jurisdiction: str | None = None
-    ) -> dict:
+    def answer_query(self, query: str, language: str | None = None, conversation_id: str | None = None) -> dict:
         started = datetime.now(timezone.utc)
-
-        # Scope guard: enforces the India/International toggle's constraints
-        # server-side (authoritative -- the frontend's client-side heuristic
-        # is only an instant UX hint, not enforcement; see
-        # app/safety/scope_guard.py's module docstring). On a violation,
-        # returns ONLY the warning/redirect message -- no retrieval, no
-        # generation, no attempted answer.
-        scope = scope_guard.check_scope(query, jurisdiction)
-        if not scope.allowed:
-            conv_id = conversation_id or f"conv-{uuid.uuid4().hex[:12]}"
-            blocked = RAGResponse(
-                query=query,
-                language=language or "en",
-                jurisdiction=[jurisdiction] if jurisdiction else [],
-                intent="OUT_OF_SCOPE",
-                answer=scope.message or "This question is outside this assistant's configured scope.",
-                citations=[],
-                evidence=[],
-                confidence=ConfidenceMetric(level="Insufficient evidence", score=0.0, reasons=[
-                    "Blocked by the scope guard before retrieval — see the message above."
-                ]),
-                needs_clarification=False,
-                needs_expert=False,
-                relevant_considerations=[],
-                recommended_next_steps=[],
-                disclaimer=get_disclaimer(),
-                scope_blocked=True,
-            ).model_dump()
-            blocked["conversation_id"] = conv_id
-            blocked["retrieval_metadata"] = {
-                "intent": "OUT_OF_SCOPE",
-                "language": language or "en",
-                "latency_ms": int((datetime.now(timezone.utc) - started).total_seconds() * 1000),
-                "scope_guard_degraded": scope.degraded,
-            }
-            save_chat(conv_id, query, blocked)
-            return blocked
 
         jurisdictions = detect_jurisdiction(query)
         classification = classify_product(query)
@@ -242,6 +204,29 @@ class IPSaktiRAG:
     def analyze_tk_abs(self, tk_query: dict) -> dict:
         q = TKABSQuery(**tk_query)
         resource_name = q.biological_resource or q.plant_material
+
+        # TKDL is restricted and is not available to this deployment. Keep the
+        # four supplied demo resources usable from the local RAG corpus, while
+        # clearly rejecting arbitrary resources that would require an actual
+        # TKDL lookup.
+        resource_text = (resource_name or "").strip().lower()
+        supported_resources = (
+            "withania somnifera",
+            "curcuma longa",
+            "bacopa monnieri",
+            "commiphora mukul",
+        )
+        if not any(name in resource_text for name in supported_resources):
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "TKDL access is currently restricted and is not available in this system. "
+                    "TK & ABS analysis can currently be demonstrated using the four preset "
+                    "biological resources: Withania somnifera (Ashwagandha), Curcuma longa "
+                    "(Haridra / Turmeric), Bacopa monnieri (Brahmi), and Commiphora mukul (Guggulu)."
+                ),
+            )
+
         search_context = f"Biological Diversity Act NBA ABS Form I Form III {resource_name} {q.geographic_origin}"
         retrieval = self.retriever.retrieve(query=search_context, top_k=4)
 

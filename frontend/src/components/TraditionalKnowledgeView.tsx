@@ -90,9 +90,31 @@ export const TraditionalKnowledgeView: React.FC<
     },
   ];
 
+  const supportedTKABSResources = [
+    "withania somnifera",
+    "curcuma longa",
+    "bacopa monnieri",
+    "commiphora mukul",
+  ];
+
+  const tkdlAccessMessage =
+    "TKDL access is currently restricted and is not available in this system. TK & ABS analysis can currently be demonstrated using the four preset biological resources provided above: Ashwagandha, Turmeric, Brahmi, and Guggulu.";
+
   const handleAnalyze = async () => {
     setLoading(true);
     setError(null);
+
+    const resource = (formData.biological_resource || "").trim().toLowerCase();
+    const isSupportedResource = supportedTKABSResources.some((name) =>
+      resource.includes(name),
+    );
+
+    if (!isSupportedResource) {
+      setError(tkdlAccessMessage);
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await authFetch("/api/abs/analyze", {
         method: "POST",
