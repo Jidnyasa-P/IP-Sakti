@@ -105,6 +105,7 @@ class HybridRetriever:
         language: str | None = None,
         topic_filter: str | None = None,
         authority_filter: str | None = None,
+        jurisdiction_filter: str | None = None,
         top_k: int = 5,
     ) -> RetrievalResult:
         started = time.monotonic()
@@ -112,8 +113,12 @@ class HybridRetriever:
         detected_intent = detect_intent(query)
 
         candidate_k = max(top_k * 4, 20)
-        semantic_hits = self._semantic_search(query, candidate_k, topic_filter, authority_filter)
-        keyword_hits = self._keyword_search(query, candidate_k, topic_filter, authority_filter)
+        semantic_hits = self._semantic_search(
+            query, candidate_k, topic_filter, authority_filter, jurisdiction_filter
+        )
+        keyword_hits = self._keyword_search(
+            query, candidate_k, topic_filter, authority_filter, jurisdiction_filter
+        )
 
         sem_score_map = dict(semantic_hits)
         kw_score_map = dict(keyword_hits)
@@ -186,7 +191,12 @@ class HybridRetriever:
 
     # -- semantic (Qdrant + remote query embedding) -----------------------
     def _semantic_search(
-        self, query: str, top_k: int, topic_filter: str | None, authority_filter: str | None
+        self,
+        query: str,
+        top_k: int,
+        topic_filter: str | None,
+        authority_filter: str | None,
+        jurisdiction_filter: str | None,
     ) -> list[tuple[str, float]]:
         if not self.chunks:
             return []
@@ -196,12 +206,23 @@ class HybridRetriever:
             # If the embedding service is unavailable, degrade to BM25-only
             # rather than failing the whole request.
             return []
-        hits = self._vector_index.search(query_vector, top_k=top_k, query_filter=_build_qdrant_filter(topic_filter, authority_filter))
+        hits = self._vector_index.search(
+            query_vector,
+            top_k=top_k,
+            query_filter=_build_qdrant_filter(
+                topic_filter, authority_filter, jurisdiction_filter
+            ),
+        )
         return [(chunk.chunk_id, score) for chunk, score in hits]
 
     # -- lexical (BM25 over in-memory chunks) ---------------------------
     def _keyword_search(
-        self, query: str, top_k: int, topic_filter: str | None, authority_filter: str | None
+        self,
+        query: str,
+        top_k: int,
+        topic_filter: str | None,
+        authority_filter: str | None,
+        jurisdiction_filter: str | None,
     ) -> list[tuple[str, float]]:
         if not self._bm25:
             return []
@@ -214,17 +235,34 @@ class HybridRetriever:
                 continue
             if authority_filter and chunk.authority != authority_filter:
                 continue
+            if jurisdiction_filter and chunk.jurisdiction != jurisdiction_filter:
+                continue
             scored.append((chunk.chunk_id, float(score)))
         scored.sort(key=lambda x: x[1], reverse=True)
         return scored[:top_k]
 
 
-def _build_qdrant_filter(topic_filter: str | None, authority_filter: str | None):
+def _build_qdrant_filter(
+    topic_filter: str | None,
+    authority_filter: str | None,
+    jurisdiction_filter: str | None,
+):
     from qdrant_client.http import models as qmodels
 
     conditions = []
     if topic_filter:
         conditions.append(qmodels.FieldCondition(key="topic", match=qmodels.MatchValue(value=topic_filter)))
     if authority_filter:
-        conditions.append(qmodels.FieldCondition(key="authority", match=qmodels.MatchValue(value=authority_filter)))
+        conditions.append(
+            qmodels.FieldCondition(
+                key="authority", match=qmodels.MatchValue(value=authority_filter)
+            )
+        )
+    if jurisdiction_filter:
+        conditions.append(
+            qmodels.FieldCondition(
+                key="jurisdiction",
+                match=qmodels.MatchValue(value=jurisdiction_filter),
+            )
+        )
     return qmodels.Filter(must=conditions) if conditions else None

@@ -29,6 +29,7 @@ from app.retrieval.hybrid import HybridRetriever
 from app.safety.abstention import apply_abstention_override, decide_abstention, get_disclaimer
 from app.safety.citation_validator import validate_citations
 from app.safety.confidence import compute_confidence
+from app.safety.scope_guard import check_scope
 from app.schemas import (
     ABSConsiderations,
     Citation,
@@ -65,10 +66,55 @@ class IPSaktiRAG:
     def answer_query(self, query: str, language: str | None = None, conversation_id: str | None = None, jurisdiction: str | None = None) -> dict:
         started = datetime.now(timezone.utc)
 
+        # Enforce the selected India/International mode before any retrieval
+        # or generation. The frontend check is only a UX guard; this is the
+        # authoritative server-side check.
+        selected_jurisdiction = (jurisdiction or "india").strip().lower()
+        if selected_jurisdiction not in {"india", "international"}:
+            selected_jurisdiction = "india"
+
+        scope = check_scope(query, selected_jurisdiction)
+        if not scope.allowed:
+            safe_language = language if language in {"en", "hi", "mr"} else "en"
+            blocked_confidence = ConfidenceMetric(
+                level="Insufficient evidence",
+                score=0.0,
+                reasons=["Query was blocked before retrieval because it does not match the selected jurisdiction or scope."],
+            )
+            out = RAGResponse(
+                query=query,
+                language=safe_language,
+                product_classification=None,
+                jurisdiction=[selected_jurisdiction],
+                intent="SCOPE_GUARD_BLOCKED",
+                answer=scope.message or "This query does not match the selected jurisdiction.",
+                citations=[],
+                evidence=[],
+                confidence=blocked_confidence,
+                needs_clarification=True,
+                needs_expert=False,
+                relevant_considerations=[],
+                recommended_next_steps=[],
+                disclaimer=get_disclaimer(),
+                scope_blocked=True,
+            ).model_dump()
+            out["conversation_id"] = conversation_id or f"conv-{uuid.uuid4().hex[:12]}"
+            out["retrieval_metadata"] = {
+                "intent": "SCOPE_GUARD_BLOCKED",
+                "language": safe_language,
+                "latency_ms": int((datetime.now(timezone.utc) - started).total_seconds() * 1000),
+            }
+            return out
+
         jurisdictions = detect_jurisdiction(query)
         classification = classify_product(query)
 
-        retrieval = self.retriever.retrieve(query=query, language=language, top_k=settings.top_k)
+        retrieval = self.retriever.retrieve(
+            query=query,
+            language=language,
+            jurisdiction_filter="International" if selected_jurisdiction == "international" else "India",
+            top_k=settings.top_k,
+        )
 
         graph_context = self.graph.get_context([classification.category])
         generated = generate_grounded_answer(
@@ -112,6 +158,7 @@ class IPSaktiRAG:
             relevant_considerations=generated.get("relevant_considerations", []),
             recommended_next_steps=generated.get("recommended_next_steps", []),
             disclaimer=get_disclaimer(),
+            scope_blocked=False,
         )
 
         out = response.model_dump()

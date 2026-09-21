@@ -735,7 +735,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
     if (!options?.forceSend) {
       const check = evaluateQueryJurisdiction(textToSend);
 
-      // Both jurisdictions detected
       if (check.isIndiaSpecific && check.isInternationalSpecific) {
         setJurisdictionWarning({
           query: textToSend,
@@ -746,7 +745,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
         return;
       }
 
-      // International mode + India-specific query
       if (isInternational && check.isIndiaSpecific) {
         setJurisdictionWarning({
           query: textToSend,
@@ -758,14 +756,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
         return;
       }
 
-      // Domestic mode + International-specific query
       if (!isInternational && check.isInternationalSpecific) {
         setJurisdictionWarning({
           query: textToSend,
           matchedKeywords: check.matchedKeywords,
           explanation:
             check.explanation ||
-            "This query appears to require International jurisdiction.",
+            "This query appears to require an international jurisdiction.",
         });
         return;
       }
