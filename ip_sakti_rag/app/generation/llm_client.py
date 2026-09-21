@@ -50,35 +50,24 @@ class LLMClient:
     def __init__(self):
         raw_key = settings.LLM_API_KEY
         provider = settings.LLM_PROVIDER.strip().lower()
-
-        self.available = False
+        self.available = provider == "gemini" and _is_key_valid(raw_key)
         self._client = None
 
-        if not _is_key_valid(raw_key):
-            print("[llm_client] STARTUP: LLM_API_KEY is not configured.")
+        if provider != "gemini":
+            print(f"[llm_client] STARTUP: Provider={provider}; Gemini client disabled.")
             return
 
-        if provider != "gemini":
-            print(
-                f"[llm_client] STARTUP: Provider={provider}. "
-                "Gemini client disabled."
-            )
+        if not self.available:
+            key_state = "unset" if not raw_key else "set but rejected"
+            print(f"[llm_client] STARTUP: Gemini API key is {key_state}; offline fallback enabled.")
             return
 
         try:
             from google import genai
-
             self._client = genai.Client(api_key=raw_key)
-            self.available = True
-
-            print(
-                f"[llm_client] STARTUP: Gemini client initialized OK. "
-                f"Model: {settings.LLM_MODEL}"
-            )
+            print(f"[llm_client] STARTUP: Gemini client initialized OK. Model: {settings.LLM_MODEL}")
         except Exception:
-            print(
-                "[llm_client] STARTUP: Gemini client initialization failed."
-            )
+            print(f"[llm_client] STARTUP: Gemini client init FAILED -- offline fallback enabled:\n{traceback.format_exc()}")
             self.available = False
 
     def generate_json(self, prompt: str, timeout_s: float = 12.0) -> dict:
@@ -141,22 +130,15 @@ class GroqClient:
     app/retrieval/reranker.py.
     """
 
-def __init__(self):
-    provider = settings.LLM_PROVIDER.strip().lower()
-    self.available = (
-        provider == "groq"
-        and _is_key_valid(settings.LLM_API_KEY)
-    )
-
-    if self.available:
-        print(
-            f"[llm_client] STARTUP: Groq enabled. "
-            f"Model: {settings.LLM_MODEL}"
+    def __init__(self):
+        self.available = (
+            settings.LLM_PROVIDER.strip().lower() == "groq"
+            and _is_key_valid(settings.LLM_API_KEY)
         )
-    else:
-        print(
-            "[llm_client] STARTUP: Groq disabled or LLM_API_KEY missing."
-        )
+        if self.available:
+            print(f"[llm_client] STARTUP: Groq enabled. Model: {settings.LLM_MODEL}")
+        else:
+            print("[llm_client] STARTUP: LLM_API_KEY not set -- no secondary LLM if Gemini fails (offline fallback still applies).")
 
     def generate_json(self, prompt: str, timeout_s: float = 12.0) -> dict:
         if not self.available:

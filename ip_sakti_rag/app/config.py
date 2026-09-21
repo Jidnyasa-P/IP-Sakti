@@ -27,24 +27,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # LLM (generation + optional Gemini-mode reranker). Not used for embeddings.
-    LLM_API_KEY: str | None = None
-    # gemini-2.0-flash was shut down 2026-06-01 — see .env.example for the
-    # current recommended model and its own shutdown-date caveat. This
-    # default is only used if LLM_MODEL isn't set in .env/Render env vars.
-    LLM_MODEL: str = "gemini-3.1-flash-lite"
-
-    # Groq (OpenAI-compatible REST API, called via plain httpx — no extra SDK
-    # dependency, see app/retrieval/reranker.py and app/generation/llm_client.py).
-    # Used for two things, both optional/degrade-gracefully if unset:
-    #  1. Semantic reranking of BM25+Qdrant candidates (real relevance scores,
-    #     not a 2nd Gemini call, so it doesn't compete with generation for
-    #     Gemini's daily free-tier quota).
-    #  2. A second LLM to try for answer generation if Gemini fails, before
-    #     falling all the way back to the fully offline template.
-    # Free key: https://console.groq.com/keys
-    # LLM provider
-    # Supported: groq | gemini
+    # LLM provider used by generation, scope classification and reranking.
+    # For the Render deployment this is Groq.
     LLM_PROVIDER: str = "groq"
     LLM_API_KEY: str | None = None
     LLM_MODEL: str = "llama-3.3-70b-versatile"

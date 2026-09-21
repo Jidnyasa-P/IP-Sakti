@@ -51,9 +51,9 @@ def rerank(query: str, candidates: list[DocumentChunk]) -> dict[str, float] | No
     network/parse failure, empty candidate list). Never raises.
     """
     if (
-    not candidates
-    or settings.LLM_PROVIDER.strip().lower() != "groq"
-    or not _is_key_valid(settings.LLM_API_KEY)
+        not candidates
+        or settings.LLM_PROVIDER.strip().lower() != "groq"
+        or not _is_key_valid(settings.LLM_API_KEY)
     ):
         return None
 

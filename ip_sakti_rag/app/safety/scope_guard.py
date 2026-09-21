@@ -138,9 +138,7 @@ def _classify(query: str) -> dict | None:
         return _classify_via_groq(query)
 
     if provider == "gemini":
-        result = _classify_via_gemini(query)
-        if result is not None:
-            return result
+        return _classify_via_gemini(query)
 
     return None
 
