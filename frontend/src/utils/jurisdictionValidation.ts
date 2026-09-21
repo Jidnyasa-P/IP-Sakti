@@ -46,53 +46,131 @@ const INDIA_SPECIFIC_TERMS: { regex: RegExp; label: string }[] = [
   { regex: /\b(rasayana|bhasma|asava|arishta|taila|churn?a|ghrita|gutika|vati)\b/i, label: 'Classical Ayurvedic Formulations' },
 ];
 
-// Terms indicating pure international jurisdiction
-const INTERNATIONAL_INDICATORS = [
-  /\b(pct|patent\s*cooperation\s*treaty)\b/i,
-  /\b(wipo|world\s*intellectual\s*property\s*organization)\b/i,
-  /\b(uspto|united\s*states\s*patent|35\s*u\.?s\.?c\.?)\b/i,
-  /\b(epo|european\s*patent\s*office|epc\s*article)\b/i,
-  /\b(jpo|japan\s*patent\s*office|ukipo|cipo)\b/i,
-  /\b(nagoya\s*protocol|cbd|convention\s*on\s*biological\s*diversity)\b/i,
-  /\b(trips|wto\s*trips|world\s*trade\s*organization)\b/i,
-  /\b(foreign\s*patent|international\s*filing|national\s*phase)\b/i,
-  /\b(united\s*states|europe|germany|japan|united\s*kingdom|australia|canada)\b/i,
+// Terms indicating international / non-Indian jurisdiction
+const INTERNATIONAL_INDICATORS: { regex: RegExp; label: string }[] = [
+  // International organizations / treaties / frameworks
+  {
+    regex: /\b(pct|patent\s*cooperation\s*treaty)\b/i,
+    label: "PCT / International Patent System",
+  },
+  {
+    regex: /\b(wipo|world\s*intellectual\s*property\s*organization)\b/i,
+    label: "WIPO",
+  },
+  {
+    regex: /\b(uspto|united\s*states\s*patent)\b/i,
+    label: "USPTO / United States",
+  },
+  {
+    regex: /\b(epo|european\s*patent\s*office|epc\s*article)\b/i,
+    label: "EPO / European Patent System",
+  },
+  {
+    regex: /\b(jpo|japan\s*patent\s*office)\b/i,
+    label: "JPO / Japan",
+  },
+  {
+    regex: /\b(ukipo|uk\s*intellectual\s*property\s*office)\b/i,
+    label: "UKIPO / United Kingdom",
+  },
+  {
+    regex: /\b(cnipa|china\s*national\s*intellectual\s*property)\b/i,
+    label: "CNIPA / China",
+  },
+  {
+    regex: /\b(cipo|canadian\s*intellectual\s*property\s*office)\b/i,
+    label: "CIPO / Canada",
+  },
+  {
+    regex:
+      /\b(nagoya\s*protocol|convention\s*on\s*biological\s*diversity)\b/i,
+    label: "Nagoya Protocol / CBD",
+  },
+  {
+    regex: /\b(trips|wto\s*trips|world\s*trade\s*organization)\b/i,
+    label: "WTO / TRIPS",
+  },
+
+  // Countries outside India
+  {
+    regex:
+      /\b(united\s*states|usa|u\.s\.a\.|america|canada|mexico|brazil|argentina|chile|colombia|peru|germany|france|italy|spain|portugal|netherlands|belgium|switzerland|austria|sweden|norway|denmark|finland|ireland|poland|czech\s*republic|hungary|romania|greece|russia|ukraine|turkey|israel|south\s*africa|egypt|nigeria|kenya|china|japan|south\s*korea|korea|singapore|malaysia|indonesia|thailand|vietnam|philippines|australia|new\s*zealand|united\s*kingdom|uk|england|scotland|wales)\b/i,
+    label: "International Country / Region",
+  },
+
+  // Major international cities / jurisdictions
+  {
+    regex:
+      /\b(washington\s*d\.?c\.?|new\s*york|boston|san\s*francisco|los\s*angeles|chicago|london|paris|berlin|munich|frankfurt|rome|milan|madrid|barcelona|amsterdam|brussels|geneva|zurich|vienna|stockholm|oslo|copenhagen|helsinki|dublin|warsaw|athens|moscow|kyiv|istanbul|tel\s*aviv|cairo|johannesburg|nairobi|beijing|shanghai|tokyo|osaka|seoul|singapore|kuala\s*lumpur|bangkok|jakarta|manila|sydney|melbourne|auckland|toronto|vancouver|montreal|mexico\s*city|sao\s*paulo|buenos\s*aires)\b/i,
+    label: "International City / Jurisdiction",
+  },
+
+  // Foreign / international filing terminology
+  {
+    regex:
+      /\b(foreign\s*patent|foreign\s*jurisdiction|foreign\s*filing|international\s*filing|international\s*patent|overseas\s*filing|national\s*phase|regional\s*phase|foreign\s*entity)\b/i,
+    label: "International / Foreign Filing",
+  },
 ];
 
-/**
- * Validates whether a query submitted in International mode is actually India-specific.
- * Returns detection info and helpful guidance.
- */
-export function evaluateQueryJurisdiction(query: string): JurisdictionCheckResult {
+// Evaluate whether a query is specific to India, international jurisdictions,
+// or contains references to both.
+export function evaluateQueryJurisdiction(
+  query: string
+): JurisdictionCheckResult {
   const normalized = query.trim();
-  const matchedKeywords: string[] = [];
 
+  const indiaMatches: string[] = [];
+  const internationalMatches: string[] = [];
+
+  // Detect India / Domestic jurisdiction
   for (const item of INDIA_SPECIFIC_TERMS) {
     if (item.regex.test(normalized)) {
-      matchedKeywords.push(item.label);
+      indiaMatches.push(item.label);
     }
   }
 
-  const isIndiaSpecific = matchedKeywords.length > 0;
-
-  let isInternationalSpecific = false;
-  for (const regex of INTERNATIONAL_INDICATORS) {
-    if (regex.test(normalized)) {
-      isInternationalSpecific = true;
-      break;
+  // Detect International / Foreign jurisdiction
+  for (const item of INTERNATIONAL_INDICATORS) {
+    if (item.regex.test(normalized)) {
+      internationalMatches.push(item.label);
     }
   }
 
-  let explanation = '';
-  if (isIndiaSpecific) {
-    const uniqueMatches = Array.from(new Set(matchedKeywords)).slice(0, 3).join(', ');
-    explanation = `This query involves India-specific regulatory, statutory, or regional frameworks (${uniqueMatches}).`;
+  const uniqueIndiaMatches = Array.from(new Set(indiaMatches));
+  const uniqueInternationalMatches = Array.from(
+    new Set(internationalMatches)
+  );
+
+  const isIndiaSpecific = uniqueIndiaMatches.length > 0;
+  const isInternationalSpecific = uniqueInternationalMatches.length > 0;
+
+  let explanation = "";
+
+  if (isIndiaSpecific && isInternationalSpecific) {
+    explanation =
+      "This query contains both India-specific and international jurisdiction references. Please edit the query or use the jurisdiction section relevant to the specific question.";
+  } else if (isIndiaSpecific) {
+    const matches = uniqueIndiaMatches.slice(0, 3).join(", ");
+
+    explanation =
+      `This query involves India-specific regulatory, statutory, or regional jurisdiction (${matches}).`;
+  } else if (isInternationalSpecific) {
+    const matches = uniqueInternationalMatches.slice(0, 3).join(", ");
+
+    explanation =
+      `This query involves an international or foreign jurisdiction (${matches}).`;
   }
 
   return {
     isIndiaSpecific,
     isInternationalSpecific,
-    matchedKeywords: Array.from(new Set(matchedKeywords)),
+    matchedKeywords: Array.from(
+      new Set([
+        ...uniqueIndiaMatches,
+        ...uniqueInternationalMatches,
+      ])
+    ),
     explanation,
   };
 }

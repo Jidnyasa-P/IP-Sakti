@@ -493,6 +493,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }, 50);
   };
 
+  const handleSwitchToInternationalAndSend = (pendingQuery: string) => {
+    setJurisdictionWarning(null);
+    handleToggleJurisdiction(true);
+    // Send in next tick after jurisdiction state and conversation swap have processed
+    setTimeout(() => {
+      handleSend(pendingQuery, { forceSend: true });
+    }, 50);
+  };
+
   // Sync with backend on mount
   useEffect(() => {
     fetchServerConversations();
@@ -719,15 +728,44 @@ export const ChatView: React.FC<ChatViewProps> = ({
       }
     }
 
-    // 2. RULE: When International mode is selected, it must NOT answer an India/state-specific query as international.
-    // Detect India-specific queries when in International mode and prompt user to switch to India/Domestic mode.
-    if (isInternational && !options?.forceSend) {
+    // 2. RULE: Prevent cross-jurisdiction queries.
+    // Domestic mode must not answer international queries.
+    // International mode must not answer India-specific queries.
+    // Queries containing both jurisdictions are also blocked.
+    if (!options?.forceSend) {
       const check = evaluateQueryJurisdiction(textToSend);
-      if (check.isIndiaSpecific) {
+
+      // Both jurisdictions detected
+      if (check.isIndiaSpecific && check.isInternationalSpecific) {
         setJurisdictionWarning({
           query: textToSend,
           matchedKeywords: check.matchedKeywords,
-          explanation: check.explanation,
+          explanation:
+            "This query contains both India-specific and international jurisdiction references. Please edit the query or use the jurisdiction section relevant to the specific question.",
+        });
+        return;
+      }
+
+      // International mode + India-specific query
+      if (isInternational && check.isIndiaSpecific) {
+        setJurisdictionWarning({
+          query: textToSend,
+          matchedKeywords: check.matchedKeywords,
+          explanation:
+            check.explanation ||
+            "This query appears to require India / Domestic jurisdiction.",
+        });
+        return;
+      }
+
+      // Domestic mode + International-specific query
+      if (!isInternational && check.isInternationalSpecific) {
+        setJurisdictionWarning({
+          query: textToSend,
+          matchedKeywords: check.matchedKeywords,
+          explanation:
+            check.explanation ||
+            "This query appears to require International jurisdiction.",
         });
         return;
       }
@@ -1799,84 +1837,112 @@ export const ChatView: React.FC<ChatViewProps> = ({
           )}
 
           {/* Jurisdiction Mismatch Alert Banner */}
-          {jurisdictionWarning && (
-            <div
-              id="jurisdiction-mode-mismatch-banner"
-              className="rounded-xl border border-amber-300 bg-amber-50/95 p-3 sm:p-3.5 shadow-sm text-slate-800 animate-in fade-in slide-in-from-bottom-2 duration-200"
+{jurisdictionWarning && (
+  <div
+    id="jurisdiction-mode-mismatch-banner"
+    className="rounded-xl border border-amber-300 bg-amber-50/95 p-3 sm:p-3.5 shadow-sm text-slate-800 animate-in fade-in slide-in-from-bottom-2 duration-200"
+  >
+    <div className="flex items-start gap-2.5">
+      <div className="w-7 h-7 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 shrink-0 mt-0.5">
+        <AlertTriangle className="w-4 h-4" />
+      </div>
+
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+            <span>
+              {isInternational
+                ? "India / Domestic Query Detected in International Mode"
+                : "International Query Detected in Domestic Mode"}
+            </span>
+          </h4>
+
+          <button
+            type="button"
+            onClick={() => setJurisdictionWarning(null)}
+            className="text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer transition-colors"
+            title="Dismiss warning"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <p className="text-xs text-slate-700 leading-relaxed font-normal">
+          {jurisdictionWarning.explanation}
+        </p>
+
+        <p className="text-xs text-slate-700 leading-relaxed font-normal">
+          {isInternational
+            ? "This query appears to require India / Domestic jurisdiction. Please switch to India / Domestic Mode or edit your query."
+            : "This query appears to require an international jurisdiction. Please switch to International Mode or edit your query."}
+        </p>
+
+        {jurisdictionWarning.matchedKeywords.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 pt-0.5">
+            <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-500 mr-1">
+              Detected:
+            </span>
+
+            {jurisdictionWarning.matchedKeywords.map((tag, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-medium"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2 pt-1.5">
+          {isInternational ? (
+            <button
+              type="button"
+              id="btn-switch-to-india-mode"
+              onClick={() =>
+                handleSwitchToIndiaAndSend(jurisdictionWarning.query)
+              }
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
             >
-              <div className="flex items-start gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 shrink-0 mt-0.5">
-                  <AlertTriangle className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <h4 className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
-                      <span>
-                        India / Domestic Query Detected in International Mode
-                      </span>
-                    </h4>
-                    <button
-                      type="button"
-                      onClick={() => setJurisdictionWarning(null)}
-                      className="text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer transition-colors"
-                      title="Dismiss warning"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <p className="text-xs text-slate-700 leading-relaxed font-normal">
-                    {jurisdictionWarning.explanation} International Mode
-                    synthesizes global treaties (PCT, USPTO, EPO, WIPO 2024
-                    Treaty, Nagoya Protocol) and will not correctly process
-                    India-specific statutory or state laws.
-                  </p>
-
-                  {jurisdictionWarning.matchedKeywords.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1 pt-0.5">
-                      <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-500 mr-1">
-                        Detected:
-                      </span>
-                      {jurisdictionWarning.matchedKeywords.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-medium"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap items-center gap-2 pt-1.5">
-                    <button
-                      type="button"
-                      id="btn-switch-to-india-mode"
-                      onClick={() =>
-                        handleSwitchToIndiaAndSend(jurisdictionWarning.query)
-                      }
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
-                    >
-                      <span>🇮🇳 Switch to India / Domestic Mode & Submit</span>
-                      <CornerDownRight className="w-3.5 h-3.5" />
-                    </button>
-
-                    <button
-                      type="button"
-                      id="btn-dismiss-jurisdiction-warning"
-                      onClick={() => {
-                        setInputValue(jurisdictionWarning.query);
-                        setJurisdictionWarning(null);
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
-                    >
-                      Edit Query
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+              <span>
+                🇮🇳 Switch to India / Domestic Mode & Submit
+              </span>
+              <CornerDownRight className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              id="btn-switch-to-international-mode"
+              onClick={() =>
+                handleSwitchToInternationalAndSend(
+                  jurisdictionWarning.query
+                )
+              }
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+            >
+              <span>
+                🌐 Switch to International Mode & Submit
+              </span>
+              <CornerDownRight className="w-3.5 h-3.5" />
+            </button>
           )}
+
+          <button
+            type="button"
+            id="btn-dismiss-jurisdiction-warning"
+            onClick={() => {
+              setInputValue(jurisdictionWarning.query);
+              setJurisdictionWarning(null);
+            }}
+            className="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
+          >
+            Edit Query
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
           <form
             id="sahayak-chat-form-container"
