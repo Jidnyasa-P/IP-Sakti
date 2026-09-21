@@ -489,7 +489,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
     handleToggleJurisdiction(false);
     // Send in next tick after jurisdiction state and conversation swap have processed
     setTimeout(() => {
-      handleSend(pendingQuery, { forceSend: true });
+      handleSend(pendingQuery, {
+        forceSend: true,
+        jurisdictionOverride: "india",
+      });
     }, 50);
   };
 
@@ -498,7 +501,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
     handleToggleJurisdiction(true);
     // Send in next tick after jurisdiction state and conversation swap have processed
     setTimeout(() => {
-      handleSend(pendingQuery, { forceSend: true });
+      handleSend(pendingQuery, {
+        forceSend: true,
+        jurisdictionOverride: "international",
+      });
     }, 50);
   };
 
@@ -707,7 +713,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
   // Send query with streaming response and robust session storage
   const handleSend = async (
     queryText?: string,
-    options?: { forceSend?: boolean },
+    options?: {
+      forceSend?: boolean;
+      jurisdictionOverride?: Jurisdiction;
+    },
   ) => {
     const textToSend = queryText || inputValue;
     if (!textToSend.trim() || loading) return;
@@ -728,10 +737,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
       }
     }
 
-    // 2. RULE: Prevent cross-jurisdiction queries.
-    // Domestic mode must not answer international queries.
-    // International mode must not answer India-specific queries.
-    // Queries containing both jurisdictions are also blocked.
+    // 2. RULE: Keep the query and selected jurisdiction aligned.
+    // A mismatch is stopped here and shown to the user. The user can either
+    // edit the query or explicitly switch to the matching chat and submit it.
     if (!options?.forceSend) {
       const check = evaluateQueryJurisdiction(textToSend);
 
@@ -741,6 +749,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
           matchedKeywords: check.matchedKeywords,
           explanation:
             "This query contains both India-specific and international jurisdiction references. Please edit the query or use the jurisdiction section relevant to the specific question.",
+        });
+        return;
+      }
+
+      if (!isInternational && check.isInternationalSpecific) {
+        setJurisdictionWarning({
+          query: textToSend,
+          matchedKeywords: check.matchedKeywords,
+          explanation:
+            check.explanation ||
+            "This query appears to require International jurisdiction.",
         });
         return;
       }
@@ -755,17 +774,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
         });
         return;
       }
-
-      if (!isInternational && check.isInternationalSpecific) {
-        setJurisdictionWarning({
-          query: textToSend,
-          matchedKeywords: check.matchedKeywords,
-          explanation:
-            check.explanation ||
-            "This query appears to require an international jurisdiction.",
-        });
-        return;
-      }
     }
 
     // Clear any active warnings on valid submission
@@ -775,9 +783,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
     setLoading(true);
     setStreamingText("");
 
-    const currentJur: Jurisdiction = isInternational
-      ? "international"
-      : "india";
+    const currentJur: Jurisdiction =
+      options?.jurisdictionOverride ||
+      (isInternational ? "international" : "india");
 
     // Ensure we have an active conversation of the right jurisdiction
     let targetConvId = activeConvId;
@@ -889,6 +897,32 @@ export const ChatView: React.FC<ChatViewProps> = ({
         if (syncRes.ok) {
           const syncData = await syncRes.json();
           assistantMsg = syncData.message || syncData;
+
+          // Server-side scope guard is authoritative. If it blocks a
+          // jurisdiction mismatch, surface the same edit-or-switch UX
+          // instead of rendering an "Out of Scope" assistant message.
+          if (assistantMsg?.scope_blocked) {
+            const blockedText =
+              assistantMsg.answer || assistantMsg.content || "";
+            const blockedLooksIndia = /india|indian|indian statutes|indian mode|indian law/i.test(
+              blockedText,
+            );
+            const blockedLooksInternational = /international|cross-border|pct|wipo|uspto|epo/i.test(
+              blockedText,
+            );
+
+            if (blockedLooksIndia || blockedLooksInternational) {
+              setJurisdictionWarning({
+                query: textToSend,
+                matchedKeywords: [],
+                explanation: blockedText,
+              });
+              setInputValue(textToSend);
+              setLoading(false);
+              setStreamingText("");
+              return;
+            }
+          }
         } else {
           requestFailed = true;
         }
