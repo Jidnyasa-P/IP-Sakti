@@ -68,6 +68,30 @@ async def _request(method: str, path: str, **kwargs) -> dict:
             resp.raise_for_status()
             return resp.json()
 
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                f"RAG service {method} {path} -> "
+                f"{exc.response.status_code}: {exc.response.text}"
+            )
+
+            # TKDL is not publicly accessible. Preserve the service's
+            # explicit availability message for the TK & ABS endpoint.
+            if path == "/api/tk-abs/analyze":
+                try:
+                    detail = exc.response.json().get("detail")
+                except Exception:
+                    detail = None
+
+                if detail:
+                    raise HTTPException(
+                        status_code=exc.response.status_code,
+                        detail=detail,
+                    )
+
+            raise RagServiceError(
+                f"RAG service error ({exc.response.status_code}) on {path}."
+            )
+
         except httpx.RequestError as exc:
             logger.warning(
                 f"RAG service {method} {path} unreachable; "
@@ -83,24 +107,14 @@ async def _request(method: str, path: str, **kwargs) -> dict:
                 "The service may be waking from Render sleep."
             )
 
-        except httpx.HTTPStatusError as exc:
-            logger.error(
-                f"RAG service {method} {path} -> "
-                f"{exc.response.status_code}: {exc.response.text}"
-            )
-            raise RagServiceError(
-                f"RAG service error "
-                f"({exc.response.status_code}) on {path}."
-            )
-
 
 async def health() -> dict:
     return await _request("GET", "/api/health")
 
 
-async def chat(query: str, language: str | None = None, conversation_id: str | None = None, jurisdiction: str | None = None) -> dict:
+async def chat(query: str, language: str | None = None, conversation_id: str | None = None) -> dict:
     return await _request("POST", "/api/chat", json={
-        "query": query, "language": language, "conversation_id": conversation_id, "jurisdiction": jurisdiction,
+        "query": query, "language": language, "conversation_id": conversation_id,
     })
 
 
