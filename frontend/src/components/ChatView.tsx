@@ -232,6 +232,32 @@ const DEFAULT_INITIAL_INTL_CONV: Conversation = {
   ],
 };
 
+function normalizeConversation(c: Conversation): Conversation | null {
+  const messages = (c.messages || []).map((m) => ({
+    ...m,
+    jurisdiction: (m.jurisdiction || c.jurisdiction || "india") as Jurisdiction,
+  }));
+
+  const firstMessageTitle = messages
+    .map((m) => (m.content || "").trim())
+    .find(Boolean) || "";
+
+  const title = (c.title || "").trim() || firstMessageTitle;
+
+  // Do not keep completely empty conversation records. These are the
+  // records that appear in the sidebar as a chat icon with no text.
+  if (!title && messages.length === 0) {
+    return null;
+  }
+
+  return {
+    ...c,
+    title: title.slice(0, 48),
+    jurisdiction: (c.jurisdiction || "india") as Jurisdiction,
+    messages,
+  };
+}
+
 function getInitialConversations(): Conversation[] {
   if (typeof window !== "undefined") {
     try {
@@ -239,23 +265,18 @@ function getInitialConversations(): Conversation[] {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const normalized: Conversation[] = parsed.map((c: Conversation) => ({
-            ...c,
-            jurisdiction: (c.jurisdiction || "india") as Jurisdiction,
-            messages: (c.messages || []).map((m) => ({
-              ...m,
-              jurisdiction: (m.jurisdiction ||
-                c.jurisdiction ||
-                "india") as Jurisdiction,
-            })),
-          }));
+          const normalized = parsed
+            .map((c: Conversation) => normalizeConversation(c))
+            .filter((c): c is Conversation => c !== null);
           const hasIntl = normalized.some(
             (c: Conversation) => c.jurisdiction === "international",
           );
           if (!hasIntl) {
             normalized.push(DEFAULT_INITIAL_INTL_CONV);
           }
-          return normalized;
+          return normalized.length > 0
+            ? normalized
+            : [DEFAULT_INITIAL_CONV, DEFAULT_INITIAL_INTL_CONV];
         }
       }
     } catch (e) {}
@@ -394,10 +415,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
     updated: Conversation[],
     newActiveId?: string,
   ) => {
-    setConversations(updated);
+    const cleaned = updated
+      .map((c) => normalizeConversation(c))
+      .filter((c): c is Conversation => c !== null);
+
+    setConversations(cleaned);
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem(LOCAL_STORAGE_CONVS_KEY, JSON.stringify(updated));
+        localStorage.setItem(LOCAL_STORAGE_CONVS_KEY, JSON.stringify(cleaned));
         if (newActiveId) {
           localStorage.setItem(LOCAL_STORAGE_ACTIVE_KEY, newActiveId);
           if (isInternational) {
@@ -521,23 +546,28 @@ export const ChatView: React.FC<ChatViewProps> = ({
         return;
       }
       const serverConvs: Conversation[] = await res.json();
-      if (Array.isArray(serverConvs) && serverConvs.length > 0) {
+      const cleanedServerConvs = Array.isArray(serverConvs)
+        ? serverConvs
+            .map((c) => normalizeConversation(c))
+            .filter((c): c is Conversation => c !== null)
+        : [];
+
+      if (cleanedServerConvs.length > 0) {
         setConversations((prev) => {
           const mergedMap = new Map<string, Conversation>();
-          for (const sc of serverConvs) {
-            mergedMap.set(sc.id, {
-              ...sc,
-              jurisdiction: sc.jurisdiction || "india",
-            });
+          for (const sc of cleanedServerConvs) {
+            mergedMap.set(sc.id, sc);
           }
           for (const pc of prev) {
-            const existing = mergedMap.get(pc.id);
+            const normalizedPc = normalizeConversation(pc);
+            if (!normalizedPc) continue;
+            const existing = mergedMap.get(normalizedPc.id);
             if (
               !existing ||
-              (pc.messages &&
-                pc.messages.length > (existing.messages?.length || 0))
+              (normalizedPc.messages &&
+                normalizedPc.messages.length > (existing.messages?.length || 0))
             ) {
-              mergedMap.set(pc.id, pc);
+              mergedMap.set(normalizedPc.id, normalizedPc);
             }
           }
           const merged = Array.from(mergedMap.values()).sort(
@@ -653,16 +683,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
     setStreamingText("");
     setInputValue("");
 
-    // Register on server
-    authFetch("/api/conversations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: defaultTitle,
-        language,
-        jurisdiction: currentJur,
-      }),
-    }).catch(() => null);
+    // Do not create the conversation on the server yet. The real /api/chat
+    // request creates it when the user actually sends the first message.
+    // This prevents abandoned "New Session" clicks from creating empty
+    // database records that later appear as blank chats.
 
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
       setSidebarOpen(false);
