@@ -34,7 +34,7 @@ export const TraditionalKnowledgeView: React.FC<
       "Rasayana (rejuvenative), balya (strength-promoting), and stress management in classical Ayurveda (Charaka Samhita)",
     source_community_info:
       "Procured from registered farmer cooperatives and cultivated farm estates with BMC records",
-    intended_use: "Commercial utilization",
+    intended_use: "Domestic commercial utilization",
   });
 
   const [loading, setLoading] = useState(false);
@@ -61,7 +61,7 @@ export const TraditionalKnowledgeView: React.FC<
       origin: "Madhya Pradesh & Rajasthan",
       use: "Rasayana, stress adaptation, joint vitality",
       community: "Cultivated via local farmer producer organizations (FPO)",
-      intended: "Commercial utilization" as const,
+      intended: "Domestic commercial utilization" as const,
     },
     {
       name: "Curcuma longa (Haridra / Turmeric)",
@@ -86,7 +86,7 @@ export const TraditionalKnowledgeView: React.FC<
       use: "Deepana, pachana, medoroga (lipid balance), and anti-arthritic formulations",
       community:
         "Forest department licensed tapping through tribal cooperatives",
-      intended: "Commercial utilization" as const,
+      intended: "Domestic commercial utilization" as const,
     },
   ];
 
@@ -266,7 +266,7 @@ export const TraditionalKnowledgeView: React.FC<
               }
               className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:ring-1 focus:ring-emerald-700 focus:outline-hidden bg-white"
             >
-              <option value="Commercial utilization">
+              <option value="Domestic commercial utilization">
                 Commercial manufacturing in India (Section 7 SBB)
               </option>
               <option value="IP filing">

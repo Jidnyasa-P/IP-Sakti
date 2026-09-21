@@ -414,7 +414,6 @@ export interface TKABSQuery {
     | 'Foreign entity utilization'
     | 'Collaborative research'
     | 'IP filing'
-    | 'Commercial utilization'
     | 'Academic research';
 }
 
