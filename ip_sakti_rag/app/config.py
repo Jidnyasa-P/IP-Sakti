@@ -43,8 +43,11 @@ class Settings(BaseSettings):
     #  2. A second LLM to try for answer generation if Gemini fails, before
     #     falling all the way back to the fully offline template.
     # Free key: https://console.groq.com/keys
+    # LLM provider
+    # Supported: groq | gemini
+    LLM_PROVIDER: str = "groq"
     LLM_API_KEY: str | None = None
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    LLM_MODEL: str = "llama-3.3-70b-versatile"
 
     # Embeddings: inference is hosted outside Render. The deployed service
     # must expose /embed and use the SAME 384-D FastEmbed model that created

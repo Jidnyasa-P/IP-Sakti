@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     # local ip_sakti_rag instance for dev (default: localhost:8001).
     rag_service_url: str = "http://localhost:8001"
     rag_service_shared_secret: str = ""
-    rag_service_timeout_seconds: float = 30.0
+    rag_service_timeout_seconds: float = 60.0
 
     # Translation (UI strings -- separate from RAG; unaffected by the above)
     translation_provider: str = "bhashini"

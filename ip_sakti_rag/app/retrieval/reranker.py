@@ -50,7 +50,11 @@ def rerank(query: str, candidates: list[DocumentChunk]) -> dict[str, float] | No
     as Groq scored, or None if reranking wasn't possible this call (no key,
     network/parse failure, empty candidate list). Never raises.
     """
-    if not candidates or not _is_key_valid(settings.LLM_API_KEY):
+    if (
+    not candidates
+    or settings.LLM_PROVIDER.strip().lower() != "groq"
+    or not _is_key_valid(settings.LLM_API_KEY)
+    ):
         return None
 
     subset = candidates[:_MAX_CANDIDATES]
@@ -77,7 +81,7 @@ def rerank(query: str, candidates: list[DocumentChunk]) -> dict[str, float] | No
                 "Content-Type": "application/json",
             },
             json={
-                "model": settings.GROQ_MODEL,
+                "model": settings.LLM_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0,
                 "response_format": {"type": "json_object"},

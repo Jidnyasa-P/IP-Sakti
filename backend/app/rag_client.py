@@ -33,18 +33,65 @@ def _headers() -> dict:
 
 
 async def _request(method: str, path: str, **kwargs) -> dict:
+    import asyncio
+
     url = f"{settings.rag_service_url.rstrip('/')}{path}"
-    try:
-        async with httpx.AsyncClient(timeout=settings.rag_service_timeout_seconds) as client:
-            resp = await client.request(method, url, headers=_headers(), **kwargs)
-        resp.raise_for_status()
-        return resp.json()
-    except httpx.HTTPStatusError as exc:
-        logger.error(f"RAG service {method} {path} -> {exc.response.status_code}: {exc.response.text}")
-        raise RagServiceError(f"RAG service error ({exc.response.status_code}) on {path}.")
-    except httpx.RequestError as exc:
-        logger.error(f"RAG service {method} {path} unreachable: {exc}")
-        raise RagServiceError(f"RAG service is unreachable at {settings.rag_service_url}. Is ip_sakti_rag running?")
+
+    max_attempts = 3
+    delays = [0, 5, 15]
+
+    for attempt in range(max_attempts):
+        if delays[attempt]:
+            await asyncio.sleep(delays[attempt])
+
+        try:
+            async with httpx.AsyncClient(
+                timeout=settings.rag_service_timeout_seconds
+            ) as client:
+                resp = await client.request(
+                    method,
+                    url,
+                    headers=_headers(),
+                    **kwargs,
+                )
+
+            if resp.status_code in (502, 503, 504):
+                logger.warning(
+                    f"RAG service {method} {path} returned "
+                    f"{resp.status_code}; attempt "
+                    f"{attempt + 1}/{max_attempts}"
+                )
+
+                if attempt < max_attempts - 1:
+                    continue
+
+            resp.raise_for_status()
+            return resp.json()
+
+        except httpx.RequestError as exc:
+            logger.warning(
+                f"RAG service {method} {path} unreachable; "
+                f"attempt {attempt + 1}/{max_attempts}: {exc}"
+            )
+
+            if attempt < max_attempts - 1:
+                continue
+
+            raise RagServiceError(
+                f"RAG service is unreachable at "
+                f"{settings.rag_service_url}. "
+                "The service may be waking from Render sleep."
+            )
+
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                f"RAG service {method} {path} -> "
+                f"{exc.response.status_code}: {exc.response.text}"
+            )
+            raise RagServiceError(
+                f"RAG service error "
+                f"({exc.response.status_code}) on {path}."
+            )
 
 
 async def health() -> dict:

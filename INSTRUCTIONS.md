@@ -51,7 +51,7 @@ data):**
 
 - The retriever was fusing BM25 + Qdrant purely by Reciprocal Rank Fusion,
   normalized by dividing by the theoretical max. That normalization is
-  quantized: a chunk ranked #1 by *exactly one* retriever — the single most
+  quantized: a chunk ranked #1 by _exactly one_ retriever — the single most
   common outcome — **always** normalizes to precisely 0.5, regardless of
   how strong or weak the match actually was. That's the "stuck at 50%".
   Weaker single-retriever matches, or cases where semantic search didn't
@@ -59,7 +59,7 @@ data):**
   threshold and get floored at the displayed minimum of 5% — explaining
   the screenshots exactly.
 - My first fix (weighted min-max normalization within the candidate pool)
-  turned out to have the *same class* of bug: min-max normalization always
+  turned out to have the _same class_ of bug: min-max normalization always
   maps whichever candidate is best-of-pool to exactly 1.0, so with only one
   signal present, every query's score collapsed to exactly `keyword_weight`
   (0.40) — verified this happening in testing before catching it.
@@ -78,7 +78,7 @@ data):**
   score. Verified against your actual corpus: on-topic legal queries now
   score ~0.26–0.29, an unrelated/gibberish query scores ~0.15 — real,
   continuous variation instead of fixed buckets.
-- `app/config.py` — added `LLM_API_KEY`, `GROQ_MODEL` (default
+- `app/config.py` — added `LLM_API_KEY`, `LLM_MODEL` (default
   `llama-3.3-70b-versatile`), `semantic_weight`/`keyword_weight` for the
   fallback formula.
 
@@ -99,7 +99,7 @@ International toggle's value never reached the backend at all.
 - Even if it had: `_handle_query()` accepted a `target_market` parameter
   and never used it anywhere in the function body — never forwarded to
   `rag_client.chat()`, which itself had no such parameter at all.
-- And even if *that* had worked: ip_sakti_rag's own `ChatRequest` model had
+- And even if _that_ had worked: ip_sakti_rag's own `ChatRequest` model had
   no `jurisdiction` field either, and `pipeline.py`'s `answer_query()` had
   no jurisdiction parameter, and nothing in ip_sakti_rag mentioned
   "international" anywhere. The toggle was decorative end-to-end.
@@ -126,7 +126,7 @@ ONLY the warning/redirect message — no retrieval, no generation, no
 attempted answer.** Wired into `pipeline.py`'s `answer_query()` as the very
 first thing that runs, before classification/retrieval/generation.
 
-If *both* Gemini and Groq are unconfigured/unreachable, it degrades to a
+If _both_ Gemini and Groq are unconfigured/unreachable, it degrades to a
 keyword-only jurisdiction-mismatch check (same term lists your frontend's
 `jurisdictionValidation.ts` already uses) and does **not** attempt
 off-topic/injection blocking in that state — failing open on what it can't
@@ -153,8 +153,9 @@ live LLM reasoning was applied" is literally the deterministic template in
 when Gemini is unavailable or its call fails.
 
 **Fix:**
+
 - `app/generation/prompts.py` — added an explicit instruction block: work
-  out what the person is *actually* asking before answering; explain what
+  out what the person is _actually_ asking before answering; explain what
   each cited provision means in plain, everyday language, not a citation-
   by-citation paraphrase dump; briefly define legal terms used.
 - `app/generation/llm_client.py` / `grounded_generator.py` — added
@@ -174,7 +175,7 @@ entirely — a failed request now shows an honest, clearly-labeled retry
 message with no citations and no confidence score. Also removed a second,
 smaller version of the same pattern (`confidence: assistantMsg.confidence
 || {level: "High", score: 0.95, ...}` — fabricating a fake badge whenever a
-*real* response happened to have no confidence field).
+_real_ response happened to have no confidence field).
 
 ---
 
@@ -200,6 +201,7 @@ smaller version of the same pattern (`confidence: assistantMsg.confidence
   **zero TypeScript errors.**
 
 ## An additional bug fixed while verifying (not one of your 4, but a real
+
 ## deploy-risk regression)
 
 `ip_sakti_rag/requirements-server.txt` — the file Render's build actually
@@ -228,7 +230,7 @@ Render dashboard → `ip-sakti-rag` service → Environment tab → add:
 
 ```
 LLM_API_KEY=<your key from https://console.groq.com/keys>
-GROQ_MODEL=llama-3.3-70b-versatile
+LLM_MODEL=llama-3.3-70b-versatile
 ```
 
 Free Groq account, free tier — separate quota from Gemini, so reranking
@@ -259,7 +261,7 @@ show a `fastembed`/`onnxruntime` install line; it shouldn't anymore.
   confirm the confidence % actually differs between them (not always the
   same number).
 - **Toggle enforcement**: on the India toggle, ask a clearly PCT/WIPO-only
-  question — should get *only* the redirect message, no attempted answer.
+  question — should get _only_ the redirect message, no attempted answer.
   On International, ask an India-only question (e.g. "What is Section 3(p)
   of the Patents Act?") — should get the reverse redirect. Try something
   off-topic (e.g. "write me a poem") on either toggle — should get the

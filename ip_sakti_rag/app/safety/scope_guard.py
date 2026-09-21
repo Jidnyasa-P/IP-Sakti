@@ -132,10 +132,17 @@ def check_scope(query: str, jurisdiction: str | None) -> ScopeCheckResult:
 
 
 def _classify(query: str) -> dict | None:
-    result = _classify_via_gemini(query)
-    if result is not None:
-        return result
-    return _classify_via_groq(query)
+    provider = settings.LLM_PROVIDER.strip().lower()
+
+    if provider == "groq":
+        return _classify_via_groq(query)
+
+    if provider == "gemini":
+        result = _classify_via_gemini(query)
+        if result is not None:
+            return result
+
+    return None
 
 
 def _classify_via_gemini(query: str) -> dict | None:
@@ -168,7 +175,7 @@ def _classify_via_groq(query: str) -> dict | None:
                 "Content-Type": "application/json",
             },
             json={
-                "model": settings.GROQ_MODEL,
+                "model": settings.LLM_MODEL,
                 "messages": [{"role": "user", "content": _SYSTEM_PROMPT + query}],
                 "temperature": 0,
                 "response_format": {"type": "json_object"},
