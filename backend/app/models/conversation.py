@@ -5,6 +5,9 @@ concurrent requests and are also queried/paginated independently — two
 narrow, indexed collections avoid growing a single document unboundedly and
 avoid whole-document rewrites on every new message."""
 from datetime import datetime, timezone
+from typing import Any
+
+from bson import ObjectId
 
 CONVERSATIONS_COLLECTION = "conversations"
 CHAT_MESSAGES_COLLECTION = "chat_messages"
@@ -73,10 +76,28 @@ def new_chat_message(
     }
 
 
+def _json_safe(value: Any) -> Any:
+    """Convert legacy MongoDB ObjectId values to JSON-safe strings.
+
+    Older conversation records may contain ObjectId values even though the
+    current application uses string IDs. Keep the API backward-compatible
+    without changing the stored MongoDB documents.
+    """
+    if isinstance(value, ObjectId):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, tuple):
+        return [_json_safe(item) for item in value]
+    return value
+
+
 def conversation_to_dict(conv: dict, messages: list[dict]) -> dict:
     return {
-        "id": conv["_id"],
-        "user_id": conv.get("user_id"),
+        "id": _json_safe(conv["_id"]),
+        "user_id": _json_safe(conv.get("user_id")),
         "title": conv.get("title"),
         "language": conv.get("language"),
         "created_at": conv["created_at"].isoformat() if conv.get("created_at") else None,
@@ -87,20 +108,20 @@ def conversation_to_dict(conv: dict, messages: list[dict]) -> dict:
 
 def message_to_dict(m: dict) -> dict:
     return {
-        "id": m["_id"],
-        "conversation_id": m.get("conversation_id"),
+        "id": _json_safe(m["_id"]),
+        "conversation_id": _json_safe(m.get("conversation_id")),
         "sequence": m.get("sequence", 0),
         "role": m.get("role"),
         "content": m.get("content"),
         "answer": m.get("answer"),
-        "relevant_considerations": m.get("relevant_considerations") or [],
-        "recommended_next_steps": m.get("recommended_next_steps") or [],
-        "citations": m.get("citations") or [],
-        "confidence": m.get("confidence"),
-        "warnings": m.get("warnings") or [],
-        "classification": m.get("classification"),
-        "jurisdiction": m.get("jurisdiction"),
-        "expert_escalation": m.get("expert_escalation"),
+        "relevant_considerations": _json_safe(m.get("relevant_considerations")) or [],
+        "recommended_next_steps": _json_safe(m.get("recommended_next_steps")) or [],
+        "citations": _json_safe(m.get("citations")) or [],
+        "confidence": _json_safe(m.get("confidence")),
+        "warnings": _json_safe(m.get("warnings")) or [],
+        "classification": _json_safe(m.get("classification")),
+        "jurisdiction": _json_safe(m.get("jurisdiction")),
+        "expert_escalation": _json_safe(m.get("expert_escalation")),
         "created_at": m["created_at"].isoformat() if m.get("created_at") else None,
         "feedback": m.get("feedback"),
         "feedback_notes": m.get("feedback_notes"),

@@ -79,7 +79,7 @@ data):**
   score ~0.26–0.29, an unrelated/gibberish query scores ~0.15 — real,
   continuous variation instead of fixed buckets.
 - `app/config.py` — added `LLM_API_KEY`, `LLM_MODEL` (default
-  `llama-3.3-70b-versatile`), `semantic_weight`/`keyword_weight` for the
+  `openai/gpt-oss-120b`), `semantic_weight`/`keyword_weight` for the
   fallback formula.
 
 Verified end-to-end against your committed corpus (7,747 chunks) — scores
@@ -230,7 +230,7 @@ Render dashboard → `ip-sakti-rag` service → Environment tab → add:
 
 ```
 LLM_API_KEY=<your key from https://console.groq.com/keys>
-LLM_MODEL=llama-3.3-70b-versatile
+LLM_MODEL=openai/gpt-oss-120b
 ```
 
 Free Groq account, free tier — separate quota from Gemini, so reranking

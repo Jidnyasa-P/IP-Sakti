@@ -18,6 +18,7 @@ for answer generation and the optional Gemini reranker only.
 from __future__ import annotations
 
 from pathlib import Path
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,7 +32,19 @@ class Settings(BaseSettings):
     # For the Render deployment this is Groq.
     LLM_PROVIDER: str = "groq"
     LLM_API_KEY: str | None = None
-    LLM_MODEL: str = "llama-3.3-70b-versatile"
+    LLM_MODEL: str = "openai/gpt-oss-120b"
+
+    @model_validator(mode="after")
+    def migrate_deprecated_groq_model(self):
+        # Groq retired openai/gpt-oss-120b on 2026-08-16. Keep an older
+        # Render environment variable from breaking the service by mapping it
+        # to the current GPT-OSS 120B production model automatically.
+        if (
+            self.LLM_PROVIDER.strip().lower() == "groq"
+            and self.LLM_MODEL.strip() == "openai/gpt-oss-120b"
+        ):
+            self.LLM_MODEL = "openai/gpt-oss-120b"
+        return self
 
     # Embeddings: inference is hosted outside Render. The deployed service
     # must expose /embed and use the SAME 384-D FastEmbed model that created
