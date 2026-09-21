@@ -70,7 +70,7 @@ def root():
     return {"name": "IP-SAKTI RAG API", "docs": "/docs", "health": "/api/health"}
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 def health():
     return {"status": "ok"}
 
