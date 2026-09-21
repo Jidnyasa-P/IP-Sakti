@@ -62,7 +62,7 @@ class IPSaktiRAG:
     # ------------------------------------------------------------------
     # 1. Core chat / RAG endpoint  (-> POST /api/chat, /api/chat/stream)
     # ------------------------------------------------------------------
-    def answer_query(self, query: str, language: str | None = None, conversation_id: str | None = None) -> dict:
+    def answer_query(self, query: str, language: str | None = None, conversation_id: str | None = None, jurisdiction: str | None = None) -> dict:
         started = datetime.now(timezone.utc)
 
         jurisdictions = detect_jurisdiction(query)
