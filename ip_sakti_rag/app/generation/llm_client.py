@@ -47,39 +47,39 @@ def _is_key_valid(key: str | None) -> bool:
 
 
 class LLMClient:
-def __init__(self):
-    raw_key = settings.LLM_API_KEY
-    provider = settings.LLM_PROVIDER.strip().lower()
+    def __init__(self):
+        raw_key = settings.LLM_API_KEY
+        provider = settings.LLM_PROVIDER.strip().lower()
 
-    self.available = False
-    self._client = None
-
-    if not _is_key_valid(raw_key):
-        print("[llm_client] STARTUP: LLM_API_KEY is not configured.")
-        return
-
-    if provider != "gemini":
-        print(
-            f"[llm_client] STARTUP: Provider={provider}. "
-            "Gemini client disabled."
-        )
-        return
-
-    try:
-        from google import genai
-
-        self._client = genai.Client(api_key=raw_key)
-        self.available = True
-
-        print(
-            f"[llm_client] STARTUP: Gemini client initialized OK. "
-            f"Model: {settings.LLM_MODEL}"
-        )
-    except Exception:
-        print(
-            "[llm_client] STARTUP: Gemini client initialization failed."
-        )
         self.available = False
+        self._client = None
+
+        if not _is_key_valid(raw_key):
+            print("[llm_client] STARTUP: LLM_API_KEY is not configured.")
+            return
+
+        if provider != "gemini":
+            print(
+                f"[llm_client] STARTUP: Provider={provider}. "
+                "Gemini client disabled."
+            )
+            return
+
+        try:
+            from google import genai
+
+            self._client = genai.Client(api_key=raw_key)
+            self.available = True
+
+            print(
+                f"[llm_client] STARTUP: Gemini client initialized OK. "
+                f"Model: {settings.LLM_MODEL}"
+            )
+        except Exception:
+            print(
+                "[llm_client] STARTUP: Gemini client initialization failed."
+            )
+            self.available = False
 
     def generate_json(self, prompt: str, timeout_s: float = 12.0) -> dict:
         if not (self.available and self._client is not None):
