@@ -33,88 +33,59 @@ def _headers() -> dict:
 
 
 async def _request(method: str, path: str, **kwargs) -> dict:
+    """Call the RAG service with retries for Render cold starts."""
     import asyncio
 
     url = f"{settings.rag_service_url.rstrip('/')}{path}"
+    delays = (0, 5, 15)
 
-    max_attempts = 3
-    delays = [0, 5, 15]
-
-    for attempt in range(max_attempts):
-        if delays[attempt]:
-            await asyncio.sleep(delays[attempt])
+    for attempt, delay in enumerate(delays, start=1):
+        if delay:
+            await asyncio.sleep(delay)
 
         try:
-            async with httpx.AsyncClient(
-                timeout=settings.rag_service_timeout_seconds
-            ) as client:
-                resp = await client.request(
-                    method,
-                    url,
-                    headers=_headers(),
-                    **kwargs,
-                )
+            async with httpx.AsyncClient(timeout=settings.rag_service_timeout_seconds) as client:
+                resp = await client.request(method, url, headers=_headers(), **kwargs)
 
-            if resp.status_code in (502, 503, 504):
+            if resp.status_code in (502, 503, 504) and attempt < len(delays):
                 logger.warning(
-                    f"RAG service {method} {path} returned "
-                    f"{resp.status_code}; attempt "
-                    f"{attempt + 1}/{max_attempts}"
+                    f"RAG service {method} {path} returned {resp.status_code}; "
+                    f"retrying ({attempt}/{len(delays)})"
                 )
-
-                if attempt < max_attempts - 1:
-                    continue
+                continue
 
             resp.raise_for_status()
             return resp.json()
 
+        except httpx.RequestError as exc:
+            logger.warning(
+                f"RAG service {method} {path} unreachable on attempt "
+                f"{attempt}/{len(delays)}: {exc}"
+            )
+            if attempt == len(delays):
+                raise RagServiceError(
+                    f"RAG service is unreachable at {settings.rag_service_url}. "
+                    "The service may be waking from Render sleep."
+                )
         except httpx.HTTPStatusError as exc:
             logger.error(
                 f"RAG service {method} {path} -> "
                 f"{exc.response.status_code}: {exc.response.text}"
             )
-
-            # TKDL is not publicly accessible. Preserve the service's
-            # explicit availability message for the TK & ABS endpoint.
-            if path == "/api/tk-abs/analyze":
-                try:
-                    detail = exc.response.json().get("detail")
-                except Exception:
-                    detail = None
-
-                if detail:
-                    raise HTTPException(
-                        status_code=exc.response.status_code,
-                        detail=detail,
-                    )
-
             raise RagServiceError(
                 f"RAG service error ({exc.response.status_code}) on {path}."
             )
 
-        except httpx.RequestError as exc:
-            logger.warning(
-                f"RAG service {method} {path} unreachable; "
-                f"attempt {attempt + 1}/{max_attempts}: {exc}"
-            )
-
-            if attempt < max_attempts - 1:
-                continue
-
-            raise RagServiceError(
-                f"RAG service is unreachable at "
-                f"{settings.rag_service_url}. "
-                "The service may be waking from Render sleep."
-            )
+    raise RagServiceError(f"RAG service unavailable on {path}.")
 
 
 async def health() -> dict:
     return await _request("GET", "/api/health")
 
 
-async def chat(query: str, language: str | None = None, conversation_id: str | None = None) -> dict:
+async def chat(query: str, language: str | None = None, conversation_id: str | None = None, jurisdiction: str | None = None) -> dict:
     return await _request("POST", "/api/chat", json={
-        "query": query, "language": language, "conversation_id": conversation_id,
+        "query": query, "language": language, "conversation_id": conversation_id, "jurisdiction": jurisdiction,
     })
 
 
