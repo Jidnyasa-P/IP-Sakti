@@ -8,7 +8,7 @@ import app.rag_client as rag_client
 router = APIRouter()
 
 
-@router.get("/api/health")
+@router.api_route("/api/health", methods=["GET", "HEAD"])
 async def health():
     settings = get_settings()
 
