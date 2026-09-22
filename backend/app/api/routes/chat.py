@@ -8,9 +8,7 @@ from app.models.conversation import CONVERSATIONS_COLLECTION, CHAT_MESSAGES_COLL
 from app.models.expert_escalation import COLLECTION as EXPERT_ESCALATIONS_COLLECTION, new_expert_escalation
 from app.models.feedback import COLLECTION as FEEDBACK_COLLECTION, new_feedback
 from app.schemas.chat import ChatRequest, QueryRequest, FeedbackRequest, NewConversationRequest, RenameConversationRequest
-import app.services.conversation_service as conversation_service
-import app.services.audit_service as audit_service
-import app.services.expert_escalation_service as expert_escalation_service
+from app.services import conversation_service, audit_service, expert_escalation_service
 import app.rag_client as rag_client
 
 router = APIRouter()
@@ -20,12 +18,7 @@ def _get_owned_conversation(db, conversation_id: str, user_id: str, is_admin: bo
     """Fetch a conversation and enforce ownership (Section 7: user data
     isolation) -- Admins may access any conversation, everyone else only
     their own."""
-    conv = db[CONVERSATIONS_COLLECTION].find_one({
-        "$or": [
-            {"_id": conversation_id},
-            {"conversation_id": conversation_id},
-        ]
-    })
+    conv = db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id})
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     if not is_admin and conv.get("user_id") != user_id:
@@ -48,17 +41,17 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
     # the conversation record (and its messages) once we actually have a
     # response to store. A failed call now raises RagServiceError with
     # nothing written to the database at all -- no more orphaned blanks.
-    existing_conv = (
-        db[CONVERSATIONS_COLLECTION].find_one({
-            "$or": [
-                {"_id": conversation_id},
-                {"conversation_id": conversation_id},
-            ]
-        })
-        if conversation_id
-        else None
+    existing_conv = db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id}) if conversation_id else None
+
+    # Normalize legacy MongoDB ObjectId IDs before crossing the HTTP boundary
+    # to the RAG service. The database may contain older conversations whose
+    # `_id` is an ObjectId, while current conversations use string IDs.
+    raw_working_conversation_id = (
+        existing_conv["_id"]
+        if existing_conv
+        else (conversation_id or conversation_service.new_conversation_id())
     )
-    working_conversation_id = existing_conv["_id"] if existing_conv else (conversation_id or conversation_service.new_conversation_id())
+    working_conversation_id = str(raw_working_conversation_id)
 
     # All retrieval + reasoning happens in the ip_sakti_rag microservice now.
     # FIXED: `jurisdiction` (the India/International toggle's value) used to
@@ -268,11 +261,11 @@ def rename_conversation(conversation_id: str, body: RenameConversationRequest, c
         raise HTTPException(status_code=400, detail="Conversation title cannot be empty.")
     title = title[:80]
     db[CONVERSATIONS_COLLECTION].update_one(
-        {"_id": _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)["_id"]},
+        {"_id": conversation_id},
         {"$set": {"title": title, "updated_at": datetime.now(timezone.utc)}},
     )
-    conv = _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)
-    messages = conversation_service.recent_messages(db, conv["_id"], limit=1000)
+    conv = db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id})
+    messages = conversation_service.recent_messages(db, conversation_id, limit=1000)
     return conversation_service.conversation_to_dict(conv, messages)
 
 
@@ -280,10 +273,8 @@ def rename_conversation(conversation_id: str, body: RenameConversationRequest, c
 def delete_conversation(conversation_id: str, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     is_admin = "Admin" in current_user.get("roles", [])
     _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)
-    conv = _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)
-    canonical_id = conv["_id"]
-    db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": canonical_id})
-    db[CONVERSATIONS_COLLECTION].delete_one({"_id": canonical_id})
+    db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": conversation_id})
+    db[CONVERSATIONS_COLLECTION].delete_one({"_id": conversation_id})
     return {"success": True, "deleted_id": conversation_id}
 
 

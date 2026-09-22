@@ -84,8 +84,18 @@ async def health() -> dict:
 
 
 async def chat(query: str, language: str | None = None, conversation_id: str | None = None, jurisdiction: str | None = None) -> dict:
+    # Legacy MongoDB conversation records can still contain ObjectId values
+    # for `_id`. HTTP/JSON cannot serialize ObjectId, so normalize the ID at
+    # the service boundary before sending it to the RAG microservice.
+    safe_conversation_id = (
+        str(conversation_id) if conversation_id is not None else None
+    )
+
     return await _request("POST", "/api/chat", json={
-        "query": query, "language": language, "conversation_id": conversation_id, "jurisdiction": jurisdiction,
+        "query": query,
+        "language": language,
+        "conversation_id": safe_conversation_id,
+        "jurisdiction": jurisdiction,
     })
 
 
