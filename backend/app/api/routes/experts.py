@@ -25,6 +25,7 @@ def _to_dict(doc: dict) -> dict:
         "recommended": doc.get("recommended", False),
         "reason": doc.get("reason"),
         "case_summary": doc.get("case_summary"),
+        "expert_type": doc.get("expert_type"),
         "status": doc.get("status", "pending"),
         "created_at": doc["created_at"].isoformat() if doc.get("created_at") else None,
     }

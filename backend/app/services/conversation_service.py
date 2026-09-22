@@ -21,12 +21,20 @@ from app.models.conversation import (
 )
 
 
+def new_conversation_id() -> str:
+    """Generate an id in the same format get_or_create_conversation() would
+    fall back to, without writing anything to the database. Lets a caller
+    (see chat.py's _handle_query) settle on the id to pass to the RAG
+    service *before* deciding whether/when to persist the conversation."""
+    return f"conv-{uuid.uuid4().hex[:12]}"
+
+
 def get_or_create_conversation(db, conversation_id: str | None, title_hint: str, language: str, user_id: str) -> dict:
     if conversation_id:
         conv = db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id})
         if conv:
             return conv
-    new_id = conversation_id or f"conv-{uuid.uuid4().hex[:12]}"
+    new_id = conversation_id or new_conversation_id()
     conv = new_conversation(
         id=new_id,
         user_id=user_id,
@@ -80,6 +88,7 @@ def touch_conversation(db, conversation: dict) -> None:
 
 # Re-exported for routes that build response payloads.
 __all__ = [
+    "new_conversation_id",
     "get_or_create_conversation",
     "recent_messages",
     "add_message",

@@ -79,6 +79,48 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
     }
   };
 
+  // NEW: Research Sessions had no delete option at all, so sessions could
+  // only ever accumulate here (including any that briefly appeared from the
+  // now-fixed blank-conversation bug in ChatView/backend). Deletes both the
+  // server record and its messages, then removes it from view immediately.
+  const deleteConversationItem = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this research session? This cannot be undone.')) {
+      return;
+    }
+    const previous = conversations;
+    setConversations(conversations.filter((c) => c.id !== id));
+    try {
+      const res = await authFetch(`/api/conversations/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        throw new Error(`Delete failed with status ${res.status}`);
+      }
+      // ChatView caches this same conversation list under this key so it
+      // doesn't have to wait on a network round trip on every mount. Strip
+      // the deleted session from that cache too, otherwise it can briefly
+      // reappear if Sahayak is opened again before its own server refetch.
+      try {
+        const cached = localStorage.getItem('ipsakti_sahayak_conversations_v2');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            localStorage.setItem(
+              'ipsakti_sahayak_conversations_v2',
+              JSON.stringify(parsed.filter((c: any) => c?.id !== id)),
+            );
+          }
+        }
+      } catch (cacheErr) {
+        // Non-fatal -- ChatView's next server sync will still reconcile this.
+      }
+    } catch (err) {
+      console.error('Failed to delete conversation:', err);
+      // Roll back the optimistic removal so the workspace still reflects
+      // the server's actual state if the delete didn't go through.
+      setConversations(previous);
+    }
+  };
+
   const exportDossierJSON = () => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({
       exported_at: new Date().toISOString(),
@@ -236,14 +278,24 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
                     <span className="text-slate-400 font-medium">
                       {conv.messages.length} messages
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('chat')}
-                      className="font-semibold text-emerald-800 hover:text-emerald-950 flex items-center gap-1"
-                    >
-                      <span>Open in Sahayak</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={(e) => deleteConversationItem(e, conv.id)}
+                        className="text-slate-400 hover:text-rose-600 transition-colors"
+                        title="Delete research session"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('chat')}
+                        className="font-semibold text-emerald-800 hover:text-emerald-950 flex items-center gap-1"
+                      >
+                        <span>Open in Sahayak</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))

@@ -74,6 +74,7 @@ def expert_escalation(body: ExpertEscalationRequest, current_user: dict = Depend
         recommended=True,
         reason=body.reason or decision.reason,
         case_summary=decision.case_summary or body.query[:200],
+        expert_type=body.expert_type,
     )
     db[EXPERT_ESCALATIONS_COLLECTION].insert_one(record)
     expert_escalation_service.notify_real_service(record_id)

@@ -86,6 +86,11 @@ class Settings(BaseSettings):
     confidence_low_threshold: float = 0.15
     min_chunks_for_high_confidence: int = 3
     abstain_below_score: float = 0.15
+    # Below this rescaled confidence score, decide_abstention() flags the
+    # answer for expert review; the backend's expert_escalation_service uses
+    # the same 0.70 cutoff, so a message is only ever redirected to an expert
+    # when its displayed confidence score is under 70%.
+    confidence_expert_escalation_threshold: float = 0.70
 
     # Translation (Bhashini) — see app/translation/bhashini_client.py
     translation_provider: str = "none"  # none | bhashini

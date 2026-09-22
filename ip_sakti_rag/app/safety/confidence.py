@@ -11,6 +11,31 @@ from app.safety.citation_validator import ValidationResult
 from app.schemas import ConfidenceLevel, ConfidenceMetric
 
 
+# The raw fused retrieval score only has to clear fairly low bars (see the
+# confidence_*_threshold settings, e.g. 0.45 for "High") to be classified into
+# a given level -- it was never itself a meaningful "confidence percentage",
+# even though it was being shown to users and compared against a 70%/80%
+# expert-escalation cutoff as if it were one. That mismatch is what made a
+# well-cited "High" answer show up at ~50% and get redirected to an expert
+# anyway. Each level is now rescaled into a fixed 0-1 band that means what it
+# says: High -> 0.80-1.00, Moderate -> 0.70-0.79 (still no expert redirect),
+# Low -> 0.40-0.69, Insufficient evidence -> 0.05-0.39 (both redirect, since
+# expert_escalation_service escalates anything below 0.70).
+_SCORE_BANDS: dict[ConfidenceLevel, tuple[float, float]] = {
+    "High": (0.80, 1.00),
+    "Moderate": (0.70, 0.79),
+    "Low": (0.40, 0.69),
+    "Insufficient evidence": (0.05, 0.39),
+}
+
+
+def _rescale_into_band(adjusted_score: float, level: ConfidenceLevel, raw_lo: float, raw_hi: float) -> float:
+    band_lo, band_hi = _SCORE_BANDS[level]
+    raw_span = max(raw_hi - raw_lo, 1e-6)
+    frac = min(1.0, max(0.0, (adjusted_score - raw_lo) / raw_span))
+    return round(band_lo + frac * (band_hi - band_lo), 3)
+
+
 def compute_confidence(
     top_score: float,
     chunk_count: int,
@@ -27,17 +52,21 @@ def compute_confidence(
         level = "High"
         reasons.append(f"Multi-source convergence across {chunk_count} relevant indexed provisions.")
         reasons.append("Direct statutory/regulatory citations matched the query terms closely.")
+        score = _rescale_into_band(adjusted_score, level, settings.confidence_high_threshold, 1.0)
     elif adjusted_score > settings.confidence_moderate_threshold and chunk_count >= 2:
         level = "Moderate"
         reasons.append("Relevant regulatory principles retrieved with partial textual alignment.")
         reasons.append("Sufficient basis for analytical decision-support; verify specifics before filing.")
+        score = _rescale_into_band(adjusted_score, level, settings.confidence_moderate_threshold, settings.confidence_high_threshold)
     elif adjusted_score > settings.confidence_low_threshold:
         level = "Low"
         reasons.append("Limited direct textual overlap with indexed statutory provisions.")
         reasons.append("Recommend consulting official gazettes or a specialist before relying on this.")
+        score = _rescale_into_band(adjusted_score, level, settings.confidence_low_threshold, settings.confidence_moderate_threshold)
     else:
         level = "Insufficient evidence"
         reasons.append("No directly matching legislative provisions or official guidelines were found in the indexed knowledge base.")
+        score = _rescale_into_band(adjusted_score, level, 0.0, settings.confidence_low_threshold)
 
     if validation.hallucinated_tag_count:
         reasons.append(
@@ -50,4 +79,4 @@ def compute_confidence(
             "authority allow-list and should be independently verified."
         )
 
-    return ConfidenceMetric(level=level, score=round(min(1.0, max(0.05, adjusted_score)), 3), reasons=reasons)
+    return ConfidenceMetric(level=level, score=score, reasons=reasons)

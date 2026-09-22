@@ -266,21 +266,21 @@ function getInitialConversations(): Conversation[] {
   if (typeof window !== "undefined") {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_CONVS_KEY);
-      if (stored) {
+      // FIXED ("2 chats keep appearing after deleting everything"): this
+      // used to check `parsed.length > 0` and fall through to reseeding the
+      // two hardcoded demo conversations whenever the stored list was
+      // empty -- which is exactly what happens right after the user
+      // deletes every conversation (persistConversations writes `[]`).
+      // Deleting everything should mean everything, so an explicit,
+      // already-initialized empty list (`stored !== null`) is now returned
+      // as-is. The demo conversations are only ever seeded on a true first
+      // run, when nothing has been saved to this browser yet.
+      if (stored !== null) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const normalized = parsed
+        if (Array.isArray(parsed)) {
+          return parsed
             .map((c: Conversation) => normalizeConversation(c))
             .filter((c): c is Conversation => c !== null);
-          const hasIntl = normalized.some(
-            (c: Conversation) => c.jurisdiction === "international",
-          );
-          if (!hasIntl) {
-            normalized.push(DEFAULT_INITIAL_INTL_CONV);
-          }
-          return normalized.length > 0
-            ? normalized
-            : [DEFAULT_INITIAL_CONV, DEFAULT_INITIAL_INTL_CONV];
         }
       }
     } catch (e) {}
@@ -320,10 +320,17 @@ function getInitialActiveId(convs: Conversation[], isIntl: boolean): string {
   const matching = convs.filter(
     (c) => (c.jurisdiction || "india") === targetJur,
   );
-  return (
-    matching[0]?.id ||
-    (isIntl ? DEFAULT_INITIAL_INTL_CONV.id : DEFAULT_INITIAL_CONV.id)
-  );
+  // Only fall back to a hardcoded demo id when that demo conversation is
+  // actually present in `convs` (true first run). Returning it
+  // unconditionally used to point activeConvId at a demo chat that no
+  // longer existed once the user had deleted everything, leaving the chat
+  // panel in a confusing half-empty state instead of the clean "no active
+  // session" state deleteConversation() already handles.
+  if (matching.length > 0) {
+    return matching[0].id;
+  }
+  const fallbackDefault = isIntl ? DEFAULT_INITIAL_INTL_CONV : DEFAULT_INITIAL_CONV;
+  return convs.some((c) => c.id === fallbackDefault.id) ? fallbackDefault.id : "";
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
@@ -392,6 +399,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [grievanceNotice, setGrievanceNotice] = useState<string | null>(null);
   const [expertRequestingMsgId, setExpertRequestingMsgId] = useState<string | null>(null);
   const [expertRequestedMsgIds, setExpertRequestedMsgIds] = useState<Set<string>>(new Set());
+  // Which low-confidence message's "choose an expert" picker is currently
+  // open (its list of expert-type buttons), keyed by message id.
+  const [expertPickerOpenMsgId, setExpertPickerOpenMsgId] = useState<string | null>(null);
+
+  const EXPERT_TYPES: { id: string; label: string }[] = [
+    { id: "ayurveda", label: "Ayurveda Expert" },
+    { id: "legal", label: "Legal / IP Expert" },
+    { id: "regulatory", label: "Regulatory Affairs Expert" },
+  ];
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -587,12 +603,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
               new Date(a.updated_at || a.created_at).getTime(),
           );
 
-          const hasIntl = merged.some(
-            (c) => c.jurisdiction === "international",
-          );
-          if (!hasIntl) {
-            merged.push(DEFAULT_INITIAL_INTL_CONV);
-          }
+          // FIXED: this used to force a demo international conversation
+          // back into the list whenever no "international" jurisdiction
+          // conversation was present -- including right after the user
+          // deliberately deleted it, which is exactly the "deleted chats
+          // keep coming back" bug. The demo conversations are now only
+          // ever seeded once, in getInitialConversations(), on a true
+          // first run.
 
           try {
             localStorage.setItem(
@@ -667,23 +684,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
       ? "international"
       : "india";
     const newId = `conv-${currentJur}-${Date.now()}`;
-    const defaultTitle = isInternational
-      ? "New International Session"
-      : "New Indian Session";
 
-    const newConv: Conversation = {
-      id: newId,
-      user_id: "user-default",
-      title: defaultTitle,
-      language,
-      jurisdiction: currentJur,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      messages: [],
-    };
-
-    const updated = [newConv, ...conversations];
-    persistConversations(updated, newId);
+    // FIXED ("blank chats piling up"): this used to immediately add a
+    // placeholder conversation (0 messages, a default "New ... Session"
+    // title) into `conversations` and localStorage. Since the title was
+    // never empty, normalizeConversation's blank-record filter never
+    // caught these, so every "+ New Session" click that wasn't followed by
+    // an actual message left another empty entry behind permanently. Now
+    // this only switches the active draft id/empty message list -- no
+    // conversation record is created (locally or on the server) until
+    // handleSend() actually sends a first message, reusing this same id.
     setActiveConvId(newId);
     if (isInternational) {
       setActiveIntlConvId(newId);
@@ -693,11 +703,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
     setMessages([]);
     setStreamingText("");
     setInputValue("");
-
-    // Do not create the conversation on the server yet. The real /api/chat
-    // request creates it when the user actually sends the first message.
-    // This prevents abandoned "New Session" clicks from creating empty
-    // database records that later appear as blank chats.
 
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
       setSidebarOpen(false);
@@ -817,7 +822,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     if (e.target) e.target.value = "";
   };
 
-  const requestExpertReview = async (msg: StructuredChatMessage) => {
+  const requestExpertReview = async (msg: StructuredChatMessage, expertType: string) => {
     if (!activeConvId || !msg.confidence || expertRequestingMsgId === msg.id) return;
     setExpertRequestingMsgId(msg.id);
     try {
@@ -828,10 +833,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
           conversation_id: activeConvId,
           query: messages.find((m) => m.role === "user")?.content || "Low-confidence consultation",
           reason: `Confidence score below 70% (${Math.round((msg.confidence.score <= 1 ? msg.confidence.score * 100 : msg.confidence.score))}%).`,
+          expert_type: expertType,
         }),
       });
       if (res.ok) {
         setExpertRequestedMsgIds((prev) => new Set(prev).add(msg.id));
+        setExpertPickerOpenMsgId(null);
       }
     } catch (err) {
       console.warn("Expert review request failed:", err);
@@ -936,8 +943,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
         c.id === targetConvId && (c.jurisdiction || "india") === currentJur,
     );
 
-    if (!targetConvId || !currentConv) {
-      targetConvId = `conv-${currentJur}-${Date.now()}`;
+    if (!currentConv) {
+      // No stored conversation matches yet -- either there's no active id
+      // at all, or (see startNewConversation) activeConvId is a fresh,
+      // not-yet-persisted draft id. Reuse that draft id when we have one so
+      // it becomes the real, stored session instead of spawning a second
+      // entry; only mint a brand new id if there truly isn't one.
+      if (!targetConvId) {
+        targetConvId = `conv-${currentJur}-${Date.now()}`;
+      }
       const newTitle =
         textToSend.slice(0, 45) + (textToSend.length > 45 ? "..." : "");
       currentConv = {
@@ -1680,6 +1694,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                         const score = rawScore <= 1 ? rawScore * 100 : rawScore;
                         if (score >= 70) return null;
                         const requested = expertRequestedMsgIds.has(msg.id);
+                        const pickerOpen = expertPickerOpenMsgId === msg.id;
                         return (
                           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2.5">
                             <div className="flex items-start gap-2">
@@ -1687,18 +1702,47 @@ export const ChatView: React.FC<ChatViewProps> = ({
                               <div>
                                 <p className="text-xs font-semibold text-amber-900">Low confidence — expert review recommended</p>
                                 <p className="text-[11px] leading-relaxed text-amber-800 mt-0.5">
-                                  The confidence score is below 70%. This query has been flagged for expert review so that a qualified expert can assess it before you rely on the answer.
+                                  The confidence score is below 70%. Choose how you'd like to proceed: get this reviewed by a qualified expert, or raise a grievance.
                                 </p>
                               </div>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                              <button type="button" onClick={() => requestExpertReview(msg)} disabled={requested || expertRequestingMsgId === msg.id} className="px-2.5 py-1.5 rounded-md bg-amber-700 text-white text-[11px] font-medium hover:bg-amber-800 disabled:opacity-60">
-                                {requested ? "Expert Review Requested" : expertRequestingMsgId === msg.id ? "Requesting..." : "Request Expert Review"}
-                              </button>
-                              <button type="button" onClick={raiseGrievance} className="px-2.5 py-1.5 rounded-md border border-amber-300 bg-white text-amber-900 text-[11px] font-medium hover:bg-amber-100">
-                                Raise a Grievance
-                              </button>
-                            </div>
+
+                            {!requested && (
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpertPickerOpenMsgId(pickerOpen ? null : msg.id)}
+                                  disabled={expertRequestingMsgId === msg.id}
+                                  className="px-2.5 py-1.5 rounded-md bg-amber-700 text-white text-[11px] font-medium hover:bg-amber-800 disabled:opacity-60"
+                                >
+                                  {expertRequestingMsgId === msg.id ? "Requesting..." : "Choose an Expert"}
+                                </button>
+                                <button type="button" onClick={raiseGrievance} className="px-2.5 py-1.5 rounded-md border border-amber-300 bg-white text-amber-900 text-[11px] font-medium hover:bg-amber-100">
+                                  Raise a Grievance
+                                </button>
+                              </div>
+                            )}
+
+                            {requested && (
+                              <p className="text-[11px] font-medium text-amber-900">Expert review requested.</p>
+                            )}
+
+                            {!requested && pickerOpen && (
+                              <div className="flex flex-wrap gap-2 pt-1 border-t border-amber-200/70">
+                                {EXPERT_TYPES.map((et) => (
+                                  <button
+                                    key={et.id}
+                                    type="button"
+                                    onClick={() => requestExpertReview(msg, et.id)}
+                                    disabled={expertRequestingMsgId === msg.id}
+                                    className="mt-1.5 px-2.5 py-1.5 rounded-md border border-amber-300 bg-white text-amber-900 text-[11px] font-medium hover:bg-amber-100 disabled:opacity-60"
+                                  >
+                                    {et.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
                             {grievanceNotice && <p className="text-[10px] text-amber-800 bg-white/70 rounded-md p-2">{grievanceNotice}</p>}
                           </div>
                         );

@@ -23,11 +23,15 @@ def decide_abstention(
     Returns (needs_clarification, needs_expert).
     """
     needs_clarification = chunk_count == 0 and confidence.score < settings.abstain_below_score
-    needs_expert = (
-        confidence.level in ("Low", "Insufficient evidence")
-        or (intent in HIGH_RISK_INTENTS and confidence.level != "High")
-        or jurisdiction_count > 1  # cross-border questions always warrant expert sign-off
-    )
+    # Expert redirection is driven purely by the (rescaled, percentage-
+    # meaningful) confidence score: >=70% never redirects, <70% always does.
+    # This used to also force a redirect for high-risk intents or any
+    # cross-border query regardless of how strong the retrieved evidence
+    # was, which made a well-cited "High confidence" answer get redirected
+    # to an expert anyway -- i.e. the confidence score had no real effect on
+    # this decision. `intent` / `jurisdiction_count` are kept as parameters
+    # (other callers still pass them) but no longer override the score.
+    needs_expert = confidence.score < settings.confidence_expert_escalation_threshold
     return needs_clarification, needs_expert
 
 

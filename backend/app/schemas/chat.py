@@ -78,3 +78,8 @@ class ExpertEscalationRequest(BaseModel):
     conversation_id: Optional[str] = None
     query: str
     reason: Optional[str] = None
+    # Which kind of expert the user picked from the low-confidence redirect
+    # options (e.g. "ayurveda", "legal", "ip_patent"). Optional/free-form so
+    # the frontend's list of expert categories can change without a schema
+    # change here.
+    expert_type: Optional[str] = None

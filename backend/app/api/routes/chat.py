@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_current_user
@@ -30,7 +30,19 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
     if not query:
         raise HTTPException(status_code=400, detail="Query is required.")
 
-    conv = conversation_service.get_or_create_conversation(db, conversation_id, query, language, user_id=user_id)
+    # FIXED ("19+ blank chats"): this used to call get_or_create_conversation
+    # (which INSERTs a conversation document) before calling the RAG
+    # microservice. On free-tier hosting the RAG service cold-starts /
+    # sleeps and regularly times out or errors after several retries (see
+    # rag_client._request) -- when that happened, the conversation record
+    # was already sitting in MongoDB with zero messages, and every retry
+    # produced another one. Now: resolve/generate the conversation id
+    # without writing anything, call the RAG service first, and only create
+    # the conversation record (and its messages) once we actually have a
+    # response to store. A failed call now raises RagServiceError with
+    # nothing written to the database at all -- no more orphaned blanks.
+    existing_conv = db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id}) if conversation_id else None
+    working_conversation_id = existing_conv["_id"] if existing_conv else (conversation_id or conversation_service.new_conversation_id())
 
     # All retrieval + reasoning happens in the ip_sakti_rag microservice now.
     # FIXED: `jurisdiction` (the India/International toggle's value) used to
@@ -38,7 +50,14 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
     # rag_client.chat() -- the toggle had zero effect on the backend. Now
     # forwarded through so ip_sakti_rag's scope guard can enforce it
     # (see ip_sakti_rag/app/safety/scope_guard.py).
-    rag_result = await rag_client.chat(query=query, language=language, conversation_id=conv["_id"], jurisdiction=jurisdiction)
+    rag_result = await rag_client.chat(query=query, language=language, conversation_id=working_conversation_id, jurisdiction=jurisdiction)
+
+    # Only now -- once the RAG call has actually succeeded -- do we create
+    # (or fetch) the conversation record, reusing working_conversation_id so
+    # it matches what was just sent to/returned by the RAG service.
+    conv = existing_conv or conversation_service.get_or_create_conversation(
+        db, working_conversation_id, query, language, user_id=user_id,
+    )
 
     confidence = rag_result.get("confidence") or {}
     raw_confidence_score = confidence.get("score")
@@ -50,13 +69,20 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
     if confidence_score is not None and confidence_score > 1:
         confidence_score = confidence_score / 100.0
 
+    # `rag_result["needs_expert"]` is now just ip_sakti_rag's own confidence
+    # < 70% check (see decide_abstention) -- it is not an actual user
+    # request, and passing it as `user_requested=True` produced a
+    # misleading "User explicitly requested expert consultation" reason on
+    # every low-confidence answer. `confidence_score` below already drives
+    # the same low-confidence escalation correctly, so it's simply dropped
+    # here; `user_requested` is reserved for a real explicit ask (there
+    # isn't one on this code path).
     escalation = expert_escalation_service.evaluate_escalation(
         query=query,
         confidence_level=confidence.get("level", "Low"),
         confidence_score=confidence_score,
         has_conflicts=False,
         jurisdiction_coverage_available=bool(rag_result.get("jurisdiction")),
-        user_requested=bool(rag_result.get("needs_expert")),
     )
 
     conversation_service.add_message(
@@ -176,6 +202,24 @@ def list_conversations(current_user: dict = Depends(get_current_user), db=Depend
     every conversation (needed for future admin oversight views)."""
     is_admin = "Admin" in current_user.get("roles", [])
     query = {} if is_admin else {"user_id": current_user["id"]}
+
+    # One-time self-cleanup for the pre-existing "blank chats" bug: earlier
+    # versions of _handle_query could leave behind a conversation record
+    # with message_seq == 0 (created, then never got any messages because
+    # the RAG call failed/timed out -- see _handle_query above, which no
+    # longer does this going forward). A conversation can only legitimately
+    # reach message_seq == 0 if its very first message insert hasn't
+    # happened yet, which now only occurs in the instant between
+    # get_or_create_conversation() and add_message() within a single
+    # request -- so it's safe to purge any that are more than a couple of
+    # minutes old; a conversation actively mid-request is never that stale.
+    stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=2)
+    db[CONVERSATIONS_COLLECTION].delete_many({
+        **query,
+        "message_seq": 0,
+        "created_at": {"$lt": stale_cutoff},
+    })
+
     convs = list(db[CONVERSATIONS_COLLECTION].find(query).sort("updated_at", -1))
     return [
         conversation_service.conversation_to_dict(c, conversation_service.recent_messages(db, c["_id"], limit=1000))

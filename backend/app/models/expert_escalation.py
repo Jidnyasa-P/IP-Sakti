@@ -13,6 +13,7 @@ def new_expert_escalation(
     conversation_id: str | None = None,
     recommended: bool = False,
     status: str = "pending",
+    expert_type: str | None = None,
 ) -> dict:
     return {
         "_id": id,
@@ -20,6 +21,7 @@ def new_expert_escalation(
         "recommended": recommended,
         "reason": reason,
         "case_summary": case_summary,
+        "expert_type": expert_type,  # e.g. "ayurveda" | "legal" | "ip_patent"
         "status": status,  # pending | assigned | resolved
         "created_at": datetime.now(timezone.utc),
     }
