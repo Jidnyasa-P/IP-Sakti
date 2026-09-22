@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_user, require_role
 from app.database.session import get_db
 from app.models.citation import COLLECTION as SAVED_RESEARCH_COLLECTION, new_saved_research, to_dict as saved_research_to_dict
-from app.schemas.chat import SaveResearchRequest, TranslateRequest
+from app.models.grievance import COLLECTION as GRIEVANCE_COLLECTION, new_grievance, to_dict as grievance_to_dict
+from app.schemas.chat import SaveResearchRequest, TranslateRequest, GrievanceCreateRequest
 from app.translation.translation_service import get_translation_provider
 import app.rag_client as rag_client
 
@@ -51,6 +52,41 @@ def delete_saved_research(research_id: str, current_user: dict = Depends(get_cur
             raise HTTPException(status_code=403, detail="You do not have access to this saved item.")
         db[SAVED_RESEARCH_COLLECTION].delete_one({"_id": research_id})
     return {"success": True}
+
+
+@router.get("/api/workspace/grievances")
+def list_grievances(current_user: dict = Depends(get_current_user), db=Depends(get_db)):
+    rows = db[GRIEVANCE_COLLECTION].find({"user_id": current_user["id"]}).sort("created_at", -1)
+    return [grievance_to_dict(row) for row in rows]
+
+
+@router.post("/api/workspace/grievances")
+def create_grievance(
+    body: GrievanceCreateRequest,
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    # If a chat context was supplied, verify that it belongs to this user.
+    if body.conversation_id:
+        conversation = db["conversations"].find_one({
+            "_id": body.conversation_id,
+            "user_id": current_user["id"],
+        })
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Related conversation was not found.")
+
+    record = new_grievance(
+        id=f"grievance-{uuid.uuid4().hex[:12]}",
+        user_id=current_user["id"],
+        category=body.category.strip(),
+        subject=body.subject.strip(),
+        description=body.description.strip(),
+        conversation_id=body.conversation_id,
+        message_id=body.message_id,
+        related_query=(body.related_query or "").strip() or None,
+    )
+    db[GRIEVANCE_COLLECTION].insert_one(record)
+    return grievance_to_dict(record)
 
 
 @router.get("/api/resources")

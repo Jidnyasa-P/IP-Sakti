@@ -10,8 +10,10 @@ import {
   Clock,
   Sparkles,
   Bell,
+  X,
+  AlertCircle,
 } from 'lucide-react';
-import { Conversation, ProductAnalysisResult } from '../types';
+import { Conversation, ProductAnalysisResult, Grievance } from '../types';
 import { ActiveTab } from './Header';
 import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
@@ -19,20 +21,43 @@ import { authFetch } from './auth/authStorage';
 
 interface WorkspaceViewProps {
   setActiveTab: (tab: ActiveTab) => void;
+  openGrievanceOnLoad?: {
+    conversationId?: string;
+    messageId?: string;
+    query?: string;
+    response?: string;
+  } | null;
+  onGrievanceOpened?: () => void;
 }
 
-export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) => {
+export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
+  setActiveTab,
+  openGrievanceOnLoad,
+  onGrievanceOpened,
+}) => {
   const { t } = useTranslation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [products, setProducts] = useState<ProductAnalysisResult[]>([]);
   const [savedResearch, setSavedResearch] = useState<any[]>([]);
+  const [grievances, setGrievances] = useState<Grievance[]>([]);
+  const [grievanceModalOpen, setGrievanceModalOpen] = useState(false);
+  const [grievanceSubmitting, setGrievanceSubmitting] = useState(false);
+  const [grievanceError, setGrievanceError] = useState<string | null>(null);
+  const [grievanceForm, setGrievanceForm] = useState({
+    category: 'Low-confidence AI response',
+    subject: '',
+    description: '',
+    conversationId: '',
+    messageId: '',
+    relatedQuery: '',
+  });
   // NEW: this view had no loading state at all -- while the 3 parallel
   // fetches were in flight (which can take a while on free-tier hosting,
   // see the message below), the page just showed empty "no items found"
   // messages, which looks identical to a broken/frozen page. Now shows an
   // actual spinner instead.
   const [isLoading, setIsLoading] = useState(true);
-  const [activeSubTab, setActiveSubTab] = useState<'conversations' | 'products' | 'bookmarks' | 'notifications'>('conversations');
+  const [activeSubTab, setActiveSubTab] = useState<'conversations' | 'products' | 'bookmarks' | 'notifications' | 'grievances'>('conversations');
 
   useEffect(() => {
     loadWorkspaceData();
@@ -41,10 +66,11 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
   const loadWorkspaceData = async () => {
     setIsLoading(true);
     try {
-      const [convRes, prodRes, savedRes] = await Promise.all([
+      const [convRes, prodRes, savedRes, grievanceRes] = await Promise.all([
         authFetch('/api/conversations').catch(() => null),
         authFetch('/api/products').catch(() => null),
         authFetch('/api/workspace/saved-research').catch(() => null),
+        authFetch('/api/workspace/grievances').catch(() => null),
       ]);
 
       const convData =
@@ -59,14 +85,87 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
         savedRes && savedRes.ok && savedRes.headers.get('content-type')?.includes('application/json')
           ? await savedRes.json()
           : [];
+      const grievanceData =
+        grievanceRes && grievanceRes.ok && grievanceRes.headers.get('content-type')?.includes('application/json')
+          ? await grievanceRes.json()
+          : [];
 
       setConversations(Array.isArray(convData) ? convData : []);
       setProducts(Array.isArray(prodData) ? prodData : []);
       setSavedResearch(Array.isArray(savedData) ? savedData : []);
+      setGrievances(Array.isArray(grievanceData) ? grievanceData : []);
     } catch (e) {
       console.warn('Failed to load workspace data:', e);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!openGrievanceOnLoad) return;
+    setActiveSubTab('grievances');
+    setGrievanceForm({
+      category: 'Low-confidence AI response',
+      subject: openGrievanceOnLoad.query
+        ? `Concern about response: ${openGrievanceOnLoad.query.slice(0, 80)}`
+        : '',
+      description: openGrievanceOnLoad.response
+        ? `I would like this response to be reviewed.\n\nAI response:\n${openGrievanceOnLoad.response}`
+        : '',
+      conversationId: openGrievanceOnLoad.conversationId || '',
+      messageId: openGrievanceOnLoad.messageId || '',
+      relatedQuery: openGrievanceOnLoad.query || '',
+    });
+    setGrievanceError(null);
+    setGrievanceModalOpen(true);
+    onGrievanceOpened?.();
+  }, [openGrievanceOnLoad]);
+
+  const openBlankGrievanceForm = () => {
+    setActiveSubTab('grievances');
+    setGrievanceForm({
+      category: 'General query',
+      subject: '',
+      description: '',
+      conversationId: '',
+      messageId: '',
+      relatedQuery: '',
+    });
+    setGrievanceError(null);
+    setGrievanceModalOpen(true);
+  };
+
+  const submitGrievance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!grievanceForm.subject.trim() || !grievanceForm.description.trim()) {
+      setGrievanceError('Please enter a subject and describe your query or grievance.');
+      return;
+    }
+    setGrievanceSubmitting(true);
+    setGrievanceError(null);
+    try {
+      const res = await authFetch('/api/workspace/grievances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: grievanceForm.category.trim(),
+          subject: grievanceForm.subject.trim(),
+          description: grievanceForm.description.trim(),
+          conversation_id: grievanceForm.conversationId || undefined,
+          message_id: grievanceForm.messageId || undefined,
+          related_query: grievanceForm.relatedQuery || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.detail || 'Unable to submit the grievance.');
+      }
+      setGrievances((prev) => [data, ...prev]);
+      setGrievanceModalOpen(false);
+    } catch (err) {
+      setGrievanceError(err instanceof Error ? err.message : 'Unable to submit the grievance.');
+    } finally {
+      setGrievanceSubmitting(false);
     }
   };
 
@@ -236,6 +335,18 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
 
   <span>Notifications ({Notification.length})</span>
 </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('grievances')}
+          className={`pb-3 border-b-2 transition-colors flex items-center gap-2 ${
+            activeSubTab === 'grievances'
+              ? 'border-emerald-700 text-slate-900 font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <AlertCircle className="w-4 h-4" />
+          <span>Grievances ({grievances.length})</span>
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -539,6 +650,159 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({ setActiveTab }) =>
 
   </div>
 )}
+
+        {activeSubTab === 'grievances' && (
+          <div className="space-y-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Grievances & Queries</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Submit a query or report a concern. Your submitted grievances are stored here.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openBlankGrievanceForm}
+                className="px-4 py-2.5 rounded-xl bg-emerald-800 text-white text-xs font-semibold hover:bg-emerald-900 transition-colors whitespace-nowrap"
+              >
+                Raise Your Query
+              </button>
+            </div>
+
+            {grievances.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400 bg-white border border-slate-200 rounded-2xl">
+                No grievances have been submitted yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {grievances.map((g) => (
+                  <div key={g.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                            {g.category}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold">
+                            {g.status}
+                          </span>
+                        </div>
+                        <h3 className="font-semibold text-slate-900 text-sm mt-2">{g.subject}</h3>
+                      </div>
+                      <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                        {g.created_at ? new Date(g.created_at).toLocaleString() : ''}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-3 whitespace-pre-wrap">{g.description}</p>
+                    {g.related_query && (
+                      <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Related query</p>
+                        <p className="text-xs text-slate-700 mt-1">{g.related_query}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {grievanceModalOpen && (
+              <div className="fixed inset-0 z-[80] bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+                  <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900">Raise Your Query</h2>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Provide the details so your query can be recorded and reviewed.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setGrievanceModalOpen(false)}
+                      className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                      aria-label="Close grievance form"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={submitGrievance} className="p-5 space-y-4">
+                    {grievanceError && (
+                      <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800">
+                        {grievanceError}
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">Query Type</label>
+                      <select
+                        value={grievanceForm.category}
+                        onChange={(e) => setGrievanceForm((f) => ({ ...f, category: e.target.value }))}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      >
+                        <option>Low-confidence AI response</option>
+                        <option>Incorrect or incomplete information</option>
+                        <option>Source or citation concern</option>
+                        <option>Technical issue</option>
+                        <option>General query</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">Subject</label>
+                      <input
+                        required
+                        maxLength={160}
+                        value={grievanceForm.subject}
+                        onChange={(e) => setGrievanceForm((f) => ({ ...f, subject: e.target.value }))}
+                        placeholder="Briefly describe your query"
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      />
+                    </div>
+
+                    {grievanceForm.relatedQuery && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">Related Chat Query</label>
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+                          {grievanceForm.relatedQuery}
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">Describe Your Query / Grievance</label>
+                      <textarea
+                        required
+                        maxLength={5000}
+                        rows={6}
+                        value={grievanceForm.description}
+                        onChange={(e) => setGrievanceForm((f) => ({ ...f, description: e.target.value }))}
+                        placeholder="Explain what you need reviewed or what went wrong..."
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setGrievanceModalOpen(false)}
+                        className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={grievanceSubmitting}
+                        className="px-5 py-2.5 rounded-xl bg-emerald-800 text-white text-xs font-semibold hover:bg-emerald-900 disabled:opacity-60"
+                      >
+                        {grievanceSubmitting ? 'Submitting...' : 'Submit Query'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <DisclaimerBanner />

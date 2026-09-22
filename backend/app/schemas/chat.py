@@ -83,3 +83,13 @@ class ExpertEscalationRequest(BaseModel):
     # the frontend's list of expert categories can change without a schema
     # change here.
     expert_type: Optional[str] = None
+
+
+
+class GrievanceCreateRequest(BaseModel):
+    category: str = Field(..., min_length=1, max_length=80)
+    subject: str = Field(..., min_length=1, max_length=160)
+    description: str = Field(..., min_length=1, max_length=5000)
+    conversation_id: Optional[str] = None
+    message_id: Optional[str] = None
+    related_query: Optional[str] = None

@@ -28,6 +28,22 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("landing");
   const { currentLanguage, setLanguage, t } = useTranslation();
   const [activeCitation, setActiveCitation] = useState<Citation | null>(null);
+  const [pendingGrievance, setPendingGrievance] = useState<{
+    conversationId?: string;
+    messageId?: string;
+    query?: string;
+    response?: string;
+  } | null>(null);
+
+  const handleRaiseGrievance = (context: {
+    conversationId?: string;
+    messageId?: string;
+    query?: string;
+    response?: string;
+  }) => {
+    setPendingGrievance(context);
+    setActiveTab("workspace");
+  };
   const { isLoggedIn, currentUser } = useAuth();
 
   // First-time visitor guided tour auto-discovery state
@@ -120,6 +136,7 @@ function AppContent() {
           <ChatView
             language={currentLanguage}
             onOpenCitation={(cite) => setActiveCitation(cite)}
+            onRaiseGrievance={handleRaiseGrievance}
           />
         );
       case "product":
@@ -145,7 +162,13 @@ function AppContent() {
           <ResearchView onOpenCitation={(cite) => setActiveCitation(cite)} />
         );
       case "workspace":
-        return <WorkspaceView setActiveTab={setActiveTab} />;
+        return (
+          <WorkspaceView
+            setActiveTab={setActiveTab}
+            openGrievanceOnLoad={pendingGrievance}
+            onGrievanceOpened={() => setPendingGrievance(null)}
+          />
+        );
       case "admin":
         return <AdminView />;
       case "profile":

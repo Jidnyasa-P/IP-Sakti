@@ -52,6 +52,12 @@ import { authFetch } from "./auth/authStorage";
 interface ChatViewProps {
   language: Language;
   onOpenCitation: (citation: Citation) => void;
+  onRaiseGrievance: (context: {
+    conversationId?: string;
+    messageId?: string;
+    query?: string;
+    response?: string;
+  }) => void;
 }
 
 const LOCAL_STORAGE_CONVS_KEY = "ipsakti_sahayak_conversations_v2";
@@ -344,6 +350,7 @@ function getInitialActiveId(convs: Conversation[], isIntl: boolean): string {
 export const ChatView: React.FC<ChatViewProps> = ({
   language,
   onOpenCitation,
+  onRaiseGrievance,
 }) => {
   const { t } = useTranslation();
 
@@ -505,25 +512,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
       typeof window !== "undefined" ? localStorage.getItem(savedKey) || "" : "";
     let targetConv = matchingConvs.find((c) => c.id === targetId);
 
-    if (!targetConv) {
-      if (matchingConvs.length > 0) {
-        targetConv = matchingConvs[0];
-        targetId = targetConv.id;
-      } else {
-        const newConv: Conversation = checked
-          ? {
-              ...DEFAULT_INITIAL_INTL_CONV,
-              id: createClientConversationId("international"),
-            }
-          : {
-              ...DEFAULT_INITIAL_CONV,
-              id: createClientConversationId("india"),
-            };
-        currentConvs = [newConv, ...currentConvs];
-        persistConversations(currentConvs, newConv.id);
-        targetConv = newConv;
-        targetId = newConv.id;
-      }
+    if (!targetConv && matchingConvs.length > 0) {
+      targetConv = matchingConvs[0];
+      targetId = targetConv.id;
     }
 
     if (checked) {
@@ -587,63 +578,56 @@ export const ChatView: React.FC<ChatViewProps> = ({
             .filter((c): c is Conversation => c !== null)
         : [];
 
-      if (cleanedServerConvs.length > 0) {
-        setConversations((prev) => {
-          const mergedMap = new Map<string, Conversation>();
-          for (const sc of cleanedServerConvs) {
-            mergedMap.set(sc.id, sc);
-          }
-          for (const pc of prev) {
-            const normalizedPc = normalizeConversation(pc);
-            if (!normalizedPc) continue;
-            const existing = mergedMap.get(normalizedPc.id);
-            if (
-              !existing ||
-              (normalizedPc.messages &&
-                normalizedPc.messages.length > (existing.messages?.length || 0))
-            ) {
-              mergedMap.set(normalizedPc.id, normalizedPc);
-            }
-          }
-          const merged = Array.from(mergedMap.values()).sort(
-            (a, b) =>
-              new Date(b.updated_at || b.created_at).getTime() -
-              new Date(a.updated_at || a.created_at).getTime(),
+      // The authenticated backend is the source of truth. In particular,
+      // an empty server list is meaningful: it means the user deleted all
+      // of their conversations and the old local cache must not resurrect
+      // them.
+      setConversations(cleanedServerConvs);
+      try {
+        localStorage.setItem(
+          LOCAL_STORAGE_CONVS_KEY,
+          JSON.stringify(cleanedServerConvs),
+        );
+      } catch (e) {}
+
+      const targetJur: Jurisdiction = isInternational
+        ? "international"
+        : "india";
+      const current =
+        cleanedServerConvs.find(
+          (c) =>
+            c.id === activeConvId &&
+            (c.jurisdiction || "india") === targetJur,
+        ) ||
+        cleanedServerConvs.find(
+          (c) => (c.jurisdiction || "india") === targetJur,
+        ) ||
+        cleanedServerConvs[0];
+
+      if (current) {
+        setActiveConvId(current.id);
+        if (isInternational) {
+          setActiveIntlConvId(current.id);
+        } else {
+          setActiveIndiaConvId(current.id);
+        }
+        setMessages(current.messages || []);
+      } else {
+        setActiveConvId("");
+        if (isInternational) {
+          setActiveIntlConvId("");
+        } else {
+          setActiveIndiaConvId("");
+        }
+        setMessages([]);
+        try {
+          localStorage.removeItem(LOCAL_STORAGE_ACTIVE_KEY);
+          localStorage.removeItem(
+            isInternational
+              ? LOCAL_STORAGE_ACTIVE_INTL_KEY
+              : LOCAL_STORAGE_ACTIVE_INDIA_KEY,
           );
-
-          // FIXED: this used to force a demo international conversation
-          // back into the list whenever no "international" jurisdiction
-          // conversation was present -- including right after the user
-          // deliberately deleted it, which is exactly the "deleted chats
-          // keep coming back" bug. The demo conversations are now only
-          // ever seeded once, in getInitialConversations(), on a true
-          // first run.
-
-          try {
-            localStorage.setItem(
-              LOCAL_STORAGE_CONVS_KEY,
-              JSON.stringify(merged),
-            );
-          } catch (e) {}
-
-          const targetJur: Jurisdiction = isInternational
-            ? "international"
-            : "india";
-          const current =
-            merged.find(
-              (c) =>
-                c.id === activeConvId &&
-                (c.jurisdiction || "india") === targetJur,
-            ) ||
-            merged.find((c) => (c.jurisdiction || "india") === targetJur) ||
-            merged[0];
-
-          if (current && current.messages && current.messages.length > 0) {
-            setMessages(current.messages);
-            setActiveConvId(current.id);
-          }
-          return merged;
-        });
+        } catch (e) {}
       }
     } catch (e) {
       // Offline / transient network notice
@@ -720,9 +704,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const deleteConversation = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     try {
-      authFetch(`/api/conversations/${id}`, { method: "DELETE" }).catch(
-        () => null,
-      );
+      const deleteRes = await authFetch(`/api/conversations/${id}`, {
+        method: "DELETE",
+      });
+      if (!deleteRes.ok) {
+        throw new Error(`Delete failed with status ${deleteRes.status}`);
+      }
       const updated = conversations.filter((c) => c.id !== id);
       const currentJur: Jurisdiction = isInternational
         ? "international"
@@ -855,8 +842,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
   };
 
-  const raiseGrievance = () => {
-    setGrievanceNotice("Grievance submission will be available here soon. Your issue can be raised from this section once the grievance module is enabled.");
+  const raiseGrievance = (msg: StructuredChatMessage) => {
+    const relatedQuery =
+      messages.find((m) => m.role === "user")?.content || "";
+    onRaiseGrievance({
+      conversationId: activeConvId || msg.conversation_id,
+      messageId: msg.id,
+      query: relatedQuery,
+      response: msg.answer || msg.content || "",
+    });
   };
 
   const scrollToBottom = () => {
@@ -1725,7 +1719,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                                 >
                                   {expertRequestingMsgId === msg.id ? "Requesting..." : "Choose an Expert"}
                                 </button>
-                                <button type="button" onClick={raiseGrievance} className="px-2.5 py-1.5 rounded-md border border-amber-300 bg-white text-amber-900 text-[11px] font-medium hover:bg-amber-100">
+                                <button type="button" onClick={() => raiseGrievance(msg)} className="px-2.5 py-1.5 rounded-md border border-amber-300 bg-white text-amber-900 text-[11px] font-medium hover:bg-amber-100">
                                   Raise a Grievance
                                 </button>
                               </div>

@@ -366,6 +366,22 @@ export interface LowConfidenceQuery {
   expert_review?: ExpertReview;
 }
 
+
+
+export interface Grievance {
+  id: string;
+  user_id: string;
+  category: string;
+  subject: string;
+  description: string;
+  conversation_id?: string;
+  message_id?: string;
+  related_query?: string;
+  status: string;
+  created_at: string;
+  updated_at?: string;
+}
+
 // IPR Navigator Types
 export type ProtectableAssetType = 
   | 'New invention'

@@ -37,6 +37,7 @@ COLLECTION_INDEXES = {
     "validation_results": [("conversation_id", {}), ("created_at", {})],
     "feedback": [("conversation_id", {}), ("message_id", {})],
     "expert_escalations": [("conversation_id", {}), ("status", {})],
+    "grievances": [("user_id", {}), ("created_at", {}), ("status", {})],
     "audit_logs": [("conversation_id", {}), ("created_at", {})],
     "user_ingested_documents": [("status", {}), ("created_at", {})],
 }
