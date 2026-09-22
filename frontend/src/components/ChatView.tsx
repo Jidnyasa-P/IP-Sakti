@@ -976,7 +976,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     if (
       currentConv.title === "New Legal Consultation" ||
       currentConv.title === "New Indian Legal Consultation" ||
-      currentConv.title === "New International IP Consultation" ||
+      currentConv.title === "New International Consultation" ||
       currentConv.messages.length === 0
     ) {
       updatedTitle =

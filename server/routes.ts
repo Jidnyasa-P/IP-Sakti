@@ -214,7 +214,7 @@ apiRouter.post('/conversations', (req: Request, res: Response) => {
   const newConv = {
     id: `conv-${Date.now()}`,
     user_id: 'user-default',
-    title: title || (jurisdiction === 'international' ? 'New International IP Consultation' : 'New Indian Legal Consultation'),
+    title: title || (jurisdiction === 'international' ? 'New International Consultation' : 'New Indian Legal Consultation'),
     language: language || 'en',
     jurisdiction: jurisdiction || 'india',
     created_at: new Date().toISOString(),
