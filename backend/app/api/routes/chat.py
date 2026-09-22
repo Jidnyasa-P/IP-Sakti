@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_user
 from app.database.session import get_db
 from app.models.conversation import CONVERSATIONS_COLLECTION, CHAT_MESSAGES_COLLECTION
+from app.models.conversation import _json_safe
 from app.models.expert_escalation import COLLECTION as EXPERT_ESCALATIONS_COLLECTION, new_expert_escalation
 from app.models.feedback import COLLECTION as FEEDBACK_COLLECTION, new_feedback
 from app.schemas.chat import ChatRequest, QueryRequest, FeedbackRequest, NewConversationRequest, RenameConversationRequest
@@ -42,16 +43,7 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
     # response to store. A failed call now raises RagServiceError with
     # nothing written to the database at all -- no more orphaned blanks.
     existing_conv = db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id}) if conversation_id else None
-
-    # Normalize legacy MongoDB ObjectId IDs before crossing the HTTP boundary
-    # to the RAG service. The database may contain older conversations whose
-    # `_id` is an ObjectId, while current conversations use string IDs.
-    raw_working_conversation_id = (
-        existing_conv["_id"]
-        if existing_conv
-        else (conversation_id or conversation_service.new_conversation_id())
-    )
-    working_conversation_id = str(raw_working_conversation_id)
+    working_conversation_id = existing_conv["_id"] if existing_conv else (conversation_id or conversation_service.new_conversation_id())
 
     # All retrieval + reasoning happens in the ip_sakti_rag microservice now.
     # FIXED: `jurisdiction` (the India/International toggle's value) used to
@@ -164,7 +156,7 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
         db, query, body.conversation_id, body.language, user_id=current_user["id"], jurisdiction=body.resolved_jurisdiction(),
     )
     return {
-        "conversation_id": outcome["conversation_id"],
+        "conversation_id": _json_safe(outcome["conversation_id"]),
         "message": outcome["message"],
         "retrieval_metadata": outcome["result"].get("retrieval_metadata", {}),
         "scope_blocked": outcome["scope_blocked"],
@@ -178,7 +170,7 @@ async def query_endpoint(body: QueryRequest, current_user: dict = Depends(get_cu
     result = outcome["result"]
     escalation = outcome["escalation"]
     return {
-        "conversation_id": outcome["conversation_id"],
+        "conversation_id": _json_safe(outcome["conversation_id"]),
         "answer": result.get("answer"),
         "classification": {"category": result.get("product_classification")},
         "jurisdiction": result.get("jurisdiction"),
