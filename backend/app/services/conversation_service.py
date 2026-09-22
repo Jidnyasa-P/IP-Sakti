@@ -9,7 +9,8 @@ conversation's history is never mixed in.
 import uuid
 from datetime import datetime, timezone
 
-from pymongo import DuplicateKeyError, ReturnDocument
+from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
 from app.models.conversation import (
     CONVERSATIONS_COLLECTION,
