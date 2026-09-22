@@ -58,6 +58,10 @@ class NewConversationRequest(BaseModel):
     language: str = "en"
 
 
+class RenameConversationRequest(BaseModel):
+    title: str
+
+
 class SaveResearchRequest(BaseModel):
     document_id: str
     title: str

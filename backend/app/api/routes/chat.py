@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_current_user
@@ -6,7 +7,7 @@ from app.database.session import get_db
 from app.models.conversation import CONVERSATIONS_COLLECTION, CHAT_MESSAGES_COLLECTION
 from app.models.expert_escalation import COLLECTION as EXPERT_ESCALATIONS_COLLECTION, new_expert_escalation
 from app.models.feedback import COLLECTION as FEEDBACK_COLLECTION, new_feedback
-from app.schemas.chat import ChatRequest, QueryRequest, FeedbackRequest, NewConversationRequest
+from app.schemas.chat import ChatRequest, QueryRequest, FeedbackRequest, NewConversationRequest, RenameConversationRequest
 from app.services import conversation_service, audit_service, expert_escalation_service
 import app.rag_client as rag_client
 
@@ -40,9 +41,19 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
     rag_result = await rag_client.chat(query=query, language=language, conversation_id=conv["_id"], jurisdiction=jurisdiction)
 
     confidence = rag_result.get("confidence") or {}
+    raw_confidence_score = confidence.get("score")
+    confidence_score = (
+        float(raw_confidence_score)
+        if isinstance(raw_confidence_score, (int, float))
+        else None
+    )
+    if confidence_score is not None and confidence_score > 1:
+        confidence_score = confidence_score / 100.0
+
     escalation = expert_escalation_service.evaluate_escalation(
         query=query,
         confidence_level=confidence.get("level", "Low"),
+        confidence_score=confidence_score,
         has_conflicts=False,
         jurisdiction_coverage_available=bool(rag_result.get("jurisdiction")),
         user_requested=bool(rag_result.get("needs_expert")),
@@ -186,6 +197,23 @@ def create_conversation(body: NewConversationRequest, current_user: dict = Depen
         db, None, body.title or "New Research Session", body.language, user_id=current_user["id"],
     )
     return conversation_service.conversation_to_dict(conv, [])
+
+
+@router.patch("/api/conversations/{conversation_id}")
+def rename_conversation(conversation_id: str, body: RenameConversationRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
+    is_admin = "Admin" in current_user.get("roles", [])
+    _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)
+    title = body.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Conversation title cannot be empty.")
+    title = title[:80]
+    db[CONVERSATIONS_COLLECTION].update_one(
+        {"_id": conversation_id},
+        {"$set": {"title": title, "updated_at": datetime.now(timezone.utc)}},
+    )
+    conv = db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id})
+    messages = conversation_service.recent_messages(db, conversation_id, limit=1000)
+    return conversation_service.conversation_to_dict(conv, messages)
 
 
 @router.delete("/api/conversations/{conversation_id}")

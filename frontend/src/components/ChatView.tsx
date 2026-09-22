@@ -22,6 +22,10 @@ import {
   X,
   Globe,
   ExternalLink,
+  Pencil,
+  Share2,
+  Paperclip,
+  ImagePlus,
 } from "lucide-react";
 import {
   Citation,
@@ -381,6 +385,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
     query: string;
     reason: string;
   } | null>(null);
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const [attachmentKind, setAttachmentKind] = useState<"document" | "image" | null>(null);
+  const [grievanceNotice, setGrievanceNotice] = useState<string | null>(null);
+  const [expertRequestingMsgId, setExpertRequestingMsgId] = useState<string | null>(null);
+  const [expertRequestedMsgIds, setExpertRequestedMsgIds] = useState<Set<string>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -657,8 +668,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
       : "india";
     const newId = `conv-${currentJur}-${Date.now()}`;
     const defaultTitle = isInternational
-      ? "New International IP Consultation"
-      : "New Indian Legal Consultation";
+      ? "New International Session"
+      : "New Indian Session";
 
     const newConv: Conversation = {
       id: newId,
@@ -718,12 +729,119 @@ export const ChatView: React.FC<ChatViewProps> = ({
         if (remainingMatching.length > 0) {
           loadConversation(remainingMatching[0].id);
         } else {
-          startNewConversation();
+          // Do not create a replacement chat when the last session is deleted.
+          setActiveConvId("");
+          if (isInternational) {
+            setActiveIntlConvId("");
+          } else {
+            setActiveIndiaConvId("");
+          }
+          setMessages([]);
+          setInputValue("");
+          try {
+            localStorage.removeItem(LOCAL_STORAGE_ACTIVE_KEY);
+            localStorage.removeItem(
+              isInternational
+                ? LOCAL_STORAGE_ACTIVE_INTL_KEY
+                : LOCAL_STORAGE_ACTIVE_INDIA_KEY,
+            );
+          } catch (e) {}
         }
       }
     } catch (err) {
       console.error("Failed to delete conversation:", err);
     }
+  };
+
+  const renameConversation = async (e: React.MouseEvent, conversation: Conversation) => {
+    e.stopPropagation();
+    const nextTitle = window.prompt("Rename chat", conversation.title || "");
+    const title = nextTitle?.trim();
+    if (!title || title === conversation.title) return;
+
+    const updated = conversations.map((c) =>
+      c.id === conversation.id
+        ? { ...c, title: title.slice(0, 80), updated_at: new Date().toISOString() }
+        : c,
+    );
+    persistConversations(updated, activeConvId);
+
+    try {
+      await authFetch(`/api/conversations/${conversation.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title.slice(0, 80) }),
+      });
+    } catch (err) {
+      console.warn("Failed to save renamed conversation:", err);
+    }
+  };
+
+  const shareConversation = async () => {
+    const current = conversations.find((c) => c.id === activeConvId);
+    if (!current) return;
+
+    const transcript = (current.messages || [])
+      .map((m) => `${m.role === "user" ? "You" : "IP-SAKTI Sahayak"}: ${m.answer || m.content || ""}`)
+      .join("\n\n");
+    const shareText = `${current.title}\n\n${transcript || "No messages yet."}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: current.title, text: shareText });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText);
+        setCopiedMsgId("__conversation_share__");
+        setTimeout(() => setCopiedMsgId(null), 2500);
+      }
+    } catch (err) {
+      if ((err as DOMException)?.name !== "AbortError") {
+        console.warn("Conversation share failed:", err);
+      }
+    }
+  };
+
+  const openAttachmentPicker = (kind: "document" | "image") => {
+    setAttachmentKind(kind);
+    setAttachmentMenuOpen(false);
+    if (attachmentInputRef.current) {
+      attachmentInputRef.current.accept =
+        kind === "image" ? "image/*" : ".pdf,.doc,.docx,.txt,.md,.csv";
+      attachmentInputRef.current.click();
+    }
+  };
+
+  const handleAttachmentSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setSelectedAttachment(file);
+    if (e.target) e.target.value = "";
+  };
+
+  const requestExpertReview = async (msg: StructuredChatMessage) => {
+    if (!activeConvId || !msg.confidence || expertRequestingMsgId === msg.id) return;
+    setExpertRequestingMsgId(msg.id);
+    try {
+      const res = await authFetch("/api/expert-escalation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversation_id: activeConvId,
+          query: messages.find((m) => m.role === "user")?.content || "Low-confidence consultation",
+          reason: `Confidence score below 70% (${Math.round((msg.confidence.score <= 1 ? msg.confidence.score * 100 : msg.confidence.score))}%).`,
+        }),
+      });
+      if (res.ok) {
+        setExpertRequestedMsgIds((prev) => new Set(prev).add(msg.id));
+      }
+    } catch (err) {
+      console.warn("Expert review request failed:", err);
+    } finally {
+      setExpertRequestingMsgId(null);
+    }
+  };
+
+  const raiseGrievance = () => {
+    setGrievanceNotice("Grievance submission will be available here soon. Your issue can be raised from this section once the grievance module is enabled.");
   };
 
   const scrollToBottom = () => {
@@ -1002,6 +1120,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       language,
       jurisdiction: currentJur,
       scope_blocked: assistantMsg.scope_blocked,
+      expert_escalation: assistantMsg.expert_escalation,
     };
 
     const finalMessages = [...updatedWithUser, finalAssistantMsg];
@@ -1259,14 +1378,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     />
                     <span className="truncate">{c.title}</span>
                   </div>
-                  <button
-                    type="button"
-                    title="Delete session"
-                    onClick={(e) => deleteConversation(e, c.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-600 transition-opacity"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100">
+                    <button
+                      type="button"
+                      title="Rename session"
+                      onClick={(e) => renameConversation(e, c)}
+                      className="p-1 hover:text-slate-900 transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Delete session"
+                      onClick={(e) => deleteConversation(e, c.id)}
+                      className="p-1 hover:text-rose-600 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               );
             })
@@ -1382,6 +1511,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 </span>
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={shareConversation}
+              disabled={!activeConvId}
+              title="Share this chat"
+              className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+            </button>
 
             <span className="text-[11px] px-2 py-1 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-medium">
               {language.toUpperCase()}
@@ -1535,6 +1674,35 @@ export const ChatView: React.FC<ChatViewProps> = ({
                           {msg.answer || msg.content}
                         </p>
                       </div>
+
+                      {msg.confidence && (() => {
+                        const rawScore = msg.confidence.score;
+                        const score = rawScore <= 1 ? rawScore * 100 : rawScore;
+                        if (score >= 70) return null;
+                        const requested = expertRequestedMsgIds.has(msg.id);
+                        return (
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2.5">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />
+                              <div>
+                                <p className="text-xs font-semibold text-amber-900">Low confidence — expert review recommended</p>
+                                <p className="text-[11px] leading-relaxed text-amber-800 mt-0.5">
+                                  The confidence score is below 70%. This query has been flagged for expert review so that a qualified expert can assess it before you rely on the answer.
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button type="button" onClick={() => requestExpertReview(msg)} disabled={requested || expertRequestingMsgId === msg.id} className="px-2.5 py-1.5 rounded-md bg-amber-700 text-white text-[11px] font-medium hover:bg-amber-800 disabled:opacity-60">
+                                {requested ? "Expert Review Requested" : expertRequestingMsgId === msg.id ? "Requesting..." : "Request Expert Review"}
+                              </button>
+                              <button type="button" onClick={raiseGrievance} className="px-2.5 py-1.5 rounded-md border border-amber-300 bg-white text-amber-900 text-[11px] font-medium hover:bg-amber-100">
+                                Raise a Grievance
+                              </button>
+                            </div>
+                            {grievanceNotice && <p className="text-[10px] text-amber-800 bg-white/70 rounded-md p-2">{grievanceNotice}</p>}
+                          </div>
+                        );
+                      })()}
 
                       {/* 2. Relevant Considerations */}
                       {msg.relevant_considerations &&
@@ -1999,6 +2167,25 @@ export const ChatView: React.FC<ChatViewProps> = ({
   </div>
 )}
 
+          <input
+            ref={attachmentInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleAttachmentSelected}
+          />
+
+          {selectedAttachment && (
+            <div className="mb-2 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700">
+              <span className="flex items-center gap-1.5 truncate">
+                {attachmentKind === "image" ? <ImagePlus className="w-3.5 h-3.5" /> : <Paperclip className="w-3.5 h-3.5" />}
+                <span className="truncate">{selectedAttachment.name}</span>
+              </span>
+              <button type="button" onClick={() => setSelectedAttachment(null)} className="p-1 text-slate-400 hover:text-slate-700" title="Remove attachment">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           <form
             id="sahayak-chat-form-container"
             onSubmit={(e) => {
@@ -2007,6 +2194,27 @@ export const ChatView: React.FC<ChatViewProps> = ({
             }}
             className="flex items-center gap-2 bg-slate-50 border border-slate-300 rounded-xl p-1.5 focus-within:border-slate-600 focus-within:ring-1 focus-within:ring-slate-400 transition-all"
           >
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                title="Add document or image"
+                onClick={() => setAttachmentMenuOpen((open) => !open)}
+                className="p-2 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              {attachmentMenuOpen && (
+                <div className="absolute bottom-full left-0 mb-2 w-40 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg z-50">
+                  <button type="button" onClick={() => openAttachmentPicker("document")} className="w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-slate-700 hover:bg-slate-50">
+                    <Paperclip className="w-3.5 h-3.5" /> Add Document
+                  </button>
+                  <button type="button" onClick={() => openAttachmentPicker("image")} className="w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-slate-700 hover:bg-slate-50">
+                    <ImagePlus className="w-3.5 h-3.5" /> Add Image
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Voice Input */}
             <VoiceInputButton
               onTranscript={(transcript, isFinal) => {

@@ -17,9 +17,8 @@ def new_conversation(id: str, user_id: str, title: str, language: str = "en") ->
     now = datetime.now(timezone.utc)
     return {
         "_id": id,
-        # Keep an explicit conversation_id field for compatibility with the
-        # existing MongoDB unique index (conversation_id_1).
-        # The application still uses _id as the canonical conversation key.
+        # Compatibility with the existing MongoDB conversation_id_1 unique index.
+        # _id remains the canonical application conversation key.
         "conversation_id": id,
         "user_id": user_id,
         "title": title,

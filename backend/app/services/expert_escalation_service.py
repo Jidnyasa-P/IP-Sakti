@@ -26,13 +26,17 @@ def evaluate_escalation(
     confidence_level: str,
     has_conflicts: bool,
     jurisdiction_coverage_available: bool,
+    confidence_score: float | None = None,
     user_requested: bool = False,
 ) -> EscalationDecision:
     reasons = []
     if user_requested:
         reasons.append("User explicitly requested expert consultation.")
-    if confidence_level in LOW_CONFIDENCE_LEVELS:
-        reasons.append(f"Retrieval confidence is '{confidence_level}'.")
+    if confidence_level in LOW_CONFIDENCE_LEVELS or (confidence_score is not None and confidence_score < 0.70):
+        if confidence_score is not None and confidence_score < 0.70:
+            reasons.append(f"Confidence score is below 70% ({confidence_score:.0%}).")
+        else:
+            reasons.append(f"Retrieval confidence is '{confidence_level}'.")
     if has_conflicts:
         reasons.append("Conflicting authoritative sources were detected.")
     if not jurisdiction_coverage_available:
