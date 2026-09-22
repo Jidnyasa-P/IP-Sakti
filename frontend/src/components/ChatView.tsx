@@ -262,6 +262,14 @@ function normalizeConversation(c: Conversation): Conversation | null {
   };
 }
 
+function createClientConversationId(jurisdiction: Jurisdiction): string {
+  const randomId =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `conv-${jurisdiction}-${randomId}`;
+}
+
 function getInitialConversations(): Conversation[] {
   if (typeof window !== "undefined") {
     try {
@@ -505,11 +513,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
         const newConv: Conversation = checked
           ? {
               ...DEFAULT_INITIAL_INTL_CONV,
-              id: `conv-intl-${Date.now()}`,
+              id: createClientConversationId("international"),
             }
           : {
               ...DEFAULT_INITIAL_CONV,
-              id: `conv-india-${Date.now()}`,
+              id: createClientConversationId("india"),
             };
         currentConvs = [newConv, ...currentConvs];
         persistConversations(currentConvs, newConv.id);
@@ -683,7 +691,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     const currentJur: Jurisdiction = isInternational
       ? "international"
       : "india";
-    const newId = `conv-${currentJur}-${Date.now()}`;
+    const newId = createClientConversationId(currentJur);
 
     // FIXED ("blank chats piling up"): this used to immediately add a
     // placeholder conversation (0 messages, a default "New ... Session"
@@ -950,7 +958,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       // it becomes the real, stored session instead of spawning a second
       // entry; only mint a brand new id if there truly isn't one.
       if (!targetConvId) {
-        targetConvId = `conv-${currentJur}-${Date.now()}`;
+        targetConvId = createClientConversationId(currentJur);
       }
       const newTitle =
         textToSend.slice(0, 45) + (textToSend.length > 45 ? "..." : "");
