@@ -216,7 +216,8 @@ class HybridRetriever:
             return []
         try:
             query_vector = embed_query(query)
-        except Exception:
+        except Exception as exc:
+            print(f"[semantic] Query embedding failed: {exc}")
             # If the embedding service is unavailable, degrade to BM25-only
             # rather than failing the whole request.
             return []

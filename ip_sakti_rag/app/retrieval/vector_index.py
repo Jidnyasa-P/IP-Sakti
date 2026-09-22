@@ -282,7 +282,8 @@ class VectorIndex:
                 with_payload=True,
             ).points
 
-        except Exception:
+        except Exception as exc:
+            print(f"[qdrant] Semantic search failed: {exc}")
             return []
 
         results: list[tuple[DocumentChunk, float]] = []
