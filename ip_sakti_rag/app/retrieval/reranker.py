@@ -80,6 +80,7 @@ def rerank(
         )
         bm25 = _get_score(
             candidate,
+            "keyword_score",  # DocumentChunk uses this canonical field
             "bm25_score",
             "lexical_score",
         )
