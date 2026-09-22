@@ -139,11 +139,25 @@ class HybridRetriever:
             for c in candidates
         }
 
-        # Order candidates by the fallback score first so Groq only sees the
-        # most promising ones (reranker.py caps how many it will send anyway).
+        # Order candidates by the fallback score first so the reranker only
+        # sees the most promising candidates. IMPORTANT: attach the actual
+        # retriever scores before reranking. Previously reranker.rerank() was
+        # called with plain DocumentChunk objects whose semantic_score and
+        # keyword_score were still None; that made the reranker print
+        # "Missing semantic or BM25 scores" on every request and silently
+        # disabled reranking.
         candidates.sort(key=lambda c: fallback_scores.get(c.chunk_id, 0.0), reverse=True)
+        rerank_candidates = [
+            c.model_copy(
+                update={
+                    "semantic_score": sem_score_map.get(c.chunk_id),
+                    "keyword_score": kw_score_map.get(c.chunk_id),
+                }
+            )
+            for c in candidates
+        ]
 
-        groq_scores = reranker.rerank(query, candidates) if candidates else None
+        groq_scores = reranker.rerank(query, rerank_candidates) if rerank_candidates else None
         reranked = groq_scores is not None
         final_scores = groq_scores if reranked else fallback_scores
 

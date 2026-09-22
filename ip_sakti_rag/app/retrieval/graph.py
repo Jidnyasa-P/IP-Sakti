@@ -58,15 +58,32 @@ class KnowledgeGraphContext:
         if not self.enabled or not self._driver or not entity_names:
             return GraphContextResult()
 
+        # Do not put relationship types directly in the Cypher pattern.
+        # Neo4j emits UnknownRelationshipTypeWarning when a configured type
+        # does not exist in the current database (for example, a graph that
+        # only contains GOVERNED_BY). Traversing relationships generically
+        # and filtering their type with a parameter keeps the query warning-
+        # free while still restricting GraphRAG to the intended relationship
+        # vocabulary. If additional relationship types are added later, they
+        # start participating automatically without changing the query.
         cypher = """
         UNWIND $names AS name
-        MATCH (n {name: name})-[:GOVERNED_BY|REQUIRES_APPROVAL_FROM|CLASSIFIED_UNDER*1..2]-(m)
+        MATCH (n {name: name})-[rels*1..2]-(m)
+        WHERE all(rel IN rels WHERE type(rel) IN $relationship_types)
         RETURN DISTINCT labels(m) AS labels, m.name AS name
         LIMIT 20
         """
         try:
             with self._driver.session() as session:
-                records = session.run(cypher, names=entity_names).data()
+                records = session.run(
+                    cypher,
+                    names=entity_names,
+                    relationship_types=[
+                        "GOVERNED_BY",
+                        "REQUIRES_APPROVAL_FROM",
+                        "CLASSIFIED_UNDER",
+                    ],
+                ).data()
         except Exception:
             return GraphContextResult(notes=["Graph lookup failed — continuing without graph context."])
 
