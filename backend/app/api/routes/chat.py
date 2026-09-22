@@ -8,7 +8,9 @@ from app.models.conversation import CONVERSATIONS_COLLECTION, CHAT_MESSAGES_COLL
 from app.models.expert_escalation import COLLECTION as EXPERT_ESCALATIONS_COLLECTION, new_expert_escalation
 from app.models.feedback import COLLECTION as FEEDBACK_COLLECTION, new_feedback
 from app.schemas.chat import ChatRequest, QueryRequest, FeedbackRequest, NewConversationRequest, RenameConversationRequest
-from app.services import conversation_service, audit_service, expert_escalation_service
+import app.services.conversation_service as conversation_service
+import app.services.audit_service as audit_service
+import app.services.expert_escalation_service as expert_escalation_service
 import app.rag_client as rag_client
 
 router = APIRouter()
