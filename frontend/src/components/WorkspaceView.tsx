@@ -187,17 +187,18 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     if (!window.confirm('Delete this research session? This cannot be undone.')) {
       return;
     }
-    const previous = conversations;
-    setConversations(conversations.filter((c) => c.id !== id));
+
+    // Remove locally first so the button always gives immediate feedback.
+    // A 404 is treated as already deleted because it means the server has no
+    // record left to remove (common after a prior delete from Sahayak).
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+
     try {
-      const res = await authFetch(`/api/conversations/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
+      const res = await authFetch(`/api/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok && res.status !== 404) {
         throw new Error(`Delete failed with status ${res.status}`);
       }
-      // ChatView caches this same conversation list under this key so it
-      // doesn't have to wait on a network round trip on every mount. Strip
-      // the deleted session from that cache too, otherwise it can briefly
-      // reappear if Sahayak is opened again before its own server refetch.
+
       try {
         const cached = localStorage.getItem('ipsakti_sahayak_conversations_v2');
         if (cached) {
@@ -209,14 +210,21 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
             );
           }
         }
-      } catch (cacheErr) {
-        // Non-fatal -- ChatView's next server sync will still reconcile this.
-      }
+        for (const key of [
+          'ipsakti_sahayak_active_conv_id_v2',
+          'ipsakti_sahayak_active_india_id',
+          'ipsakti_sahayak_active_intl_id',
+        ]) {
+          if (localStorage.getItem(key) === id) localStorage.removeItem(key);
+        }
+      } catch (cacheErr) {}
+
+      // Re-read the backend collection after deletion so this tab cannot keep
+      // a stale server-side session in memory.
+      await loadWorkspaceData();
     } catch (err) {
       console.error('Failed to delete conversation:', err);
-      // Roll back the optimistic removal so the workspace still reflects
-      // the server's actual state if the delete didn't go through.
-      setConversations(previous);
+      await loadWorkspaceData();
     }
   };
 

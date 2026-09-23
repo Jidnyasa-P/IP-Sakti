@@ -66,14 +66,51 @@ def create_grievance(
     current_user: dict = Depends(get_current_user),
     db=Depends(get_db),
 ):
-    # If a chat context was supplied, verify that it belongs to this user.
+    canonical_conversation_id = body.conversation_id
+    canonical_message_id = body.message_id
+
+    # Resolve the chat context against persistent backend records. The frontend
+    # normally sends the authoritative conversation_id, but older/local drafts
+    # can carry a stale id. In that case, a valid message_id is enough to find
+    # the owning conversation and recover the grievance submission.
+    conversation = None
     if body.conversation_id:
         conversation = db["conversations"].find_one({
-            "_id": body.conversation_id,
+            "$or": [
+                {"_id": body.conversation_id},
+                {"conversation_id": body.conversation_id},
+            ],
             "user_id": current_user["id"],
         })
-        if not conversation:
-            raise HTTPException(status_code=404, detail="Related conversation was not found.")
+
+    if not conversation and body.message_id:
+        message = db["chat_messages"].find_one({"_id": body.message_id})
+        if message:
+            candidate_id = message.get("conversation_id")
+            candidate = db["conversations"].find_one({
+                "_id": candidate_id,
+                "user_id": current_user["id"],
+            })
+            if candidate:
+                conversation = candidate
+                canonical_conversation_id = str(candidate["_id"])
+                canonical_message_id = str(message["_id"])
+
+    if conversation:
+        canonical_conversation_id = str(conversation["_id"])
+        if canonical_message_id:
+            message = db["chat_messages"].find_one({
+                "_id": canonical_message_id,
+                "conversation_id": canonical_conversation_id,
+            })
+            canonical_message_id = str(message["_id"]) if message else None
+    else:
+        # The grievance itself must remain submit-able even when a stale local
+        # chat context cannot be recovered. Store the grievance without an
+        # invalid foreign conversation reference rather than returning a
+        # blocking "conversation not found" error.
+        canonical_conversation_id = None
+        canonical_message_id = None
 
     record = new_grievance(
         id=f"grievance-{uuid.uuid4().hex[:12]}",
@@ -81,8 +118,8 @@ def create_grievance(
         category=body.category.strip(),
         subject=body.subject.strip(),
         description=body.description.strip(),
-        conversation_id=body.conversation_id,
-        message_id=body.message_id,
+        conversation_id=canonical_conversation_id,
+        message_id=canonical_message_id,
         related_query=(body.related_query or "").strip() or None,
     )
     db[GRIEVANCE_COLLECTION].insert_one(record)

@@ -16,10 +16,14 @@ router = APIRouter()
 
 
 def _get_owned_conversation(db, conversation_id: str, user_id: str, is_admin: bool) -> dict:
-    """Fetch a conversation and enforce ownership (Section 7: user data
-    isolation) -- Admins may access any conversation, everyone else only
-    their own."""
-    conv = db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id})
+    """Fetch a conversation by either canonical `_id` or the legacy
+    `conversation_id` field and enforce ownership."""
+    conv = db[CONVERSATIONS_COLLECTION].find_one({
+        "$or": [
+            {"_id": conversation_id},
+            {"conversation_id": conversation_id},
+        ]
+    })
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     if not is_admin and conv.get("user_id") != user_id:
@@ -42,7 +46,10 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
     # the conversation record (and its messages) once we actually have a
     # response to store. A failed call now raises RagServiceError with
     # nothing written to the database at all -- no more orphaned blanks.
-    existing_conv = db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id}) if conversation_id else None
+    existing_conv = (
+        db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id, "user_id": user_id})
+        if conversation_id else None
+    )
     working_conversation_id = existing_conv["_id"] if existing_conv else (conversation_id or conversation_service.new_conversation_id())
 
     # All retrieval + reasoning happens in the ip_sakti_rag microservice now.
@@ -232,7 +239,8 @@ def list_conversations(current_user: dict = Depends(get_current_user), db=Depend
 def get_conversation(conversation_id: str, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     is_admin = "Admin" in current_user.get("roles", [])
     conv = _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)
-    messages = conversation_service.recent_messages(db, conversation_id, limit=1000)
+    canonical_id = str(conv["_id"])
+    messages = conversation_service.recent_messages(db, canonical_id, limit=1000)
     return conversation_service.conversation_to_dict(conv, messages)
 
 
@@ -247,27 +255,46 @@ def create_conversation(body: NewConversationRequest, current_user: dict = Depen
 @router.patch("/api/conversations/{conversation_id}")
 def rename_conversation(conversation_id: str, body: RenameConversationRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     is_admin = "Admin" in current_user.get("roles", [])
-    _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)
+    conv = _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)
+    canonical_id = str(conv["_id"])
     title = body.title.strip()
     if not title:
         raise HTTPException(status_code=400, detail="Conversation title cannot be empty.")
     title = title[:80]
     db[CONVERSATIONS_COLLECTION].update_one(
-        {"_id": conversation_id},
+        {"_id": canonical_id},
         {"$set": {"title": title, "updated_at": datetime.now(timezone.utc)}},
     )
-    conv = db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id})
-    messages = conversation_service.recent_messages(db, conversation_id, limit=1000)
+    conv = db[CONVERSATIONS_COLLECTION].find_one({"_id": canonical_id})
+    messages = conversation_service.recent_messages(db, canonical_id, limit=1000)
     return conversation_service.conversation_to_dict(conv, messages)
 
 
 @router.delete("/api/conversations/{conversation_id}")
 def delete_conversation(conversation_id: str, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     is_admin = "Admin" in current_user.get("roles", [])
-    _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)
-    db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": conversation_id})
-    db[CONVERSATIONS_COLLECTION].delete_one({"_id": conversation_id})
-    return {"success": True, "deleted_id": conversation_id}
+
+    # Deletion is intentionally idempotent. If the client already removed a
+    # stale/local-only session, there is nothing to delete on the server and
+    # returning success keeps the two clients in sync.
+    conv = db[CONVERSATIONS_COLLECTION].find_one({
+        "$or": [
+            {"_id": conversation_id},
+            {"conversation_id": conversation_id},
+        ]
+    })
+    if not conv:
+        return {"success": True, "deleted_id": conversation_id, "already_absent": True}
+
+    if not is_admin and conv.get("user_id") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="You do not have access to this conversation.")
+
+    canonical_id = str(conv["_id"])
+    ids = list({conversation_id, canonical_id, str(conv.get("conversation_id")) if conv.get("conversation_id") else conversation_id})
+    db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": {"$in": ids}})
+    db[CONVERSATIONS_COLLECTION].delete_one({"_id": canonical_id})
+    return {"success": True, "deleted_id": canonical_id}
+
 
 
 @router.post("/api/conversations/{conversation_id}/feedback")

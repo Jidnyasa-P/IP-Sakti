@@ -38,7 +38,6 @@ import {
 import { VoiceInputButton } from "./VoiceInputButton";
 import { DisclaimerBanner } from "./DisclaimerBanner";
 import { useTranslation } from "../context/LanguageContext";
-import { getSectionLink } from "../utils/sectionLinks";
 import {
   evaluateQueryJurisdiction,
   JurisdictionCheckResult,
@@ -464,6 +463,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
     setConversations(cleaned);
     if (typeof window !== "undefined") {
       try {
+        // Keep a compatibility snapshot for an offline refresh, but never
+        // use it as the authoritative source when the backend is reachable.
         localStorage.setItem(LOCAL_STORAGE_CONVS_KEY, JSON.stringify(cleaned));
         if (newActiveId) {
           localStorage.setItem(LOCAL_STORAGE_ACTIVE_KEY, newActiveId);
@@ -472,6 +473,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
           } else {
             localStorage.setItem(LOCAL_STORAGE_ACTIVE_INDIA_KEY, newActiveId);
           }
+        } else {
+          localStorage.removeItem(LOCAL_STORAGE_ACTIVE_KEY);
+          localStorage.removeItem(
+            isInternational
+              ? LOCAL_STORAGE_ACTIVE_INTL_KEY
+              : LOCAL_STORAGE_ACTIVE_INDIA_KEY,
+          );
         }
       } catch (e) {}
     }
@@ -703,55 +711,76 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   const deleteConversation = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+
+    const updated = conversations.filter((c) => c.id !== id);
+    const currentJur: Jurisdiction = isInternational
+      ? "international"
+      : "india";
+    const remainingMatching = updated.filter(
+      (c) => (c.jurisdiction || "india") === currentJur,
+    );
+    const nextActiveId =
+      activeConvId === id ? (remainingMatching[0]?.id || "") : activeConvId;
+
+    // Remove it from the UI/cache immediately. A 404 below simply means the
+    // server record was already absent (common for an old local-only session).
+    persistConversations(updated, nextActiveId);
+
     try {
-      const deleteRes = await authFetch(`/api/conversations/${id}`, {
+      const deleteRes = await authFetch(`/api/conversations/${encodeURIComponent(id)}`, {
         method: "DELETE",
       });
-      if (!deleteRes.ok) {
+      if (deleteRes.ok || deleteRes.status === 404) {
+      } else {
         throw new Error(`Delete failed with status ${deleteRes.status}`);
-      }
-      const updated = conversations.filter((c) => c.id !== id);
-      const currentJur: Jurisdiction = isInternational
-        ? "international"
-        : "india";
-      const remainingMatching = updated.filter(
-        (c) => (c.jurisdiction || "india") === currentJur,
-      );
-
-      let nextActiveId = activeConvId;
-      if (activeConvId === id) {
-        nextActiveId = remainingMatching[0]?.id || "";
-      }
-
-      persistConversations(updated, nextActiveId);
-
-      if (activeConvId === id) {
-        if (remainingMatching.length > 0) {
-          loadConversation(remainingMatching[0].id);
-        } else {
-          // Do not create a replacement chat when the last session is deleted.
-          setActiveConvId("");
-          if (isInternational) {
-            setActiveIntlConvId("");
-          } else {
-            setActiveIndiaConvId("");
-          }
-          setMessages([]);
-          setInputValue("");
-          try {
-            localStorage.removeItem(LOCAL_STORAGE_ACTIVE_KEY);
-            localStorage.removeItem(
-              isInternational
-                ? LOCAL_STORAGE_ACTIVE_INTL_KEY
-                : LOCAL_STORAGE_ACTIVE_INDIA_KEY,
-            );
-          } catch (e) {}
-        }
       }
     } catch (err) {
       console.error("Failed to delete conversation:", err);
     }
+
+    // Do not discard a successful UI deletion just because an offline request
+    // could not reach the backend. The next successful server sync will decide
+    // whether the session still exists.
+
+    // Delete every client-side copy of the session so changing sections or
+    // reopening Sahayak cannot resurrect it.
+    try {
+      const cached = localStorage.getItem(LOCAL_STORAGE_CONVS_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          localStorage.setItem(
+            LOCAL_STORAGE_CONVS_KEY,
+            JSON.stringify(parsed.filter((c: any) => c?.id !== id)),
+          );
+        }
+      }
+      for (const key of [
+        LOCAL_STORAGE_ACTIVE_KEY,
+        LOCAL_STORAGE_ACTIVE_INDIA_KEY,
+        LOCAL_STORAGE_ACTIVE_INTL_KEY,
+      ]) {
+        if (localStorage.getItem(key) === id) localStorage.removeItem(key);
+      }
+    } catch (cacheErr) {}
+
+    if (activeConvId === id) {
+      if (remainingMatching.length > 0) {
+        loadConversation(remainingMatching[0].id);
+      } else {
+        setActiveConvId("");
+        if (isInternational) setActiveIntlConvId("");
+        else setActiveIndiaConvId("");
+        setMessages([]);
+        setInputValue("");
+      }
+    }
+
+    // Reconcile with the backend after the mutation so Workspace and Sahayak
+    // immediately share exactly the same session list.
+    await fetchServerConversations();
   };
+
 
   const renameConversation = async (e: React.MouseEvent, conversation: Conversation) => {
     e.stopPropagation();
@@ -843,10 +872,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
   };
 
   const raiseGrievance = (msg: StructuredChatMessage) => {
-    const relatedQuery =
-      messages.find((m) => m.role === "user")?.content || "";
+    const messageIndex = messages.findIndex((m) => m.id === msg.id);
+    let relatedQuery = "";
+    for (let i = messageIndex - 1; i >= 0; i -= 1) {
+      if (messages[i].role === "user") {
+        relatedQuery = messages[i].content || messages[i].answer || "";
+        break;
+      }
+    }
     onRaiseGrievance({
-      conversationId: activeConvId || msg.conversation_id,
+      conversationId: msg.conversation_id || activeConvId || undefined,
       messageId: msg.id,
       query: relatedQuery,
       response: msg.answer || msg.content || "",
@@ -1056,6 +1091,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
           const syncData = await syncRes.json();
           assistantMsg = syncData.message || syncData;
 
+          // The backend is authoritative for the persisted conversation ID.
+          // Rebind the local draft/messages to that ID before any grievance or
+          // workspace action can reference it.
+          const canonicalConversationId =
+            String(syncData.conversation_id || assistantMsg?.conversation_id || targetConvId);
+          if (canonicalConversationId && canonicalConversationId !== targetConvId) {
+            targetConvId = canonicalConversationId;
+            setActiveConvId(canonicalConversationId);
+            if (isInternational) setActiveIntlConvId(canonicalConversationId);
+            else setActiveIndiaConvId(canonicalConversationId);
+            localStorage.setItem(LOCAL_STORAGE_ACTIVE_KEY, canonicalConversationId);
+          }
+
           // Server-side scope guard is authoritative. If it blocks a
           // jurisdiction mismatch, surface the same edit-or-switch UX
           // instead of rendering an "Out of Scope" assistant message.
@@ -1117,6 +1165,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
 
 
+    // Rebind the just-added user message to the authoritative conversation ID.
+    const canonicalUserMessages = updatedWithUser.map((m) =>
+      m.id === userMsg.id ? { ...m, conversation_id: targetConvId } : m,
+    );
     const finalAssistantMsg: StructuredChatMessage = {
       id: assistantMsg.id || `msg-a-${Date.now()}`,
       conversation_id: targetConvId,
@@ -1139,15 +1191,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
       expert_escalation: assistantMsg.expert_escalation,
     };
 
-    const finalMessages = [...updatedWithUser, finalAssistantMsg];
+    const finalMessages = [...canonicalUserMessages, finalAssistantMsg];
     setMessages(finalMessages);
     setStreamingText("");
 
     // Persist final conversation
     const finalConvs = updatedConvsWithUser.map((c) =>
-      c.id === targetConvId
+      c.id === targetConvId || c.id === userMsg.conversation_id
         ? {
             ...c,
+            id: targetConvId,
             title: updatedTitle,
             jurisdiction: currentJur,
             messages: finalMessages,
@@ -1155,7 +1208,22 @@ export const ChatView: React.FC<ChatViewProps> = ({
           }
         : c,
     );
-    persistConversations(finalConvs, targetConvId);
+    persistConversations(
+      finalConvs.some((c) => c.id === targetConvId)
+        ? finalConvs
+        : [
+            {
+              ...currentConv,
+              id: targetConvId,
+              title: updatedTitle,
+              jurisdiction: currentJur,
+              messages: finalMessages,
+              updated_at: new Date().toISOString(),
+            },
+            ...finalConvs,
+          ],
+      targetConvId,
+    );
     setLoading(false);
   };
 
@@ -1831,10 +1899,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
                           </h4>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {msg.citations.map((cite) => {
-                              const linkInfo = getSectionLink(
-                                cite.section,
-                                cite.document_id,
-                              );
                               return (
                                 /* FIXED: this was a plain <a href> straight to
                                    one external link -- the same bug already
@@ -1856,7 +1920,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                                   type="button"
                                   key={cite.chunk_id}
                                   onClick={() => onOpenCitation(cite)}
-                                  title={`View full cited section: ${cite.section} (${linkInfo.authority})`}
+                                  title={`View full cited section: ${cite.section} (${cite.authority || "Authoritative source"})`}
                                   className={`p-3 rounded-xl border text-left group transition-all flex flex-col justify-between shadow-2xs hover:shadow-xs w-full ${
                                     msg.jurisdiction === "international" ||
                                     isInternational

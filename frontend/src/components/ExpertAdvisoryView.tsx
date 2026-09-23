@@ -25,7 +25,6 @@ import {
 import { LowConfidenceQuery, ExpertReview, UserRole, Citation } from '../types';
 import { useExpertAdvisory } from '../context/ExpertAdvisoryContext';
 import { useAuth } from '../context/AuthContext';
-import { getSectionLink } from '../utils/sectionLinks';
 
 interface ExpertAdvisoryViewProps {
   onOpenCitation?: (citation: Citation) => void;
@@ -521,24 +520,18 @@ export const ExpertAdvisoryView: React.FC<ExpertAdvisoryViewProps> = ({ onOpenCi
                         Related Statutory Provisions Identified:
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {selectedQuery.ai_response.citations.map((c, idx) => {
-                          const linkInfo = getSectionLink(c.section, c.document_id);
-                          const href = c.url || linkInfo.url;
-                          return (
-                            <a
-                              key={idx}
-                              href={href}
-                              target="_blank"
-                              rel="noreferrer noopener"
-                              title={`Open authoritative statutory text: ${c.section} (${linkInfo.authority})`}
-                              className="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 border border-slate-300 hover:border-emerald-400 text-slate-800 text-[11px] font-medium flex items-center gap-1.5 transition-colors group"
-                            >
-                              <FileText className="w-3 h-3 text-slate-500 group-hover:text-emerald-700" />
-                              <span className="group-hover:text-emerald-950">{c.section}</span>
-                              <ExternalLink className="w-2.5 h-2.5 text-slate-400 group-hover:text-emerald-700" />
-                            </a>
-                          );
-                        })}
+                        {selectedQuery.ai_response.citations.map((c, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => onOpenCitation?.(c)}
+                            className="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 border border-slate-300 hover:border-emerald-400 text-slate-800 text-[11px] font-medium flex items-center gap-1.5 transition-colors group"
+                          >
+                            <FileText className="w-3 h-3 text-slate-500 group-hover:text-emerald-700" />
+                            <span className="group-hover:text-emerald-950">{c.section}</span>
+                            <ExternalLink className="w-2.5 h-2.5 text-slate-400 group-hover:text-emerald-700" />
+                          </button>
+                        ))}
                       </div>
                     </div>
                   )}

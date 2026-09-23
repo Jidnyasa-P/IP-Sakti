@@ -21,6 +21,7 @@ import { LanguageProvider, useTranslation } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ExpertAdvisoryProvider } from "./context/ExpertAdvisoryContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { authFetch } from "./components/auth/authStorage";
 
 const TOUR_STORAGE_KEY = "ipsakti_guided_tour_status";
 
@@ -45,6 +46,42 @@ function AppContent() {
     setActiveTab("workspace");
   };
   const { isLoggedIn, currentUser } = useAuth();
+  const [officialPortalLinks, setOfficialPortalLinks] = useState<
+    { id: string; label: string; url: string }[]
+  >([]);
+
+  useEffect(() => {
+    let active = true;
+    if (!isLoggedIn) {
+      setOfficialPortalLinks([]);
+      return () => { active = false; };
+    }
+
+    const manifestDocuments = [
+      { id: "DOC-PATENTS-ACT-1970", label: "IP India (CGPDTM)" },
+      { id: "DOC-DRUGS-RULES-1945", label: "CDSCO / ASU Rules" },
+      { id: "DOC-BD-AMENDMENT-ACT-2023", label: "National Biodiversity Authority (NBA)" },
+      { id: "DOC-WIPO-PCT", label: "WIPO" },
+    ];
+
+    Promise.all(
+      manifestDocuments.map(async (item) => {
+        try {
+          const res = await authFetch(`/api/documents/${encodeURIComponent(item.id)}`);
+          if (!res.ok) return null;
+          const data = await res.json();
+          const url = data?.metadata?.url;
+          return url ? { ...item, url: String(url) } : null;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((links) => {
+      if (active) setOfficialPortalLinks(links.filter(Boolean) as { id: string; label: string; url: string }[]);
+    });
+
+    return () => { active = false; };
+  }, [isLoggedIn]);
 
   // First-time visitor guided tour auto-discovery state
   // The site always opens directly on the Home/Landing page.
@@ -237,61 +274,23 @@ function AppContent() {
             </span>
           </div>
 
-          {/* Official Statutory Portal Links */}
-          <div className="flex flex-wrap items-center gap-4 text-[11px]">
-            <a
-              href="https://ipindia.gov.in"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="hover:text-slate-800 dark:hover:text-slate-200 hover:underline flex items-center gap-1"
-            >
-              <span>IP India (CGPDTM)</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-            <a
-              href="https://ayush.gov.in"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="hover:text-slate-800 dark:hover:text-slate-200 hover:underline flex items-center gap-1"
-            >
-              <span>Ministry of AYUSH</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-            <a
-              href="http://nbaindia.org"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="hover:text-slate-800 dark:hover:text-slate-200 hover:underline flex items-center gap-1"
-            >
-              <span>National Biodiversity Authority (NBA)</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-            <a
-              href="http://www.tkdl.res.in"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="hover:text-slate-800 dark:hover:text-slate-200 hover:underline flex items-center gap-1"
-            >
-              <span>CSIR-TKDL</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-            <a
-              href="https://www.wipo.int"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="hover:text-slate-800 dark:hover:text-slate-200 hover:underline flex items-center gap-1"
-            >
-              <span>WIPO</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
-
-          <div className="text-slate-400 dark:text-slate-500 text-[10px]">
-            {t(
-              "footer.statutory_notice",
-              "Decision-support repository grounded in Indian statutory acts.",
-            )}
-          </div>
+          {/* Official Statutory Portal Links — URLs are resolved from manifest-backed document metadata. */}
+          {officialPortalLinks.length > 0 && (
+            <div className="flex flex-wrap items-center gap-4 text-[11px]">
+              {officialPortalLinks.map((link) => (
+                <a
+                  key={link.id}
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="hover:text-slate-800 dark:hover:text-slate-200 hover:underline flex items-center gap-1"
+                >
+                  <span>{link.label}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </footer>
     </div>
