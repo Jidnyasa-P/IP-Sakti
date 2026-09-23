@@ -94,6 +94,11 @@ class VectorIndex:
 
         if vector_size:
             self._ensure_collection(vector_size)
+        else:
+            # The API server opens VectorIndex() without a vector size.
+            # Payload indexes are still required for filtered semantic search,
+            # so ensure them whenever the existing collection is used.
+            self._ensure_payload_indexes()
 
     def _ensure_collection(self, vector_size: int) -> None:
         existing = {
@@ -135,13 +140,26 @@ class VectorIndex:
             info = self.client.get_collection(self.collection)
             existing = info.payload_schema or {}
 
-            if "document_id" not in existing:
-                self.client.create_payload_index(
-                    collection_name=self.collection,
-                    field_name="document_id",
-                    field_schema=qmodels.PayloadSchemaType.KEYWORD,
-                    wait=True,
-                )
+            # These fields are used by retrieval filters. Existing points do
+            # not need to be re-ingested when a payload index is added.
+            required_indexes = (
+                "document_id",
+                "topic",
+                "authority",
+                "jurisdiction",
+            )
+
+            for field_name in required_indexes:
+                if field_name not in existing:
+                    print(
+                        f"[qdrant] Creating keyword payload index: {field_name}"
+                    )
+                    self.client.create_payload_index(
+                        collection_name=self.collection,
+                        field_name=field_name,
+                        field_schema=qmodels.PayloadSchemaType.KEYWORD,
+                        wait=True,
+                    )
 
         except Exception as exc:
             raise RuntimeError(
