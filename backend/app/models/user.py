@@ -35,6 +35,7 @@ def new_user(
     role: str,
     roles: list[str] | None = None,
     preferred_language: str = "en",
+    expert_type: str | None = None,
 ) -> dict:
     return {
         "_id": id,
@@ -44,6 +45,9 @@ def new_user(
         "role": role,
         "roles": roles or [role],
         "preferred_language": preferred_language,
+        "expert_type": expert_type,
+        "email_verified": False,
+        "email_verified_at": None,
         "created_at": datetime.now(timezone.utc),
     }
 
@@ -57,5 +61,7 @@ def to_dict(doc: dict) -> dict:
         "role": doc.get("role"),
         "roles": doc.get("roles") or [doc.get("role")],
         "preferred_language": doc.get("preferred_language", "en"),
+        "expert_type": doc.get("expert_type"),
+        "email_verified": bool(doc.get("email_verified", False)),
         "created_at": doc["created_at"].isoformat() if doc.get("created_at") else None,
     }

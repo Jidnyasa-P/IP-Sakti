@@ -16,6 +16,7 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=6)
     roles: list[str]
     preferred_language: str = "en"
+    expert_type: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -44,3 +45,33 @@ class UserPublic(BaseModel):
 class AuthResponse(BaseModel):
     token: str
     user: UserPublic
+
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=6, max_length=6)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=6, max_length=6)
+    new_password: str = Field(min_length=6)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    otp: str = Field(min_length=6, max_length=6)
+    new_password: str = Field(min_length=6)
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str
+    otp: str = Field(min_length=6, max_length=6)
+
+
+class PasswordVerificationRequest(BaseModel):
+    password: str

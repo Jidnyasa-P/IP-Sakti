@@ -12,9 +12,19 @@ from app.models.feedback import COLLECTION as FEEDBACK_COLLECTION, new_feedback
 from app.schemas.chat import ChatRequest, QueryRequest, FeedbackRequest, NewConversationRequest, RenameConversationRequest
 from app.services import conversation_service, audit_service, expert_escalation_service
 from app.services.conversation_service import ConversationDeletedError
+from app.services.email_service import send_query_email, send_expert_request_email
 import app.rag_client as rag_client
 
 router = APIRouter()
+
+
+def current_user_email(db, user_id: str) -> str | None:
+    user = db["users"].find_one({"_id": user_id})
+    return user.get("email") if user else None
+
+def current_user_name(db, user_id: str) -> str:
+    user = db["users"].find_one({"_id": user_id})
+    return user.get("name", "there") if user else "there"
 
 
 def _conversation_id_candidates(conversation_id: str) -> list:
@@ -232,6 +242,8 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
             reason=escalation.reason,
             case_summary=escalation.case_summary,
         ))
+
+    send_query_email(user_email := current_user_email(db, user_id), current_user_name(db, user_id), query) if user_email else None
 
     return {
         "conversation_id": conv["_id"],

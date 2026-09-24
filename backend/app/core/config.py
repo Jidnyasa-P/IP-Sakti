@@ -44,10 +44,34 @@ class Settings(BaseSettings):
     bhashini_user_id: str = ""
     bhashini_ulca_api_key: str = ""
 
+    # SMTP / email
+    email_backend: str = "auto"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_starttls: bool = True
+    smtp_use_ssl: bool = False
+    smtp_timeout_seconds: int = 20
+    email_from_address: str = ""
+    email_from_name: str = "IP-SAKTI Sahayak"
+    contact_recipient: str = ""
+    otp_length: int = 6
+    otp_ttl_minutes: int = 10
+    otp_max_attempts: int = 5
+    otp_resend_cooldown_seconds: int = 60
+    otp_max_sends_per_hour: int = 5
+    otp_pepper: str = ""
+    require_email_verification: bool = True
+
     # Security
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
+
+    @property
+    def smtp_configured(self) -> bool:
+        return bool(self.smtp_host and self.smtp_username and self.smtp_password)
 
     @property
     def rag_service_configured(self) -> bool:

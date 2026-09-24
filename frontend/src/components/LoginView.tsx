@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { ActiveTab } from './Header';
 import { UserRole, ALL_ROLES, ExpertCertificate } from '../types';
 import { ExpertCertificateUpload, ExpertCertificateData } from './ExpertCertificateUpload';
+import { forgotPassword, resetPassword } from './auth/authStorage';
 
 interface LoginViewProps {
   setActiveTab: (tab: ActiveTab) => void;
@@ -34,6 +35,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [expertCertificate, setExpertCertificate] =
     useState<Partial<ExpertCertificateData> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotOtpSent, setForgotOtpSent] = useState(false);
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [forgotMessage, setForgotMessage] = useState<string | null>(null);
 
   const isExpertSelected = selectedRole === 'Expert';
 
@@ -93,6 +99,27 @@ export const LoginView: React.FC<LoginViewProps> = ({
       setError(result.error || 'Failed to authenticate. Please check your credentials.');
     }
   };
+
+  if (forgotMode) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] bg-slate-50 flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-md">
+          <div className="mb-6 text-center"><div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center"><img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="h-full w-full object-contain" /></div><h1 className="text-2xl font-semibold text-slate-900">Reset your password</h1><p className="mt-1.5 text-sm text-slate-500">We will verify your email before changing the password.</p></div>
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+            {error && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{error}</div>}
+            {forgotMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{forgotMessage}</div>}
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email address" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+            {!forgotOtpSent ? <button type="button" onClick={async () => { try { await forgotPassword(email); setForgotOtpSent(true); setForgotMessage('If the account exists, a password reset OTP has been sent.'); setError(null); } catch (err) { setError(err instanceof Error ? err.message : 'Could not send OTP.'); } }} className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Send OTP</button> : <>
+              <input value={forgotOtp} onChange={e => setForgotOtp(e.target.value.replace(/\D/g, '').slice(0,6))} inputMode="numeric" placeholder="6-digit OTP" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-center tracking-[0.3em]" />
+              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+              <button type="button" onClick={async () => { try { await resetPassword(email, forgotOtp, newPassword); setForgotMode(false); setForgotOtpSent(false); setForgotMessage(null); setError(null); alert('Password reset successfully. Please sign in with your new password.'); } catch (err) { setError(err instanceof Error ? err.message : 'Could not reset password.'); } }} className="w-full rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white">Reset password</button>
+            </>}
+            <button type="button" onClick={() => { setForgotMode(false); setForgotOtpSent(false); setError(null); }} className="w-full text-xs font-semibold text-slate-500 hover:text-slate-800">Back to sign in</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-50 flex items-center justify-center px-4 py-10 sm:py-14">
@@ -249,6 +276,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 />
               </div>
             )}
+
+            <div className="flex justify-end">
+              <button type="button" onClick={() => { setForgotMode(true); setError(null); }} className="text-xs font-semibold text-emerald-800 hover:underline">Forgot password?</button>
+            </div>
 
             <label className="flex cursor-pointer items-center gap-2.5 text-xs text-slate-600">
               <input

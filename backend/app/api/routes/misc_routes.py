@@ -5,11 +5,21 @@ from app.api.deps import get_current_user, require_role
 from app.database.session import get_db
 from app.models.citation import COLLECTION as SAVED_RESEARCH_COLLECTION, new_saved_research, to_dict as saved_research_to_dict
 from app.models.grievance import COLLECTION as GRIEVANCE_COLLECTION, new_grievance, to_dict as grievance_to_dict
-from app.schemas.chat import SaveResearchRequest, TranslateRequest, GrievanceCreateRequest
+from app.schemas.chat import SaveResearchRequest, TranslateRequest, GrievanceCreateRequest, ContactRequest
+from app.services.email_service import send_contact_confirmation, send_contact_admin, send_email
 from app.translation.translation_service import get_translation_provider
 import app.rag_client as rag_client
 
 router = APIRouter()
+
+
+@router.post("/api/contact")
+def contact(body: ContactRequest):
+    if not body.email or "@" not in body.email:
+        raise HTTPException(status_code=400, detail="Please provide a valid email address.")
+    send_contact_confirmation(body.email, body.name, body.subject)
+    send_contact_admin(body.name, body.email, body.subject, body.message)
+    return {"success": True, "message": "Your message has been received. A confirmation email has been sent."}
 
 
 @router.get("/api/research/search")
@@ -121,6 +131,7 @@ def create_grievance(
         related_query=(body.related_query or "").strip() or None,
     )
     db[GRIEVANCE_COLLECTION].insert_one(record)
+    send_email(current_user["email"], "Your IP-SAKTI grievance was received", f"Hello {current_user.get('name', 'there')},\n\nYour grievance \"{record['subject']}\" has been received successfully.\n\nRegards,\nIP-SAKTI Sahayak")
     return grievance_to_dict(record)
 
 

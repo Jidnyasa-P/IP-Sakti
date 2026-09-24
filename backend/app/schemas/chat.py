@@ -93,3 +93,10 @@ class GrievanceCreateRequest(BaseModel):
     conversation_id: Optional[str] = None
     message_id: Optional[str] = None
     related_query: Optional[str] = None
+
+
+class ContactRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    email: str = Field(..., min_length=3, max_length=320)
+    subject: str = Field(..., min_length=1, max_length=160)
+    message: str = Field(..., min_length=1, max_length=5000)

@@ -129,7 +129,8 @@ export async function dummyRegister(params: {
   password: string;
   preferred_language?: string;
   roles: UserRole[];
-}): Promise<User> {
+  expert_type?: 'ayurveda' | 'legal' | 'regulatory';
+}): Promise<{ requires_verification: boolean; user: User }> {
   const res = await fetch(apiUrl('/api/auth/register'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -140,11 +141,68 @@ export async function dummyRegister(params: {
     throw new Error(await parseErrorMessage(res, 'Registration failed. Please try again.'));
   }
 
-  const { token, user } = await res.json();
-  // Registration creates an active session so the new account can continue
-  // directly into the application.
-  writeSession(token, user, true);
-  return user;
+  const data = await res.json();
+  return data as { requires_verification: boolean; user: User };
+}
+
+export async function verifyRegistrationEmail(email: string, otp: string): Promise<User> {
+  const res = await fetch(apiUrl('/api/auth/verify-email'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp }),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, 'Email verification failed.'));
+  const data = await res.json();
+  return data.user as User;
+}
+
+export async function resendRegistrationOtp(email: string): Promise<void> {
+  const res = await fetch(apiUrl('/api/auth/resend-registration-otp'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, 'Could not resend OTP.'));
+}
+
+export async function forgotPassword(email: string): Promise<void> {
+  const res = await fetch(apiUrl('/api/auth/forgot-password'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, 'Could not start password recovery.'));
+}
+
+export async function resetPassword(email: string, otp: string, newPassword: string): Promise<void> {
+  const res = await fetch(apiUrl('/api/auth/reset-password'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp, new_password: newPassword }),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, 'Could not reset password.'));
+}
+
+export async function sendChangePasswordOtp(): Promise<void> {
+  const res = await authFetch('/api/auth/change-password/send-otp', { method: 'POST' });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, 'Could not send password OTP.'));
+}
+
+export async function changePassword(currentPassword: string, otp: string, newPassword: string): Promise<void> {
+  const res = await authFetch('/api/auth/change-password', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ current_password: currentPassword, otp, new_password: newPassword }),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, 'Could not change password.'));
+}
+
+export async function deleteAccount(password: string, otp: string): Promise<void> {
+  const res = await authFetch('/api/auth/account', {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password, otp }),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, 'Could not delete account.'));
+  clearSession();
 }
 
 export async function dummyLogin(

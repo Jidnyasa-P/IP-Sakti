@@ -28,6 +28,7 @@ _using_mock = False
 # collection_name -> list of (field_name, index_kwargs)
 COLLECTION_INDEXES = {
     "users": [("email", {"unique": True})],
+    "email_otps": [("email", {}), ("expires_at", {})],
     "conversations": [("user_id", {}), ("updated_at", {})],
     "deleted_conversations": [("conversation_id", {"unique": True}), ("user_id", {}), ("deleted_at", {})],
     "chat_messages": [("conversation_id", {}), ("created_at", {}), ("sequence", {})],

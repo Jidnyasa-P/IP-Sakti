@@ -30,6 +30,7 @@ import { Language, UserRole, ALL_ROLES, ROLE_DEFINITIONS, normalizeRole, SUPPORT
 import { useTranslation } from '../context/LanguageContext';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { ExpertVerificationModal } from './ExpertVerificationModal';
+import { changePassword, sendChangePasswordOtp, deleteAccount, authFetch } from './auth/authStorage';
 
 interface ProfileViewProps {
   setActiveTab: (tab: ActiveTab) => void;
@@ -58,6 +59,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [isExpertModalOpen, setIsExpertModalOpen] = useState(false);
+  const [securityMessage, setSecurityMessage] = useState<string | null>(null);
+  const [securityError, setSecurityError] = useState<string | null>(null);
+  const [changeCurrentPassword, setChangeCurrentPassword] = useState('');
+  const [changeOtp, setChangeOtp] = useState('');
+  const [changeNewPassword, setChangeNewPassword] = useState('');
+  const [changeOtpSent, setChangeOtpSent] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteOtp, setDeleteOtp] = useState('');
+  const [deleteOtpSent, setDeleteOtpSent] = useState(false);
 
   // Sync state with currentUser changes
   useEffect(() => {
@@ -1026,6 +1036,33 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
           </div>
         </div>
       </div>
+
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-8">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-5">
+          <div><h3 className="text-sm font-semibold text-slate-900">Account security</h3><p className="text-xs text-slate-500 mt-1">Change your password or permanently delete your account.</p></div>
+          {securityError && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{securityError}</div>}
+          {securityMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{securityMessage}</div>}
+          <div className="grid lg:grid-cols-2 gap-5">
+            <div className="rounded-xl border border-slate-200 p-4 space-y-3">
+              <h4 className="text-xs font-semibold text-slate-800">Change password</h4>
+              <input type="password" value={changeCurrentPassword} onChange={e => setChangeCurrentPassword(e.target.value)} placeholder="Current password" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-xs" />
+              <input type="password" value={changeNewPassword} onChange={e => setChangeNewPassword(e.target.value)} placeholder="New password" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-xs" />
+              {!changeOtpSent ? <button type="button" onClick={async () => { try { if (!changeCurrentPassword) throw new Error('Enter your current password first.'); await sendChangePasswordOtp(); setChangeOtpSent(true); setSecurityError(null); setSecurityMessage('OTP sent to your registered email.'); } catch (err) { setSecurityError(err instanceof Error ? err.message : 'Could not send OTP.'); setSecurityMessage(null); } }} className="w-full rounded-lg bg-slate-900 px-3 py-2.5 text-xs font-semibold text-white">Verify & send OTP</button> : <>
+                <input value={changeOtp} onChange={e => setChangeOtp(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" placeholder="Email OTP" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-xs text-center tracking-[0.25em]" />
+                <button type="button" onClick={async () => { try { await changePassword(changeCurrentPassword, changeOtp, changeNewPassword); setSecurityMessage('Password changed successfully.'); setSecurityError(null); setChangeCurrentPassword(''); setChangeNewPassword(''); setChangeOtp(''); setChangeOtpSent(false); } catch (err) { setSecurityError(err instanceof Error ? err.message : 'Could not change password.'); } }} className="w-full rounded-lg bg-emerald-800 px-3 py-2.5 text-xs font-semibold text-white">Change password</button>
+              </>}
+            </div>
+            <div className="rounded-xl border border-rose-200 bg-rose-50/30 p-4 space-y-3">
+              <h4 className="text-xs font-semibold text-rose-800">Delete account</h4><p className="text-[11px] text-slate-600">This permanently removes your account and application data.</p>
+              <input type="password" value={deletePassword} onChange={e => setDeletePassword(e.target.value)} placeholder="Current password" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-xs" />
+              {!deleteOtpSent ? <button type="button" onClick={async () => { try { if (!deletePassword) throw new Error('Enter your current password first.'); const res = await authFetch('/api/auth/delete-account/send-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: deletePassword }) }); if (!res.ok) throw new Error('Could not send OTP.'); setDeleteOtpSent(true); setSecurityMessage('OTP sent to your registered email.'); setSecurityError(null); } catch (err) { setSecurityError(err instanceof Error ? err.message : 'Could not send OTP.'); } }} className="w-full rounded-lg border border-rose-300 bg-white px-3 py-2.5 text-xs font-semibold text-rose-700">Send deletion OTP</button> : <>
+                <input value={deleteOtp} onChange={e => setDeleteOtp(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" placeholder="Email OTP" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-xs text-center tracking-[0.25em]" />
+                <button type="button" onClick={async () => { if (!window.confirm('Delete your account permanently? This cannot be undone.')) return; try { await deleteAccount(deletePassword, deleteOtp); logout(); setActiveTab('landing'); } catch (err) { setSecurityError(err instanceof Error ? err.message : 'Could not delete account.'); } }} className="w-full rounded-lg bg-rose-700 px-3 py-2.5 text-xs font-semibold text-white">Delete account permanently</button>
+              </>}
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Camera Capture Modal */}
       <CameraCaptureModal

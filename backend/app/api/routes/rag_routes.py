@@ -7,6 +7,7 @@ from app.database.session import get_db
 from app.schemas.chat import SearchRequest, ExpertEscalationRequest
 from app.services import expert_escalation_service
 from app.models.expert_escalation import COLLECTION as EXPERT_ESCALATIONS_COLLECTION, new_expert_escalation
+from app.services.email_service import send_expert_request_email
 import app.rag_client as rag_client
 
 router = APIRouter()
@@ -77,5 +78,22 @@ def expert_escalation(body: ExpertEscalationRequest, current_user: dict = Depend
         expert_type=body.expert_type,
     )
     db[EXPERT_ESCALATIONS_COLLECTION].insert_one(record)
+
+    user = db["users"].find_one({"_id": current_user["id"]})
+    if user:
+        send_expert_request_email(user["email"], user.get("name", "there"), body.expert_type or "expert", body.query)
+
+    matching_experts = db["users"].find({
+        "email_verified": True,
+        "roles": "Expert",
+        "expert_type": body.expert_type,
+        "_id": {"$ne": current_user["id"]},
+    })
+    notified = 0
+    for expert in matching_experts:
+        if expert.get("email"):
+            send_expert_request_email(expert["email"], expert.get("name", "Expert"), body.expert_type or "expert", body.query, recipient_is_expert=True)
+            notified += 1
+
     expert_escalation_service.notify_real_service(record_id)
-    return {"success": True, "escalation_id": record_id, "status": record["status"]}
+    return {"success": True, "escalation_id": record_id, "status": record["status"], "matched_experts": notified}

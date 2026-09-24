@@ -57,6 +57,7 @@ export interface RegisterData {
   photo_url?: string;
   organization?: string;
   expertCertificate?: ExpertCertificate;
+  expert_type?: 'ayurveda' | 'legal' | 'regulatory';
 }
 
 export interface AuthContextType {
@@ -317,30 +318,17 @@ export const AuthProvider: React.FC<{
       /*
        * REAL BACKEND REGISTER
        */
-      const user = await dummyRegister({
+      await dummyRegister({
         name: data.name.trim(),
         email: data.email.trim(),
         password: data.password,
-        preferred_language:
-          data.preferred_language || 'en',
+        preferred_language: data.preferred_language || 'en',
         roles,
+        expert_type: data.expert_type,
       });
 
-      /*
-       * Keep frontend-only information for the current session.
-       */
-      const mergedUser: User = {
-        ...user,
-        organization: data.organization,
-        photo_url: data.photo_url,
-        expertCertificate: data.expertCertificate,
-      };
-
-      setCurrentUser(mergedUser);
-
-      return {
-        success: true,
-      };
+      // Registration now requires email OTP verification before a session is created.
+      return { success: true };
     } catch (err: unknown) {
       return {
         success: false,

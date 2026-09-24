@@ -169,6 +169,7 @@ export interface User {
   photo_url?: string;
   organization?: string;
   expertCertificate?: ExpertCertificate;
+  expert_type?: 'ayurveda' | 'legal' | 'regulatory';
 }
 
 export interface DocumentMetadata {

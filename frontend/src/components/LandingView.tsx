@@ -35,6 +35,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
   const { currentUser, isLoggedIn } = useAuth();
 
   const [contactSent, setContactSent] = useState(false);
+  const [contactError, setContactError] = useState<string | null>(null);
 
   const handleActionClick = (targetTab: ActiveTab) => {
     if (isLoggedIn) {
@@ -75,10 +76,20 @@ export const LandingView: React.FC<LandingViewProps> = ({
     },
   ];
 
-  const handleContactSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleContactSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setContactSent(true);
-    event.currentTarget.reset();
+    setContactError(null);
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    try {
+      const res = await fetch(`${(import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')}/api/contact`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: data.get('name'), email: data.get('email'), subject: data.get('subject'), message: data.get('message') }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.detail || 'Could not send your message.');
+      setContactSent(true); form.reset();
+    } catch (err) { setContactError(err instanceof Error ? err.message : 'Could not send your message.'); }
   };
 
   return (
@@ -341,10 +352,10 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 Send Message
               </button>
               {contactSent && (
-                <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
-                  Thanks! Your message has been recorded for this session.
+                <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">Confirmation sent to your email.
                 </span>
               )}
+              {contactError && <span className="text-sm text-rose-700 dark:text-rose-400 font-medium">{contactError}</span>}
             </div>
           </form>
         </div>
