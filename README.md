@@ -2,7 +2,7 @@
 
 **Live Application:** https://ip-sakti-frontend.onrender.com/
 
-Multilingual, RAG-based, source-cited AI assistant for Intellectual Property and regulatory guidance in Ayurveda (SIH26045).
+Multilingual, RAG-based, source-cited AI assistant for Intellectual Property and regulatory guidance in Ayurveda.
 
 ## 1. Overview
 
