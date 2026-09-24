@@ -68,7 +68,8 @@ export interface AuthContextType {
   login: (
     email: string,
     password?: string,
-    expertCertificate?: ExpertCertificate
+    expertCertificate?: ExpertCertificate,
+    rememberMe?: boolean
   ) => Promise<{
     success: boolean;
     user?: User;
@@ -196,7 +197,8 @@ export const AuthProvider: React.FC<{
   const login = async (
     email: string,
     password?: string,
-    expertCertificate?: ExpertCertificate
+    expertCertificate?: ExpertCertificate,
+    rememberMe = true
   ): Promise<{
     success: boolean;
     user?: User;
@@ -226,7 +228,8 @@ export const AuthProvider: React.FC<{
        */
       const user = await dummyLogin(
         email.trim(),
-        password
+        password,
+        rememberMe
       );
 
       const mergedUser: User = expertCertificate

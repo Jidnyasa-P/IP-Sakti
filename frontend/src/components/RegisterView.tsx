@@ -1,13 +1,45 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Shield, Lock, Mail, User as UserIcon, ArrowRight, LogIn, AlertCircle, Check, ChevronDown, X, Scale } from 'lucide-react';
+import {
+  Shield,
+  Lock,
+  Mail,
+  User as UserIcon,
+  ArrowRight,
+  LogIn,
+  AlertCircle,
+  Check,
+  ChevronDown,
+  X,
+  Scale,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ActiveTab } from './Header';
-import { Language, UserRole, ALL_ROLES, ROLE_DEFINITIONS, SUPPORTED_LANGUAGES, LANGUAGES_MAP, ExpertCertificate } from '../types';
-import { ExpertCertificateUpload, ExpertCertificateData } from './ExpertCertificateUpload';
+import {
+  Language,
+  UserRole,
+  ALL_ROLES,
+  ROLE_DEFINITIONS,
+  SUPPORTED_LANGUAGES,
+  ExpertCertificate,
+} from '../types';
+import {
+  ExpertCertificateUpload,
+  ExpertCertificateData,
+} from './ExpertCertificateUpload';
 
 interface RegisterViewProps {
   setActiveTab: (tab: ActiveTab) => void;
 }
+
+const passwordChecks = [
+  { key: 'length', label: '8 or more characters', test: (value: string) => value.length >= 8 },
+  { key: 'upper', label: 'One uppercase letter', test: (value: string) => /[A-Z]/.test(value) },
+  { key: 'lower', label: 'One lowercase letter', test: (value: string) => /[a-z]/.test(value) },
+  { key: 'number', label: 'One number', test: (value: string) => /\d/.test(value) },
+  { key: 'special', label: 'One special character', test: (value: string) => /[^A-Za-z0-9]/.test(value) },
+] as const;
 
 export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
   const { register, isLoading } = useAuth();
@@ -16,17 +48,28 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState<UserRole[]>(['Practitioner']);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [preferredLanguage, setPreferredLanguage] = useState<Language>('en');
-  const [expertCertificate, setExpertCertificate] = useState<Partial<ExpertCertificateData> | null>(null);
+  const [expertCertificate, setExpertCertificate] =
+    useState<Partial<ExpertCertificateData> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const isExpertSelected = selectedRoles.includes('Expert');
-
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
+  const strength = passwordChecks.filter(check => check.test(password)).length;
+  const strengthLabel =
+    password.length === 0
+      ? ''
+      : strength <= 2
+        ? 'Weak'
+        : strength <= 4
+          ? 'Good'
+          : 'Strong';
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -40,14 +83,10 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
   const handleToggleRole = (role: UserRole) => {
     setSelectedRoles(prev => {
       if (prev.includes(role)) {
-        if (prev.length <= 1) {
-          // Prevent deselecting all roles
-          return prev;
-        }
+        if (prev.length <= 1) return prev;
         return prev.filter(r => r !== role);
-      } else {
-        return Array.from(new Set([...prev, role]));
       }
+      return Array.from(new Set([...prev, role]));
     });
   };
 
@@ -61,7 +100,17 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
     e.preventDefault();
     setError(null);
 
-    if (password && confirmPassword && password !== confirmPassword) {
+    if (!name.trim() || !email.trim() || !password || !confirmPassword) {
+      setError('Please complete all required fields.');
+      return;
+    }
+
+    if (strength < passwordChecks.length) {
+      setError('Please choose a stronger password that meets all the requirements shown below.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
       setError('Passwords do not match.');
       return;
     }
@@ -73,7 +122,9 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
 
     if (isExpertSelected) {
       if (!expertCertificate?.fileName) {
-        setError('Mandatory Proof Required: You must upload a verified certificate file (PDF, PNG, JPG) to register with the Expert role.');
+        setError(
+          'Mandatory Proof Required: You must upload a verified certificate file (PDF, PNG, JPG) to register with the Expert role.'
+        );
         return;
       }
       if (!expertCertificate?.certificateId?.trim()) {
@@ -86,19 +137,22 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
       }
     }
 
-    const certPayload: ExpertCertificate | undefined = isExpertSelected && expertCertificate?.fileName
-      ? {
-          fileName: expertCertificate.fileName,
-          fileSize: expertCertificate.fileSize || 428000,
-          fileType: expertCertificate.fileType || 'application/pdf',
-          fileDataUrl: expertCertificate.fileDataUrl,
-          certificateId: expertCertificate.certificateId!.trim(),
-          certificateType: expertCertificate.certificateType || 'CGPDTM Registered Patent Agent (Rule 110, Patents Rules 2003)',
-          issuingAuthority: expertCertificate.issuingAuthority!.trim(),
-          uploadedAt: expertCertificate.uploadedAt || new Date().toISOString(),
-          status: 'Verified'
-        }
-      : undefined;
+    const certPayload: ExpertCertificate | undefined =
+      isExpertSelected && expertCertificate?.fileName
+        ? {
+            fileName: expertCertificate.fileName,
+            fileSize: expertCertificate.fileSize || 428000,
+            fileType: expertCertificate.fileType || 'application/pdf',
+            fileDataUrl: expertCertificate.fileDataUrl,
+            certificateId: expertCertificate.certificateId!.trim(),
+            certificateType:
+              expertCertificate.certificateType ||
+              'CGPDTM Registered Patent Agent (Rule 110, Patents Rules 2003)',
+            issuingAuthority: expertCertificate.issuingAuthority!.trim(),
+            uploadedAt: expertCertificate.uploadedAt || new Date().toISOString(),
+            status: 'Verified',
+          }
+        : undefined;
 
     const result = await register({
       name,
@@ -106,8 +160,8 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
       roles: selectedRoles,
       role: selectedRoles[0],
       preferred_language: preferredLanguage,
-      password: password || 'demo1234',
-      expertCertificate: certPayload
+      password,
+      expertCertificate: certPayload,
     });
 
     if (result.success) {
@@ -118,310 +172,373 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-3 sm:p-6 bg-slate-50">
-      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 md:p-8 space-y-5 sm:space-y-6">
-        {/* Header Branding */}
-        <div className="text-center space-y-2">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 mx-auto flex items-center justify-center shadow-xs">
-            <Shield className="w-5 h-5" />
+    <div className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-8 sm:py-10">
+      <div className="mx-auto w-full max-w-2xl">
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-800 shadow-sm">
+            <Shield className="h-5 w-5" />
           </div>
-          <div>
-            <h2 className="text-base sm:text-lg font-semibold text-slate-900">
-              Create an IP-SAKTI Sahayak Account
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Access statutory patent analysis, TKDL dossiers, and biodiversity approvals
-            </p>
-          </div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-800">
+            IP-SAKTI Sahayak
+          </p>
+          <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-slate-900">
+            Create your account
+          </h1>
+          <p className="mt-1.5 text-sm text-slate-500">
+            Set up your profile to access IP and regulatory guidance.
+          </p>
         </div>
 
-        {/* Error notification */}
-        {error && (
-          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-xs text-rose-800">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Registration Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Full Name */}
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
-              Full Legal / Professional Name
-            </label>
-            <div className="relative">
-              <UserIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="e.g. Dr. Priya Kulkarni"
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* Email Address */}
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
-              Official Email Address
-            </label>
-            <div className="relative">
-              <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="name@organization.in"
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* Profile Type Multi-Select Dropdown */}
-          <div className="relative" ref={dropdownRef}>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-medium text-slate-700">
-                Profile Type <span className="text-[11px] text-emerald-800 font-normal">(Multi-select enabled)</span>
-              </label>
-              <span className="text-[11px] text-slate-500 font-medium">
-                {selectedRoles.length} of 5 selected
-              </span>
-            </div>
-
-            {/* Dropdown Trigger Box with Chips */}
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          {error && (
             <div
-              id="register-profile-type-trigger"
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className={`w-full min-h-[42px] px-2.5 py-1.5 bg-slate-50 border rounded-xl text-xs flex items-center justify-between gap-2 cursor-pointer transition-colors ${
-                isDropdownOpen
-                  ? 'border-emerald-700 ring-1 ring-emerald-700 bg-white'
-                  : 'border-slate-300 hover:border-slate-400'
-              }`}
+              role="alert"
+              className="mb-6 flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs leading-relaxed text-rose-800"
             >
-              <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
-                {selectedRoles.length === 0 ? (
-                  <span className="text-slate-400 text-xs px-1">
-                    Select one or more profile types...
-                  </span>
-                ) : (
-                  selectedRoles.map(r => (
-                    <span
-                      key={r}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-950 border border-emerald-200 text-xs font-medium shadow-2xs animate-in fade-in duration-100"
-                    >
-                      <span>{r}</span>
-                      <button
-                        type="button"
-                        onClick={e => handleRemoveRoleChip(e, r)}
-                        title={`Remove ${r}`}
-                        aria-label={`Remove ${r}`}
-                        className="p-0.5 rounded-full hover:bg-emerald-200 text-emerald-800 transition-colors"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))
-                )}
-              </div>
-
-              <div className="flex items-center gap-1 shrink-0 text-slate-400 pl-1">
-                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-emerald-700' : ''}`} />
-              </div>
-            </div>
-
-            {/* Multi-Select Dropdown Menu */}
-            {isDropdownOpen && (
-              <div
-                id="register-profile-type-dropdown"
-                className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-2 space-y-1 animate-in fade-in slide-in-from-top-1 duration-150"
-              >
-                <div className="px-2 py-1 border-b border-slate-100 flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                    Select Any Combination of Roles
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    Check all that apply
-                  </span>
-                </div>
-
-                <div className="py-1 space-y-1 max-h-60 overflow-y-auto">
-                  {ALL_ROLES.map(roleOption => {
-                    const isChecked = selectedRoles.includes(roleOption);
-                    const meta = ROLE_DEFINITIONS[roleOption];
-
-                    return (
-                      <div
-                        key={roleOption}
-                        onClick={() => handleToggleRole(roleOption)}
-                        className={`flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                          isChecked
-                            ? 'bg-emerald-50/70 text-slate-900'
-                            : 'hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        {/* Checkbox */}
-                        <div className="pt-0.5 shrink-0">
-                          <div
-                            className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
-                              isChecked
-                                ? 'bg-emerald-700 border-emerald-700 text-white'
-                                : 'border-slate-300 bg-white'
-                            }`}
-                          >
-                            {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                          </div>
-                        </div>
-
-                        {/* Role Details */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-900">
-                              {roleOption}
-                            </span>
-                            <span className={`text-[9px] px-1.5 py-0.2 rounded font-medium ${meta?.pillBg || 'bg-slate-100 text-slate-700'}`}>
-                              {meta?.badge || roleOption}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                            {meta?.desc || meta?.title}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Dropdown Footer */}
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between px-1">
-                  <span className="text-[11px] text-slate-500">
-                    {selectedRoles.length} profile{selectedRoles.length !== 1 ? 's' : ''} active
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsDropdownOpen(false)}
-                    className="px-3 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium transition-colors cursor-pointer"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Mandatory Expert Certificate Upload when Expert role is selected */}
-          {isExpertSelected && (
-            <div className="p-4 bg-gradient-to-br from-emerald-50/70 to-teal-50/40 border-2 border-emerald-500/40 rounded-2xl space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-              <div className="flex items-center justify-between border-b border-emerald-200/80 pb-2">
-                <div className="flex items-center gap-2">
-                  <Scale className="w-4 h-4 text-emerald-800" />
-                  <span className="text-xs font-bold text-emerald-950">
-                    Expert Statutory Accreditation Proof
-                  </span>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-400 text-slate-950 uppercase tracking-wider">
-                  Mandatory for Expert
-                </span>
-              </div>
-
-              <ExpertCertificateUpload
-                certificateData={expertCertificate}
-                onChange={setExpertCertificate}
-              />
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+              <span>{error}</span>
             </div>
           )}
 
-          {/* Preferred Language */}
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">
-              Default Interface Language / भाषा
-            </label>
-            <select
-              value={preferredLanguage}
-              onChange={e => setPreferredLanguage(e.target.value as Language)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-hidden focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 transition-colors"
-            >
-              {SUPPORTED_LANGUAGES.map(lang => (
-                <option key={lang.code} value={lang.code}>
-                  {lang.native} ({lang.label})
-                </option>
-              ))}
-            </select>
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="register-name"
+                  className="mb-1.5 block text-xs font-semibold text-slate-700"
+                >
+                  Full name
+                </label>
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="register-name"
+                    type="text"
+                    required
+                    autoComplete="name"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Your full name"
+                    className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
+                  />
+                </div>
+              </div>
 
-          {/* Password (Optional for dummy demo, but standard) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700"
-                />
+              <div>
+                <label
+                  htmlFor="register-email"
+                  className="mb-1.5 block text-xs font-semibold text-slate-700"
+                >
+                  Email address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="register-email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="you@organization.in"
+                    className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
+                  />
+                </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Confirm Password
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                Profile type <span className="font-normal text-slate-400">(select one or more)</span>
               </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700"
-                />
+
+              <div className="relative" ref={dropdownRef}>
+                <div
+                  id="register-profile-type-trigger"
+                  onClick={() => setIsDropdownOpen(open => !open)}
+                  className={`flex min-h-[44px] w-full cursor-pointer items-center justify-between gap-2 rounded-lg border bg-white px-3 py-1.5 text-sm transition ${
+                    isDropdownOpen
+                      ? 'border-emerald-700 ring-2 ring-emerald-700/10'
+                      : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                >
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    {selectedRoles.map(role => (
+                      <span
+                        key={role}
+                        className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-900"
+                      >
+                        {role}
+                        <button
+                          type="button"
+                          onClick={e => handleRemoveRoleChip(e, role)}
+                          title={`Remove ${role}`}
+                          aria-label={`Remove ${role}`}
+                          className="rounded-full p-0.5 text-emerald-700 hover:bg-emerald-100"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${
+                      isDropdownOpen ? 'rotate-180 text-emerald-700' : ''
+                    }`}
+                  />
+                </div>
+
+                {isDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+                    <div className="border-b border-slate-100 px-2 pb-2 text-[11px] text-slate-500">
+                      Choose the profile types relevant to your work.
+                    </div>
+                    <div className="max-h-60 space-y-1 overflow-y-auto py-2">
+                      {ALL_ROLES.map(role => {
+                        const isChecked = selectedRoles.includes(role);
+                        const meta = ROLE_DEFINITIONS[role];
+
+                        return (
+                          <div
+                            key={role}
+                            onClick={() => handleToggleRole(role)}
+                            className={`flex cursor-pointer items-start gap-3 rounded-md p-2.5 transition ${
+                              isChecked
+                                ? 'bg-emerald-50'
+                                : 'hover:bg-slate-50'
+                            }`}
+                          >
+                            <div
+                              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                                isChecked
+                                  ? 'border-emerald-700 bg-emerald-700 text-white'
+                                  : 'border-slate-300 bg-white'
+                              }`}
+                            >
+                              {isChecked && <Check className="h-3 w-3" />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-slate-800">{role}</p>
+                              <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
+                                {meta?.desc || meta?.title}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-100 px-1 pt-2">
+                      <span className="text-[11px] text-slate-500">
+                        {selectedRoles.length} selected
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsDropdownOpen(false)}
+                        className="rounded-md bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-900"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <>
-                <span>Complete Registration</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="register-language"
+                  className="mb-1.5 block text-xs font-semibold text-slate-700"
+                >
+                  Preferred language
+                </label>
+                <select
+                  id="register-language"
+                  value={preferredLanguage}
+                  onChange={e => setPreferredLanguage(e.target.value as Language)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
+                >
+                  {SUPPORTED_LANGUAGES.map(lang => (
+                    <option key={lang.code} value={lang.code}>
+                      {lang.native} ({lang.label})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="hidden sm:block" />
+            </div>
+
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="register-password"
+                  className="mb-1.5 block text-xs font-semibold text-slate-700"
+                >
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="register-password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="Create a password"
+                    className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(value => !value)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+
+                <div className="mt-2.5">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-slate-500">Password strength</span>
+                    <span
+                      className={`text-[11px] font-semibold ${
+                        strength === 5
+                          ? 'text-emerald-700'
+                          : strength > 2
+                            ? 'text-amber-700'
+                            : 'text-rose-700'
+                      }`}
+                    >
+                      {strengthLabel || 'Not set'}
+                    </span>
+                  </div>
+                  <div className="flex gap-1">
+                    {passwordChecks.map(check => (
+                      <div
+                        key={check.key}
+                        className={`h-1.5 flex-1 rounded-full ${
+                          check.test(password) ? 'bg-emerald-600' : 'bg-slate-200'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-2 grid grid-cols-1 gap-1 text-[10px] text-slate-500 sm:grid-cols-2">
+                    {passwordChecks.map(check => {
+                      const passed = check.test(password);
+                      return (
+                        <span
+                          key={check.key}
+                          className={passed ? 'text-emerald-700' : 'text-slate-500'}
+                        >
+                          {passed ? '✓' : '•'} {check.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="register-confirm-password"
+                  className="mb-1.5 block text-xs font-semibold text-slate-700"
+                >
+                  Confirm password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="register-confirm-password"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter your password"
+                    className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(value => !value)}
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                {confirmPassword && (
+                  <p
+                    className={`mt-2 text-[11px] ${
+                      password === confirmPassword ? 'text-emerald-700' : 'text-rose-700'
+                    }`}
+                  >
+                    {password === confirmPassword
+                      ? 'Passwords match.'
+                      : 'Passwords do not match.'}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {isExpertSelected && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-3 flex items-center justify-between border-b border-slate-200 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Scale className="h-4 w-4 text-emerald-800" />
+                    <span className="text-xs font-semibold text-slate-800">
+                      Expert statutory certificate
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-rose-700">
+                    Required
+                  </span>
+                </div>
+                <ExpertCertificateUpload
+                  certificateData={expertCertificate}
+                  onChange={setExpertCertificate}
+                />
+              </div>
             )}
-          </button>
-        </form>
 
-        {/* Footer Navigation */}
-        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-center sm:text-left">
-          <button
-            type="button"
-            onClick={() => setActiveTab('landing')}
-            className="text-slate-500 hover:text-slate-800"
-          >
-            ← Back to Portal Home
-          </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLoading ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <ArrowRight className="h-4 w-4" />
+              )}
+              <span>{isLoading ? 'Creating account…' : 'Create account'}</span>
+            </button>
+          </form>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('login')}
-            className="text-emerald-800 font-semibold hover:underline flex items-center gap-1"
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            <span>Already have an account? Sign In</span>
-          </button>
+          <div className="mt-5 border-t border-slate-100 pt-5 text-center text-xs text-slate-500">
+            Already have an account?{' '}
+            <button
+              type="button"
+              onClick={() => setActiveTab('login')}
+              className="font-semibold text-emerald-800 hover:underline"
+            >
+              Sign in
+            </button>
+          </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('landing')}
+          className="mx-auto mt-4 flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800"
+        >
+          ← Back to landing page
+        </button>
       </div>
     </div>
   );
