@@ -1,6 +1,8 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from bson import ObjectId
+from pymongo.errors import DuplicateKeyError
 
 from app.api.deps import get_current_user
 from app.database.session import get_db
@@ -10,24 +12,81 @@ from app.models.expert_escalation import COLLECTION as EXPERT_ESCALATIONS_COLLEC
 from app.models.feedback import COLLECTION as FEEDBACK_COLLECTION, new_feedback
 from app.schemas.chat import ChatRequest, QueryRequest, FeedbackRequest, NewConversationRequest, RenameConversationRequest
 from app.services import conversation_service, audit_service, expert_escalation_service
+from app.services.conversation_service import ConversationDeletedError
 import app.rag_client as rag_client
 
 router = APIRouter()
 
 
-def _get_owned_conversation(db, conversation_id: str, user_id: str, is_admin: bool) -> dict:
-    """Fetch a conversation by either canonical `_id` or the legacy
-    `conversation_id` field and enforce ownership."""
-    conv = db[CONVERSATIONS_COLLECTION].find_one({
+def _mark_conversation_deleted(db, conversation_id: str, user_id: str, deleted_at: datetime) -> None:
+    """Create/update a deletion tombstone atomically and idempotently.
+
+    The deleted_conversations collection has a unique index on conversation_id.
+    A plain upsert can still raise DuplicateKeyError when two delete requests
+    arrive at the same time (for example, a double-click or retry). Treat that
+    race as success because the desired final state is already a tombstone.
+    """
+    value = str(conversation_id)
+    try:
+        db["deleted_conversations"].update_one(
+            {"conversation_id": value},
+            {
+                "$set": {"deleted_at": deleted_at},
+                "$setOnInsert": {
+                    "conversation_id": value,
+                    "user_id": user_id,
+                },
+            },
+            upsert=True,
+        )
+    except DuplicateKeyError:
+        # Another concurrent request inserted the same tombstone. Verify the
+        # marker exists; either way the conversation is already permanently
+        # deleted from the application's point of view.
+        db["deleted_conversations"].update_one(
+            {"conversation_id": value},
+            {"$set": {"deleted_at": deleted_at}},
+        )
+
+
+def _conversation_id_candidates(conversation_id: str) -> list:
+    """Support current string IDs and legacy MongoDB ObjectId IDs."""
+    value = str(conversation_id)
+    candidates = [value]
+    try:
+        candidates.append(ObjectId(value))
+    except Exception:
+        pass
+    return candidates
+
+
+def _conversation_lookup_filter(conversation_id: str) -> dict:
+    candidates = _conversation_id_candidates(conversation_id)
+    return {
         "$or": [
-            {"_id": conversation_id},
-            {"conversation_id": conversation_id},
+            {"_id": candidate} for candidate in candidates
+        ] + [
+            {"conversation_id": candidate} for candidate in candidates
         ]
-    })
+    }
+
+
+def _get_owned_conversation(db, conversation_id: str, user_id: str, is_admin: bool) -> dict:
+    """Fetch a live conversation by canonical id or legacy conversation_id."""
+    if db["deleted_conversations"].find_one({"conversation_id": str(conversation_id), "user_id": user_id}):
+        raise HTTPException(status_code=410, detail="Conversation was permanently deleted.")
+
+    conv = db[CONVERSATIONS_COLLECTION].find_one(_conversation_lookup_filter(conversation_id))
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     if not is_admin and conv.get("user_id") != user_id:
         raise HTTPException(status_code=403, detail="You do not have access to this conversation.")
+
+    # Also reject a legacy record whose canonical id has already been
+    # tombstoned. This closes the old-id/canonical-id resurrection path.
+    for candidate in {str(conv.get("_id")), str(conv.get("conversation_id"))}:
+        if db["deleted_conversations"].find_one({"conversation_id": candidate, "user_id": user_id}):
+            raise HTTPException(status_code=410, detail="Conversation was permanently deleted.")
     return conv
 
 
@@ -48,17 +107,21 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
     # nothing written to the database at all -- no more orphaned blanks.
     # Deleted sessions are tombstoned so an in-flight/stale client request can
     # never recreate the exact same conversation after the user removed it.
-    requested_conversation_id = conversation_id
+    requested_conversation_id = str(conversation_id) if conversation_id else None
     if requested_conversation_id:
         deleted_marker = db["deleted_conversations"].find_one({
-            "conversation_id": str(requested_conversation_id),
+            "conversation_id": requested_conversation_id,
             "user_id": user_id,
         })
         if deleted_marker:
-            conversation_id = None
+            # A session that the user explicitly deleted must never be reused,
+            # even when an old tab/in-flight request sends the deleted id.
+            raise HTTPException(status_code=410, detail="Conversation was permanently deleted.")
 
     existing_conv = (
-        db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id, "user_id": user_id})
+        db[CONVERSATIONS_COLLECTION].find_one({
+            "$and": [_conversation_lookup_filter(str(conversation_id)), {"user_id": user_id}]
+        })
         if conversation_id else None
     )
     working_conversation_id = existing_conv["_id"] if existing_conv else (conversation_id or conversation_service.new_conversation_id())
@@ -74,10 +137,15 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
     # A delete may have happened while the RAG request was running. Never
     # recreate that deleted session after the user explicitly removed it.
     if requested_conversation_id and db["deleted_conversations"].find_one({
-        "conversation_id": str(requested_conversation_id),
+        "conversation_id": requested_conversation_id,
         "user_id": user_id,
     }):
         raise HTTPException(status_code=410, detail="Conversation was deleted while the request was in progress.")
+    if db["deleted_conversations"].find_one({
+        "conversation_id": str(working_conversation_id),
+        "user_id": user_id,
+    }):
+        raise HTTPException(status_code=410, detail="Conversation was permanently deleted.")
 
     # Only now -- once the RAG call has actually succeeded -- do we create
     # (or fetch) the conversation record, reusing working_conversation_id so
@@ -112,35 +180,48 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
         jurisdiction_coverage_available=bool(rag_result.get("jurisdiction")),
     )
 
-    conversation_service.add_message(
-        db, conversation_id=conv["_id"], role="user", content=query, language=rag_result.get("language"),
-    )
-    assistant_msg = conversation_service.add_message(
-        db,
-        conversation_id=conv["_id"],
-        role="assistant",
-        content=rag_result.get("answer"),
-        answer=rag_result.get("answer"),
-        relevant_considerations=rag_result.get("relevant_considerations", []),
-        recommended_next_steps=rag_result.get("recommended_next_steps", []),
-        citations=rag_result.get("citations", []),
-        confidence=confidence,
-        warnings=[rag_result["disclaimer"]] if rag_result.get("needs_clarification") else [],
-        classification={"category": rag_result.get("product_classification")},
-        jurisdiction=rag_result.get("jurisdiction"),
-        expert_escalation={
-            "recommended": escalation.recommended,
-            "reason": escalation.reason,
-            "case_summary": escalation.case_summary,
-        },
-        language=rag_result.get("language"),
-        # True when ip_sakti_rag's scope guard blocked this before retrieval/
-        # generation ran (off-topic, prompt injection, or wrong jurisdiction
-        # toggle) -- see ip_sakti_rag/app/safety/scope_guard.py. `answer` is
-        # then only the warning/redirect message. Frontend renders this
-        # distinctly (see ChatView.tsx).
-        scope_blocked=bool(rag_result.get("scope_blocked")),
-    )
+    try:
+        conversation_service.add_message(
+            db, conversation_id=conv["_id"], role="user", content=query, language=rag_result.get("language"),
+        )
+        assistant_msg = conversation_service.add_message(
+            db,
+            conversation_id=conv["_id"],
+            role="assistant",
+            content=rag_result.get("answer"),
+            answer=rag_result.get("answer"),
+            relevant_considerations=rag_result.get("relevant_considerations", []),
+            recommended_next_steps=rag_result.get("recommended_next_steps", []),
+            citations=rag_result.get("citations", []),
+            confidence=confidence,
+            warnings=[rag_result["disclaimer"]] if rag_result.get("needs_clarification") else [],
+            classification={"category": rag_result.get("product_classification")},
+            jurisdiction=rag_result.get("jurisdiction"),
+            expert_escalation={
+                "recommended": escalation.recommended,
+                "reason": escalation.reason,
+                "case_summary": escalation.case_summary,
+            },
+            language=rag_result.get("language"),
+            # True when ip_sakti_rag's scope guard blocked this before retrieval/
+            # generation ran (off-topic, prompt injection, or wrong jurisdiction
+            # toggle) -- see ip_sakti_rag/app/safety/scope_guard.py. `answer` is
+            # then only the warning/redirect message. Frontend renders this
+            # distinctly (see ChatView.tsx).
+            scope_blocked=bool(rag_result.get("scope_blocked")),
+        )
+    except ConversationDeletedError:
+        raise HTTPException(status_code=410, detail="Conversation was permanently deleted.")
+
+    # A delete can race the message write. Always re-check the tombstone before
+    # returning the result so an explicit delete cannot be resurrected by an
+    # in-flight request.
+    if db["deleted_conversations"].find_one({
+        "conversation_id": str(conv["_id"]),
+        "user_id": user_id,
+    }):
+        raise HTTPException(status_code=410, detail="Conversation was permanently deleted.")
+
     conversation_service.touch_conversation(db, conv)
 
     audit_service.record_audit_log(
@@ -225,21 +306,16 @@ async def query_endpoint(body: QueryRequest, current_user: dict = Depends(get_cu
 
 @router.get("/api/conversations")
 def list_conversations(current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    """Section 7: a user only ever sees their own conversations. Admins see
-    every conversation (needed for future admin oversight views)."""
-    is_admin = "Admin" in current_user.get("roles", [])
-    query = {} if is_admin else {"user_id": current_user["id"]}
+    """Return only live conversations for the authenticated user.
 
-    # One-time self-cleanup for the pre-existing "blank chats" bug: earlier
-    # versions of _handle_query could leave behind a conversation record
-    # with message_seq == 0 (created, then never got any messages because
-    # the RAG call failed/timed out -- see _handle_query above, which no
-    # longer does this going forward). A conversation can only legitimately
-    # reach message_seq == 0 if its very first message insert hasn't
-    # happened yet, which now only occurs in the instant between
-    # get_or_create_conversation() and add_message() within a single
-    # request -- so it's safe to purge any that are more than a couple of
-    # minutes old; a conversation actively mid-request is never that stale.
+    Deleted conversation IDs are permanently filtered by their tombstones so
+    an old/stale worker or client cannot make a removed session reappear.
+    """
+    is_admin = "Admin" in current_user.get("roles", [])
+    user_id = current_user["id"]
+    query = {} if is_admin else {"user_id": user_id}
+
+    # Clean up only truly stale blank records from old deployments.
     stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=2)
     db[CONVERSATIONS_COLLECTION].delete_many({
         **query,
@@ -247,9 +323,26 @@ def list_conversations(current_user: dict = Depends(get_current_user), db=Depend
         "created_at": {"$lt": stale_cutoff},
     })
 
-    convs = list(db[CONVERSATIONS_COLLECTION].find(query).sort("updated_at", -1))
+    tombstone_query = {} if is_admin else {"user_id": user_id}
+    tombstone_ids = {
+        str(row.get("conversation_id"))
+        for row in db["deleted_conversations"].find(tombstone_query, {"conversation_id": 1})
+        if row.get("conversation_id") is not None
+    }
+
+    # Filter in Python so legacy ObjectId `_id` values are compared by their
+    # string representation too. This prevents an old deleted session from
+    # returning simply because its Mongo type differs from current IDs.
+    all_convs = list(db[CONVERSATIONS_COLLECTION].find(query).sort("updated_at", -1))
+    convs = [
+        c for c in all_convs
+        if str(c.get("_id")) not in tombstone_ids
+        and str(c.get("conversation_id")) not in tombstone_ids
+    ]
     return [
-        conversation_service.conversation_to_dict(c, conversation_service.recent_messages(db, c["_id"], limit=1000))
+        conversation_service.conversation_to_dict(
+            c, conversation_service.recent_messages(db, str(c["_id"]), limit=1000)
+        )
         for c in convs
     ]
 
@@ -289,6 +382,44 @@ def rename_conversation(conversation_id: str, body: RenameConversationRequest, c
     return conversation_service.conversation_to_dict(conv, messages)
 
 
+@router.delete("/api/conversations")
+async def delete_all_conversations(
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Permanently delete every chat/research session belonging to the user."""
+    user_id = current_user["id"]
+    convs = list(db[CONVERSATIONS_COLLECTION].find({"user_id": user_id}, {"_id": 1, "conversation_id": 1}))
+    now = datetime.now(timezone.utc)
+
+    all_ids: set[str] = set()
+    for conv in convs:
+        canonical_id = str(conv.get("_id"))
+        aliases = {canonical_id}
+        if conv.get("conversation_id") is not None:
+            aliases.add(str(conv.get("conversation_id")))
+        all_ids.update(aliases)
+        for conversation_id in aliases:
+            _mark_conversation_deleted(db, conversation_id, user_id, now)
+
+    if all_ids:
+        db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": {"$in": list(all_ids)}})
+        db[CONVERSATIONS_COLLECTION].delete_many({"user_id": user_id})
+        for collection_name in (
+            "feedback",
+            "expert_escalations",
+            "classification_records",
+            "validation_results",
+            "audit_logs",
+        ):
+            db[collection_name].delete_many({"conversation_id": {"$in": list(all_ids)}})
+        for conversation_id in all_ids:
+            background_tasks.add_task(rag_client.delete_conversation, conversation_id)
+
+    return {"success": True, "deleted_count": len(convs), "permanent": True}
+
+
 @router.delete("/api/conversations/{conversation_id}")
 async def delete_conversation(
     conversation_id: str,
@@ -299,12 +430,7 @@ async def delete_conversation(
     is_admin = "Admin" in current_user.get("roles", [])
     user_id = current_user["id"]
 
-    conv = db[CONVERSATIONS_COLLECTION].find_one({
-        "$or": [
-            {"_id": conversation_id},
-            {"conversation_id": conversation_id},
-        ]
-    })
+    conv = db[CONVERSATIONS_COLLECTION].find_one(_conversation_lookup_filter(conversation_id))
 
     # Verify ownership before creating any deletion marker. This prevents one
     # user from writing a side-effecting tombstone for another user's chat.
@@ -312,23 +438,34 @@ async def delete_conversation(
         raise HTTPException(status_code=403, detail="You do not have access to this conversation.")
 
     tombstone_user_id = conv.get("user_id") if conv else user_id
-    db["deleted_conversations"].update_one(
-        {"conversation_id": str(conversation_id), "user_id": tombstone_user_id},
-        {
-            "$set": {
-                "conversation_id": str(conversation_id),
-                "user_id": tombstone_user_id,
-                "deleted_at": datetime.now(timezone.utc),
-            }
-        },
-        upsert=True,
-    )
-
     if conv:
         canonical_id = str(conv["_id"])
-        ids = list({str(conversation_id), canonical_id, str(conv.get("conversation_id"))})
+        id_values = _conversation_id_candidates(canonical_id)
+        if conv.get("conversation_id") is not None:
+            id_values.extend(_conversation_id_candidates(str(conv.get("conversation_id"))))
+        id_values.extend(_conversation_id_candidates(str(conversation_id)))
+        # De-duplicate values while preserving both ObjectId and string types.
+        ids = set()
+        for value in id_values:
+            try:
+                ids.add((type(value).__name__, str(value)))
+            except Exception:
+                pass
+        message_ids = list({value for _, value in ids})
+        message_id_values = []
+        for value in message_ids:
+            message_id_values.extend(_conversation_id_candidates(value))
+    else:
+        message_id_values = _conversation_id_candidates(str(conversation_id))
+        canonical_id = str(conversation_id)
 
-        db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": {"$in": ids}})
+    tombstone_ids = set(message_ids if conv else [str(conversation_id)])
+    now = datetime.now(timezone.utc)
+    for deleted_id in tombstone_ids:
+        _mark_conversation_deleted(db, deleted_id, tombstone_user_id, now)
+
+    if conv:
+        db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": {"$in": message_id_values}})
         db[CONVERSATIONS_COLLECTION].delete_one({"_id": conv["_id"]})
 
         # Remove related application-side records that belong exclusively to
@@ -341,14 +478,15 @@ async def delete_conversation(
             "validation_results",
             "audit_logs",
         ):
-            db[collection_name].delete_many({"conversation_id": {"$in": ids}})
+            db[collection_name].delete_many({"conversation_id": {"$in": list(tombstone_ids)}})
     else:
         canonical_id = str(conversation_id)
 
     # Keep ip_sakti_rag's separate persistence in sync without making the
     # user's delete button wait for a Render cold start. The local tombstone
     # above already makes resurrection impossible on the backend.
-    background_tasks.add_task(rag_client.delete_conversation, str(conversation_id))
+    for deleted_id in tombstone_ids:
+        background_tasks.add_task(rag_client.delete_conversation, deleted_id)
 
     return {"success": True, "deleted_id": canonical_id, "permanent": True}
 

@@ -1,113 +1,294 @@
 # IP-SAKTI Sahayak
 
-Multilingual, RAG-based, source-cited AI assistant for Intellectual Property
-and regulatory guidance in Ayurveda (built for SIH26045).
+**Live Application:** https://ip-sakti-frontend.onrender.com/
 
-## Architecture
+Multilingual, RAG-based, source-cited AI assistant for Intellectual Property and regulatory guidance in Ayurveda (SIH26045).
 
-Three sibling services:
+## 1. Overview
 
+IP-SAKTI Sahayak combines conversational AI, retrieval-augmented generation (RAG), authoritative source citation, IP/regulatory analysis, Traditional Knowledge and Access & Benefit Sharing (TK & ABS), research, workspace persistence, and expert/grievance workflows.
+
+### Core capabilities
+
+- Sahayak AI chat with source citations and confidence scoring
+- Multilingual UI and translation
+- Hybrid RAG retrieval
+- Research and source discovery
+- Product Analyzer
+- IPR analysis
+- TK & ABS analysis
+- Workspace for saved sessions and user activity
+- Notifications
+- Grievance / Raise Your Query workflow
+- Expert escalation
+- Safe abstention and citation validation
+
+## 2. Architecture
+
+The deployed system uses three sibling services:
+
+```text
+ip_sakti_rag/   Python 3.12 + FastAPI
+                RAG retrieval, generation, knowledge graph,
+                confidence and citation validation
+
+backend/        Python 3.12 + FastAPI
+                Authentication, MongoDB persistence, API proxy,
+                translation, expert/grievance workflows
+
+frontend/       React 19 + Vite
+                User interface
 ```
-ip_sakti_rag/   Python 3.12 + FastAPI — the RAG engine: hybrid BM25 +
-                Qdrant vector retrieval, Gemini generation, Neo4j knowledge
-                graph, citation validation, confidence scoring, safe
-                abstention. Runs standalone on its own port.
-backend/        Python 3.12 + FastAPI — auth, MongoDB persistence
-                (conversations, product analyses, saved research, audit
-                logs, expert escalations), translation. Calls ip_sakti_rag
-                over HTTP for every RAG-backed operation; has no
-                retrieval/generation code of its own.
-frontend/       React 19 + Vite — chat UI, auth, admin, expert-advisory
-                views. Talks only to backend/, never directly to
-                ip_sakti_rag.
+
+### Request flow
+
+```text
+Frontend → Backend → ip_sakti_rag → Backend → Frontend
+                    |
+                    ├─ BM25
+                    ├─ Qdrant vector retrieval
+                    ├─ Neo4j graph context
+                    ├─ Gemini generation
+                    ├─ Citation validation
+                    └─ Confidence scoring
 ```
 
-Request flow: `frontend → backend (auth + persistence) → ip_sakti_rag
-(retrieval + generation) → backend → frontend`.
+The frontend communicates with the backend. The backend communicates with `ip_sakti_rag` for RAG-backed operations.
 
-> The root-level `server.ts` / `src/` / `package.json` / `render.yaml` /
-> `docker-compose.yml` in this repo belong to a different, unused
-> architecture — safe to ignore or delete.
+> The root-level `server.ts`, `src/`, `package.json`, `render.yaml`, and `docker-compose.yml` belong to a different architecture and are not required for this three-service deployment.
 
-## Quick start
+## 3. Service Responsibilities
+
+### ip_sakti_rag
+
+Responsible for document retrieval, hybrid BM25/Qdrant retrieval, Neo4j context, Gemini generation, confidence scoring, safe abstention, citation validation, telemetry, TK/ABS analysis, product analysis and IPR analysis.
+
+### backend
+
+Responsible for authentication, authorization, MongoDB persistence, conversations, workspace data, product analyses, saved research, notifications, grievances, audit information, expert escalation, translation, and HTTP communication with the RAG service.
+
+### frontend
+
+Provides Sahayak AI, Research, Product Analyzer, IPR, TK & ABS, Expert Advisory, Workspace, notifications, grievances, authentication and citation UI.
+
+## 4. Application Sections
+
+### Sahayak AI
+
+Main conversational interface for IP, Ayurveda, regulatory and related questions. Answers are generated through the backend/RAG pipeline and can include citations and confidence information.
+
+### Research
+
+Research-oriented source discovery and document-backed information.
+
+### Product Analyzer
+
+Product classification and regulatory/IP/TK-ABS analysis.
+
+### TK & ABS
+
+Traditional Knowledge and Access & Benefit Sharing analysis. Restricted TKDL access is handled explicitly; the application does not claim that an unavailable TKDL source was queried.
+
+### Workspace
+
+Persistent user activity including chat sessions, research sessions, product analyses, bookmarks, notifications and grievances.
+
+### Grievances
+
+Users can submit a query from Workspace. Low-confidence chat responses can also open the grievance workflow with the relevant conversation context.
+
+## 5. Citation Architecture
+
+Authoritative government and regulatory citation URLs are sourced from `manifest.json` document metadata.
+
+```text
+Document ID
+    ↓
+Document metadata
+    ↓
+manifest.json
+    ↓
+Authoritative source URL
+    ↓
+Citation UI
+```
+
+The manifest is the source of truth for authoritative citation URLs. Individual application sections should not maintain separate hardcoded government citation URLs.
+
+## 6. API Endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/health` | Backend/RAG health |
+| `POST /api/chat` | Main chat |
+| `POST /api/products/analyze` | Product analysis |
+| `POST /api/ipr/analyze` | IPR analysis |
+| `POST /api/abs/analyze` | ABS analysis |
+| `POST /api/tk-abs/analyze` | TK & ABS analysis |
+| `GET /api/search` | Document search |
+| `GET /api/sources` | Source listing |
+| `GET /api/documents/{id}` | Document/citation metadata |
+| `GET /api/rag/telemetry` | RAG telemetry |
+| `POST /api/expert-escalation` | Expert escalation |
+| `POST /api/translate` | Translation |
+
+FastAPI interactive documentation is available at `/docs` on the backend service.
+
+## 7. Local Setup
+
+### RAG engine
 
 ```bash
-# 1. RAG engine (start first)
 cd ip_sakti_rag
-python -m venv venv && source venv/bin/activate
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-# .env already has your Gemini/Qdrant/Neo4j credentials
 uvicorn main:app --reload --port 8001
+```
 
-# 2. Backend (separate terminal)
+### Backend
+
+```bash
 cd backend
-python -m venv venv && source venv/bin/activate
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # set RAG_SERVICE_URL=http://localhost:8001, MongoDB, etc.
-uvicorn app.main:app --reload --port 8000
+cp .env.example .env
+```
 
-# 3. Frontend (separate terminal)
+Configure the backend environment, including:
+
+```text
+RAG_SERVICE_URL=http://localhost:8001
+```
+
+Then:
+
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+
+### Frontend
+
+```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. Full details: **`setup_steps.md`**.
+Open `http://localhost:3000`.
 
-## RAG integration & deployment
+## 8. Deployment
 
-Exact list of files changed/deleted to wire `backend/` up to `ip_sakti_rag`,
-what functionality changed shape (streaming chat removed, runtime document
-ingest removed), and step-by-step Render (×2 services) + Vercel deployment:
-see **`integration_steps.md`**.
+Deploy the three services independently:
 
-## Key API endpoints (backend, proxying to ip_sakti_rag where noted)
+1. `ip_sakti_rag`
+2. `backend`
+3. `frontend`
 
-| Endpoint | Purpose | Backed by |
-|---|---|---|
-| `GET /api/health` | Health check (includes ip_sakti_rag connectivity) | backend |
-| `POST /api/chat` | Main chat endpoint | ip_sakti_rag (via backend) |
-| `POST /api/products/analyze` | Product classification + regulatory/IPR/TK-ABS analysis | ip_sakti_rag |
-| `POST /api/ipr/analyze` | IPR pathway analysis | ip_sakti_rag |
-| `POST /api/abs/analyze` / `/api/tk-abs/analyze` | Traditional-knowledge/ABS analysis | ip_sakti_rag |
-| `GET /api/search`, `/api/sources`, `/api/documents/{id}` | Document search/listing | ip_sakti_rag |
-| `GET /api/rag/telemetry` | Query volume, confidence, feedback stats | ip_sakti_rag |
-| `POST /api/expert-escalation` | Escalate a query to a human expert | backend |
-| `POST /api/translate` | UI string translation | backend (separate from RAG) |
+The RAG service should be available before the backend performs RAG-backed operations. The backend must be configured with the RAG service URL and MongoDB credentials. The frontend must be configured to use the deployed backend.
 
-Full interactive docs at `/docs` on the backend once it's running.
+**Live application:** https://ip-sakti-frontend.onrender.com/
 
-## Repo layout
+## 9. External Services
 
+Depending on deployment configuration:
+
+- Gemini API
+- Qdrant
+- Neo4j
+- MongoDB
+- Bhashini / translation services
+
+Store credentials in environment variables or deployment secrets. Never commit secrets.
+
+## 10. Data Persistence
+
+MongoDB stores application-level persistent data such as users, conversations, messages, product analyses, saved research, notifications, grievances, audit information and expert escalation information.
+
+The backend is the application persistence authority.
+
+## 11. RAG Pipeline
+
+```text
+User query
+   ↓
+Classification / jurisdiction
+   ↓
+Hybrid retrieval
+   ├─ BM25
+   ├─ Qdrant
+   └─ Neo4j context
+   ↓
+Context assembly
+   ↓
+Gemini generation
+   ↓
+Citation validation
+   ↓
+Confidence assessment
+   ├─ Sufficient confidence → grounded answer
+   └─ Low confidence → safe response / escalation
 ```
+
+## 12. Project Structure
+
+```text
 ip_sakti_rag/
-  main.py                 FastAPI entrypoint (RAG service)
-  app/
-    pipeline.py             IPSaktiRAG — the class main.py calls
-    retrieval/               Hybrid BM25 + Qdrant + Neo4j graph context
-    generation/               Gemini grounded answer generation
-    safety/                    Citation validation, confidence, abstention
-    classification.py, jurisdiction.py
-  data/documents/            Source PDFs (statutes, treaties, rules)
-  data/processed/             Pre-built chunks/embeddings (chunks.jsonl)
-  scripts/ingest.py           Offline ingestion — run after adding documents
-  requirements.txt            (added — was missing from the original zip)
+├── main.py
+├── app/
+│   ├── pipeline.py
+│   ├── retrieval/
+│   ├── generation/
+│   ├── safety/
+│   ├── classification.py
+│   └── jurisdiction.py
+├── data/
+│   ├── documents/
+│   └── processed/
+├── scripts/
+│   └── ingest.py
+└── requirements.txt
 
 backend/
-  app/
-    main.py                  FastAPI entrypoint
-    rag_client.py              HTTP client for ip_sakti_rag (added)
-    core/config.py              Env settings (RAG_SERVICE_URL, Mongo, JWT, Bhashini)
-    api/routes/                 chat, products, rag_routes, misc_routes, auth, experts, health
-    services/                    conversation, audit, expert_escalation, pdf, auth
-    translation/                  Bhashini / curated-dictionary UI translation
-    database/session.py           MongoDB (mongomock fallback for demo mode)
-  requirements.txt
+├── app/
+│   ├── main.py
+│   ├── rag_client.py
+│   ├── core/
+│   ├── api/routes/
+│   ├── services/
+│   ├── translation/
+│   └── database/
+└── requirements.txt
 
 frontend/
-  src/
-    components/                 Views (Chat, Admin, Research, Product Analyzer, etc.)
-    context/                     Auth, language, jurisdiction, expert-advisory
-  vite.config.ts                 Dev-time /api proxy to localhost:8000
-  vercel.json                    Prod /api rewrite to the Render backend (added)
+├── src/
+│   ├── components/
+│   └── context/
+├── vite.config.ts
+└── vercel.json
 ```
+
+## 13. Troubleshooting
+
+### Backend cannot reach RAG
+
+Verify `RAG_SERVICE_URL` and confirm the RAG service is reachable.
+
+### Frontend cannot reach backend
+
+Check backend status, frontend API configuration, CORS and browser network requests.
+
+### RAG answers are unavailable
+
+Check Gemini credentials, Qdrant, Neo4j, processed documents/indexes and RAG logs.
+
+### Citation is unavailable
+
+Check the document ID, document metadata endpoint and corresponding `manifest.json` entry.
+
+## 14. Documentation Files
+
+- `setup_steps.md` — local environment and setup
+- `integration_steps.md` — backend/RAG integration and deployment
+- `IP-SAKTI-Sahayak-Technical-Documentation.docx` — detailed technical documentation supplied separately

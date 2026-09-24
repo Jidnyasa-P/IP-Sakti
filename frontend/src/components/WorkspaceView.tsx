@@ -19,6 +19,32 @@ import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
 import { authFetch } from './auth/authStorage';
 
+const LOCAL_STORAGE_CONVS_KEY = 'ipsakti_sahayak_conversations_v2';
+const LOCAL_STORAGE_ACTIVE_KEY = 'ipsakti_sahayak_active_conv_id_v2';
+const LOCAL_STORAGE_ACTIVE_INDIA_KEY = 'ipsakti_sahayak_active_india_id';
+const LOCAL_STORAGE_ACTIVE_INTL_KEY = 'ipsakti_sahayak_active_intl_id';
+const LOCAL_STORAGE_DELETED_CONVS_KEY = 'ipsakti_sahayak_deleted_conversation_ids_v1';
+
+function rememberDeletedConversationIds(ids: string[]) {
+  if (typeof window === 'undefined' || ids.length === 0) return;
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_DELETED_CONVS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    const deleted = new Set<string>(Array.isArray(parsed) ? parsed.map(String) : []);
+    ids.forEach((id) => deleted.add(String(id)));
+    localStorage.setItem(LOCAL_STORAGE_DELETED_CONVS_KEY, JSON.stringify([...deleted]));
+  } catch {}
+}
+
+function clearDeletedConversationClientState() {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_CONVS_KEY, JSON.stringify([]));
+    localStorage.removeItem(LOCAL_STORAGE_ACTIVE_KEY);
+    localStorage.removeItem(LOCAL_STORAGE_ACTIVE_INDIA_KEY);
+    localStorage.removeItem(LOCAL_STORAGE_ACTIVE_INTL_KEY);
+  } catch {}
+}
+
 interface WorkspaceViewProps {
   setActiveTab: (tab: ActiveTab) => void;
   openGrievanceOnLoad?: {
@@ -202,49 +228,62 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   // server record and its messages, then removes it from view immediately.
   const deleteConversationItem = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!window.confirm('Delete this research session? This cannot be undone.')) {
-      return;
-    }
+    if (!window.confirm('Delete this research session? This cannot be undone.')) return;
 
-    // Remove locally first so the button always gives immediate feedback.
-    // A 404 is treated as already deleted because it means the server has no
-    // record left to remove (common after a prior delete from Sahayak).
-    setConversations((prev) => prev.filter((c) => c.id !== id));
+    rememberDeletedConversationIds([id]);
+    setConversations((prev) => prev.filter((c) => String(c.id) !== String(id)));
 
     try {
       const res = await authFetch(`/api/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' });
-      if (!res.ok && res.status !== 404) {
-        throw new Error(`Delete failed with status ${res.status}`);
+      if (!res.ok && res.status !== 404 && res.status !== 410) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.detail || `Delete failed with status ${res.status}`);
       }
 
+      // Remove every browser-side copy. Backend tombstones are the permanent
+      // source of truth, while this cache prevents an already-mounted Chat
+      // view from restoring the deleted session before the next sync.
       try {
-        const cached = localStorage.getItem('ipsakti_sahayak_conversations_v2');
+        const cached = localStorage.getItem(LOCAL_STORAGE_CONVS_KEY);
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed)) {
-            localStorage.setItem(
-              'ipsakti_sahayak_conversations_v2',
-              JSON.stringify(parsed.filter((c: any) => c?.id !== id)),
-            );
+            localStorage.setItem(LOCAL_STORAGE_CONVS_KEY, JSON.stringify(parsed.filter((c: any) => String(c?.id) !== String(id))));
           }
         }
-        for (const key of [
-          'ipsakti_sahayak_active_conv_id_v2',
-          'ipsakti_sahayak_active_india_id',
-          'ipsakti_sahayak_active_intl_id',
-        ]) {
+        for (const key of [LOCAL_STORAGE_ACTIVE_KEY, LOCAL_STORAGE_ACTIVE_INDIA_KEY, LOCAL_STORAGE_ACTIVE_INTL_KEY]) {
           if (localStorage.getItem(key) === id) localStorage.removeItem(key);
         }
-      } catch (cacheErr) {}
+      } catch {}
 
-      // Re-read the backend collection after deletion so this tab cannot keep
-      // a stale server-side session in memory.
       await loadWorkspaceData();
     } catch (err) {
       console.error('Failed to delete conversation:', err);
       await loadWorkspaceData();
     }
   };
+
+  const deleteAllConversationItems = async () => {
+    if (conversations.length === 0) return;
+    if (!window.confirm('Remove all research sessions? This permanently deletes all chat sessions and their messages.')) return;
+
+    rememberDeletedConversationIds(conversations.map((c) => String(c.id)));
+    setConversations([]);
+    clearDeletedConversationClientState();
+
+    try {
+      const res = await authFetch('/api/conversations', { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.detail || `Delete all failed with status ${res.status}`);
+      }
+      await loadWorkspaceData();
+    } catch (err) {
+      console.error('Failed to remove all research sessions:', err);
+      await loadWorkspaceData();
+    }
+  };
+
 
   const exportDossierJSON = () => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({
@@ -378,7 +417,21 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
       {/* Tab Content */}
       <div className="space-y-4">
         {activeSubTab === 'conversations' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <>
+            {conversations.length > 0 && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={deleteAllConversationItems}
+                  className="inline-flex items-center gap-2 rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 transition-colors"
+                  title="Permanently remove all research sessions"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Remove All
+                </button>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {conversations.length === 0 ? (
               <div className="col-span-2 py-12 text-center text-xs text-slate-400">
                 No past research sessions found. Start a new query in Sahayak.
@@ -437,7 +490,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                 </div>
               ))
             )}
-          </div>
+            </div>
+          </>
         )}
 
         {activeSubTab === 'products' && (
