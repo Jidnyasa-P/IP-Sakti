@@ -2,7 +2,6 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from bson import ObjectId
-from pymongo.errors import DuplicateKeyError
 
 from app.api.deps import get_current_user
 from app.database.session import get_db
@@ -16,37 +15,6 @@ from app.services.conversation_service import ConversationDeletedError
 import app.rag_client as rag_client
 
 router = APIRouter()
-
-
-def _mark_conversation_deleted(db, conversation_id: str, user_id: str, deleted_at: datetime) -> None:
-    """Create/update a deletion tombstone atomically and idempotently.
-
-    The deleted_conversations collection has a unique index on conversation_id.
-    A plain upsert can still raise DuplicateKeyError when two delete requests
-    arrive at the same time (for example, a double-click or retry). Treat that
-    race as success because the desired final state is already a tombstone.
-    """
-    value = str(conversation_id)
-    try:
-        db["deleted_conversations"].update_one(
-            {"conversation_id": value},
-            {
-                "$set": {"deleted_at": deleted_at},
-                "$setOnInsert": {
-                    "conversation_id": value,
-                    "user_id": user_id,
-                },
-            },
-            upsert=True,
-        )
-    except DuplicateKeyError:
-        # Another concurrent request inserted the same tombstone. Verify the
-        # marker exists; either way the conversation is already permanently
-        # deleted from the application's point of view.
-        db["deleted_conversations"].update_one(
-            {"conversation_id": value},
-            {"$set": {"deleted_at": deleted_at}},
-        )
 
 
 def _conversation_id_candidates(conversation_id: str) -> list:
@@ -124,7 +92,25 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
         })
         if conversation_id else None
     )
-    working_conversation_id = existing_conv["_id"] if existing_conv else (conversation_id or conversation_service.new_conversation_id())
+
+    if existing_conv:
+        # Use the authenticated user's canonical stored ID.
+        working_conversation_id = str(existing_conv["_id"])
+    elif conversation_id:
+        requested_id = str(conversation_id)
+        # If the requested ID belongs to another account, never send that ID
+        # to the RAG service or attempt to persist it. Allocate a new ID for
+        # this user so accounts remain completely isolated.
+        foreign_conv = db[CONVERSATIONS_COLLECTION].find_one(
+            _conversation_lookup_filter(requested_id)
+        )
+        working_conversation_id = (
+            conversation_service.new_conversation_id()
+            if foreign_conv
+            else requested_id
+        )
+    else:
+        working_conversation_id = conversation_service.new_conversation_id()
 
     # All retrieval + reasoning happens in the ip_sakti_rag microservice now.
     # FIXED: `jurisdiction` (the India/International toggle's value) used to
@@ -311,11 +297,9 @@ def list_conversations(current_user: dict = Depends(get_current_user), db=Depend
     Deleted conversation IDs are permanently filtered by their tombstones so
     an old/stale worker or client cannot make a removed session reappear.
     """
+    is_admin = "Admin" in current_user.get("roles", [])
     user_id = current_user["id"]
-    # Conversations are private user-owned records. Admin role does not grant
-    # cross-user chat/workspace visibility; administrative telemetry has its
-    # own endpoints.
-    query = {"user_id": user_id}
+    query = {} if is_admin else {"user_id": user_id}
 
     # Clean up only truly stale blank records from old deployments.
     stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=2)
@@ -325,7 +309,7 @@ def list_conversations(current_user: dict = Depends(get_current_user), db=Depend
         "created_at": {"$lt": stale_cutoff},
     })
 
-    tombstone_query = {"user_id": user_id}
+    tombstone_query = {} if is_admin else {"user_id": user_id}
     tombstone_ids = {
         str(row.get("conversation_id"))
         for row in db["deleted_conversations"].find(tombstone_query, {"conversation_id": 1})
@@ -351,7 +335,8 @@ def list_conversations(current_user: dict = Depends(get_current_user), db=Depend
 
 @router.get("/api/conversations/{conversation_id}")
 def get_conversation(conversation_id: str, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    conv = _get_owned_conversation(db, conversation_id, current_user["id"], False)
+    is_admin = "Admin" in current_user.get("roles", [])
+    conv = _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)
     canonical_id = str(conv["_id"])
     messages = conversation_service.recent_messages(db, canonical_id, limit=1000)
     return conversation_service.conversation_to_dict(conv, messages)
@@ -367,7 +352,8 @@ def create_conversation(body: NewConversationRequest, current_user: dict = Depen
 
 @router.patch("/api/conversations/{conversation_id}")
 def rename_conversation(conversation_id: str, body: RenameConversationRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    conv = _get_owned_conversation(db, conversation_id, current_user["id"], False)
+    is_admin = "Admin" in current_user.get("roles", [])
+    conv = _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)
     canonical_id = str(conv["_id"])
     title = body.title.strip()
     if not title:
@@ -401,7 +387,11 @@ async def delete_all_conversations(
             aliases.add(str(conv.get("conversation_id")))
         all_ids.update(aliases)
         for conversation_id in aliases:
-            _mark_conversation_deleted(db, conversation_id, user_id, now)
+            db["deleted_conversations"].update_one(
+                {"conversation_id": conversation_id, "user_id": user_id},
+                {"$set": {"conversation_id": conversation_id, "user_id": user_id, "deleted_at": now}},
+                upsert=True,
+            )
 
     if all_ids:
         db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": {"$in": list(all_ids)}})
@@ -427,12 +417,14 @@ async def delete_conversation(
     current_user: dict = Depends(get_current_user),
     db=Depends(get_db),
 ):
+    is_admin = "Admin" in current_user.get("roles", [])
     user_id = current_user["id"]
 
     conv = db[CONVERSATIONS_COLLECTION].find_one(_conversation_lookup_filter(conversation_id))
 
-    # Conversations are private to their owning account.
-    if conv and conv.get("user_id") != user_id:
+    # Verify ownership before creating any deletion marker. This prevents one
+    # user from writing a side-effecting tombstone for another user's chat.
+    if conv and not is_admin and conv.get("user_id") != user_id:
         raise HTTPException(status_code=403, detail="You do not have access to this conversation.")
 
     tombstone_user_id = conv.get("user_id") if conv else user_id
@@ -460,7 +452,17 @@ async def delete_conversation(
     tombstone_ids = set(message_ids if conv else [str(conversation_id)])
     now = datetime.now(timezone.utc)
     for deleted_id in tombstone_ids:
-        _mark_conversation_deleted(db, deleted_id, tombstone_user_id, now)
+        db["deleted_conversations"].update_one(
+            {"conversation_id": deleted_id, "user_id": tombstone_user_id},
+            {
+                "$set": {
+                    "conversation_id": deleted_id,
+                    "user_id": tombstone_user_id,
+                    "deleted_at": now,
+                }
+            },
+            upsert=True,
+        )
 
     if conv:
         db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": {"$in": message_id_values}})

@@ -40,69 +40,95 @@ def new_conversation_id() -> str:
 def get_or_create_conversation(db, conversation_id: str | None, title_hint: str, language: str, user_id: str) -> dict:
     collection = db[CONVERSATIONS_COLLECTION]
 
-    # The application uses `_id` as the canonical conversation key, while
-    # older deployments also have a unique `conversation_id_1` index. Check
-    # both fields so a legacy record is reused instead of being inserted
-    # again. This also prevents duplicate records when two requests for the
-    # same chat arrive at nearly the same time.
+    # Conversation IDs must be isolated per account. A client can accidentally
+    # send an ID that already belongs to another user (for example from stale
+    # browser storage). Never reuse that record and never return it to the
+    # requesting user.
     if conversation_id:
-        conversation_id = str(conversation_id)
-        if db["deleted_conversations"].find_one({"conversation_id": conversation_id, "user_id": user_id}):
-            raise ConversationDeletedError(conversation_id)
-        candidates = [conversation_id]
+        requested_id = str(conversation_id)
+        if db["deleted_conversations"].find_one({
+            "conversation_id": requested_id,
+            "user_id": user_id,
+        }):
+            raise ConversationDeletedError(requested_id)
+
+        candidates = [requested_id]
         try:
-            candidates.append(ObjectId(conversation_id))
+            candidates.append(ObjectId(requested_id))
         except Exception:
             pass
-        conv = collection.find_one({
+
+        # First look only within the authenticated user's conversations.
+        own_filter = {
             "$and": [
-                {"user_id": user_id},
                 {
                     "$or": [
-                        *[{"_id": candidate} for candidate in candidates],
-                        *[{"conversation_id": candidate} for candidate in candidates],
+                        {"_id": candidate} for candidate in candidates
+                    ] + [
+                        {"conversation_id": candidate} for candidate in candidates
                     ]
                 },
+                {"user_id": user_id},
             ]
-        })
+        }
+        conv = collection.find_one(own_filter)
         if conv:
             return conv
 
-    new_id = str(conversation_id) if conversation_id else new_conversation_id()
-    conv = new_conversation(
-        id=new_id,
-        user_id=user_id,
-        title=(title_hint[:48] + "...") if len(title_hint) > 50 else title_hint,
-        language=language,
-    )
-
-    try:
-        collection.insert_one(conv)
-    except DuplicateKeyError:
-        # Two requests can both observe that the conversation does not exist
-        # before either insert completes. If the unique legacy
-        # `conversation_id_1` index wins that race, reuse the record that was
-        # inserted by the other request rather than returning HTTP 500.
-        existing = collection.find_one({
-            "$and": [
-                {"user_id": user_id},
-                {
-                    "$or": [
-                        {"_id": new_id},
-                        {"conversation_id": new_id},
-                    ]
-                },
+        # If the requested ID already belongs to another account, do NOT try
+        # to insert it because the legacy unique conversation_id index will
+        # reject it. Generate a fresh ID for this user instead.
+        foreign = collection.find_one({
+            "$or": [
+                {"_id": candidate} for candidate in candidates
+            ] + [
+                {"conversation_id": candidate} for candidate in candidates
             ]
         })
-        if existing:
-            return existing
-        raise
+        if foreign:
+            conversation_id = None
 
-    if db["deleted_conversations"].find_one({"conversation_id": new_id, "user_id": user_id}):
-        collection.delete_one({"_id": new_id})
-        raise ConversationDeletedError(new_id)
+    # Generate a globally unique ID. The retry loop also protects against an
+    # extremely unlikely UUID collision and against concurrent requests.
+    for _ in range(3):
+        new_id = str(conversation_id) if conversation_id else new_conversation_id()
+        conv = new_conversation(
+            id=new_id,
+            user_id=user_id,
+            title=(title_hint[:48] + "...") if len(title_hint) > 50 else title_hint,
+            language=language,
+        )
 
-    return conv
+        try:
+            collection.insert_one(conv)
+        except DuplicateKeyError:
+            # Another request may have inserted this exact ID concurrently.
+            # Reuse it only when it belongs to the same authenticated user.
+            existing = collection.find_one({
+                "$or": [
+                    {"_id": new_id},
+                    {"conversation_id": new_id},
+                ],
+                "user_id": user_id,
+            })
+            if existing:
+                return existing
+
+            # The ID belongs to another user (or is otherwise occupied). Never
+            # cross account boundaries; generate a new ID and retry.
+            conversation_id = None
+            continue
+
+        if db["deleted_conversations"].find_one({
+            "conversation_id": new_id,
+            "user_id": user_id,
+        }):
+            collection.delete_one({"_id": conv["_id"], "user_id": user_id})
+            raise ConversationDeletedError(new_id)
+
+        return conv
+
+    raise RuntimeError("Unable to allocate a unique conversation ID.")
 
 
 def recent_messages(db, conversation_id: str, limit: int = 6) -> list[dict]:
