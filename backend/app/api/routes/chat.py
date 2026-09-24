@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from bson import ObjectId
+from pymongo.errors import DuplicateKeyError
 
 from app.api.deps import get_current_user
 from app.database.session import get_db
@@ -15,6 +16,37 @@ from app.services.conversation_service import ConversationDeletedError
 import app.rag_client as rag_client
 
 router = APIRouter()
+
+
+def _mark_conversation_deleted(db, conversation_id: str, user_id: str, deleted_at: datetime) -> None:
+    """Create/update a deletion tombstone atomically and idempotently.
+
+    The deleted_conversations collection has a unique index on conversation_id.
+    A plain upsert can still raise DuplicateKeyError when two delete requests
+    arrive at the same time (for example, a double-click or retry). Treat that
+    race as success because the desired final state is already a tombstone.
+    """
+    value = str(conversation_id)
+    try:
+        db["deleted_conversations"].update_one(
+            {"conversation_id": value},
+            {
+                "$set": {"deleted_at": deleted_at},
+                "$setOnInsert": {
+                    "conversation_id": value,
+                    "user_id": user_id,
+                },
+            },
+            upsert=True,
+        )
+    except DuplicateKeyError:
+        # Another concurrent request inserted the same tombstone. Verify the
+        # marker exists; either way the conversation is already permanently
+        # deleted from the application's point of view.
+        db["deleted_conversations"].update_one(
+            {"conversation_id": value},
+            {"$set": {"deleted_at": deleted_at}},
+        )
 
 
 def _conversation_id_candidates(conversation_id: str) -> list:
@@ -369,11 +401,7 @@ async def delete_all_conversations(
             aliases.add(str(conv.get("conversation_id")))
         all_ids.update(aliases)
         for conversation_id in aliases:
-            db["deleted_conversations"].update_one(
-                {"conversation_id": conversation_id, "user_id": user_id},
-                {"$set": {"conversation_id": conversation_id, "user_id": user_id, "deleted_at": now}},
-                upsert=True,
-            )
+            _mark_conversation_deleted(db, conversation_id, user_id, now)
 
     if all_ids:
         db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": {"$in": list(all_ids)}})
@@ -434,17 +462,7 @@ async def delete_conversation(
     tombstone_ids = set(message_ids if conv else [str(conversation_id)])
     now = datetime.now(timezone.utc)
     for deleted_id in tombstone_ids:
-        db["deleted_conversations"].update_one(
-            {"conversation_id": deleted_id, "user_id": tombstone_user_id},
-            {
-                "$set": {
-                    "conversation_id": deleted_id,
-                    "user_id": tombstone_user_id,
-                    "deleted_at": now,
-                }
-            },
-            upsert=True,
-        )
+        _mark_conversation_deleted(db, deleted_id, tombstone_user_id, now)
 
     if conv:
         db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": {"$in": message_id_values}})

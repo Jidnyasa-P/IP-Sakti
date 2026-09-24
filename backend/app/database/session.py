@@ -91,7 +91,16 @@ def init_db() -> None:
         if name not in existing:
             db.create_collection(name)
         coll = db[name]
+        existing_indexes = {idx["name"]: idx for idx in coll.list_indexes()}
         for field, opts in indexes:
+            index_name = f"{field}_1"
+            # Existing Render/MongoDB databases may already contain this index
+            # (including an older unique definition). Do not recreate an index
+            # that already exists; recreating it with different options can
+            # raise IndexKeySpecsConflict and prevent the whole backend from
+            # starting. Fresh databases still receive the requested definition.
+            if index_name in existing_indexes:
+                continue
             coll.create_index([(field, ASCENDING)], **opts)
 
     mode = "in-memory mock (DEMO MODE — non-persistent)" if _using_mock else f"live MongoDB ({settings.mongodb_uri})"
