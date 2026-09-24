@@ -29,6 +29,7 @@ _using_mock = False
 COLLECTION_INDEXES = {
     "users": [("email", {"unique": True})],
     "conversations": [("user_id", {}), ("updated_at", {})],
+    "deleted_conversations": [("user_id", {}), ("deleted_at", {})],
     "chat_messages": [("conversation_id", {}), ("created_at", {}), ("sequence", {})],
     "product_analyses": [("user_id", {}), ("created_at", {})],
     "tk_abs_analyses": [("user_id", {}), ("created_at", {})],

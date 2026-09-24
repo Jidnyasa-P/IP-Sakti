@@ -23,6 +23,7 @@ def _db_handle():
         _db.conversations.create_index([("conversation_id", ASCENDING)], unique=True)
         _db.chat_messages.create_index([("conversation_id", ASCENDING), ("created_at", ASCENDING)])
         _db.feedback.create_index([("conversation_id", ASCENDING), ("created_at", ASCENDING)])
+        _db.deleted_conversations.create_index([("conversation_id", ASCENDING)], unique=True)
     return _db
 
 
@@ -32,6 +33,8 @@ def save_chat(conversation_id: str, query: str, response: dict[str, Any]) -> Non
         if db is None:
             return
         now = datetime.now(timezone.utc)
+        if db.deleted_conversations.find_one({"conversation_id": conversation_id}):
+            return
         db.conversations.update_one(
             {"conversation_id": conversation_id},
             {"$set": {"updated_at": now}, "$setOnInsert": {"conversation_id": conversation_id, "created_at": now}},
@@ -52,6 +55,24 @@ def save_chat(conversation_id: str, query: str, response: dict[str, Any]) -> Non
         })
     except Exception:
         # Persistence must never make a grounded answer unavailable.
+        return
+
+
+def delete_conversation(conversation_id: str) -> None:
+    """Permanently remove a chat from RAG persistence and tombstone its id."""
+    try:
+        db = _db_handle()
+        if db is None:
+            return
+        db.deleted_conversations.update_one(
+            {"conversation_id": conversation_id},
+            {"$set": {"conversation_id": conversation_id, "deleted_at": datetime.now(timezone.utc)}},
+            upsert=True,
+        )
+        db.conversations.delete_many({"conversation_id": conversation_id})
+        db.chat_messages.delete_many({"conversation_id": conversation_id})
+        db.feedback.delete_many({"conversation_id": conversation_id})
+    except Exception:
         return
 
 

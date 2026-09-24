@@ -126,6 +126,15 @@ def create_grievance(
     return grievance_to_dict(record)
 
 
+@router.delete("/api/workspace/grievances/{grievance_id}")
+def delete_grievance(grievance_id: str, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
+    row = db[GRIEVANCE_COLLECTION].find_one({"_id": grievance_id, "user_id": current_user["id"]})
+    if not row:
+        raise HTTPException(status_code=404, detail="Grievance not found.")
+    db[GRIEVANCE_COLLECTION].delete_one({"_id": grievance_id, "user_id": current_user["id"]})
+    return {"success": True, "deleted_id": grievance_id}
+
+
 @router.get("/api/resources")
 async def resources_mini_tab(current_user: dict = Depends(get_current_user)):
     """Lightweight document listing for the frontend's smaller Resources

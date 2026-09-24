@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from app.api.deps import get_current_user
 from app.database.session import get_db
@@ -46,6 +46,17 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
     # the conversation record (and its messages) once we actually have a
     # response to store. A failed call now raises RagServiceError with
     # nothing written to the database at all -- no more orphaned blanks.
+    # Deleted sessions are tombstoned so an in-flight/stale client request can
+    # never recreate the exact same conversation after the user removed it.
+    requested_conversation_id = conversation_id
+    if requested_conversation_id:
+        deleted_marker = db["deleted_conversations"].find_one({
+            "conversation_id": str(requested_conversation_id),
+            "user_id": user_id,
+        })
+        if deleted_marker:
+            conversation_id = None
+
     existing_conv = (
         db[CONVERSATIONS_COLLECTION].find_one({"_id": conversation_id, "user_id": user_id})
         if conversation_id else None
@@ -59,6 +70,14 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
     # forwarded through so ip_sakti_rag's scope guard can enforce it
     # (see ip_sakti_rag/app/safety/scope_guard.py).
     rag_result = await rag_client.chat(query=query, language=language, conversation_id=working_conversation_id, jurisdiction=jurisdiction)
+
+    # A delete may have happened while the RAG request was running. Never
+    # recreate that deleted session after the user explicitly removed it.
+    if requested_conversation_id and db["deleted_conversations"].find_one({
+        "conversation_id": str(requested_conversation_id),
+        "user_id": user_id,
+    }):
+        raise HTTPException(status_code=410, detail="Conversation was deleted while the request was in progress.")
 
     # Only now -- once the RAG call has actually succeeded -- do we create
     # (or fetch) the conversation record, reusing working_conversation_id so
@@ -271,29 +290,67 @@ def rename_conversation(conversation_id: str, body: RenameConversationRequest, c
 
 
 @router.delete("/api/conversations/{conversation_id}")
-def delete_conversation(conversation_id: str, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
+async def delete_conversation(
+    conversation_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_db),
+):
     is_admin = "Admin" in current_user.get("roles", [])
+    user_id = current_user["id"]
 
-    # Deletion is intentionally idempotent. If the client already removed a
-    # stale/local-only session, there is nothing to delete on the server and
-    # returning success keeps the two clients in sync.
     conv = db[CONVERSATIONS_COLLECTION].find_one({
         "$or": [
             {"_id": conversation_id},
             {"conversation_id": conversation_id},
         ]
     })
-    if not conv:
-        return {"success": True, "deleted_id": conversation_id, "already_absent": True}
 
-    if not is_admin and conv.get("user_id") != current_user["id"]:
+    # Verify ownership before creating any deletion marker. This prevents one
+    # user from writing a side-effecting tombstone for another user's chat.
+    if conv and not is_admin and conv.get("user_id") != user_id:
         raise HTTPException(status_code=403, detail="You do not have access to this conversation.")
 
-    canonical_id = str(conv["_id"])
-    ids = list({conversation_id, canonical_id, str(conv.get("conversation_id")) if conv.get("conversation_id") else conversation_id})
-    db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": {"$in": ids}})
-    db[CONVERSATIONS_COLLECTION].delete_one({"_id": canonical_id})
-    return {"success": True, "deleted_id": canonical_id}
+    tombstone_user_id = conv.get("user_id") if conv else user_id
+    db["deleted_conversations"].update_one(
+        {"conversation_id": str(conversation_id), "user_id": tombstone_user_id},
+        {
+            "$set": {
+                "conversation_id": str(conversation_id),
+                "user_id": tombstone_user_id,
+                "deleted_at": datetime.now(timezone.utc),
+            }
+        },
+        upsert=True,
+    )
+
+    if conv:
+        canonical_id = str(conv["_id"])
+        ids = list({str(conversation_id), canonical_id, str(conv.get("conversation_id"))})
+
+        db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": {"$in": ids}})
+        db[CONVERSATIONS_COLLECTION].delete_one({"_id": conv["_id"]})
+
+        # Remove related application-side records that belong exclusively to
+        # this session. A grievance is intentionally retained because it is a
+        # user-submitted record and has its own lifecycle in Workspace.
+        for collection_name in (
+            "feedback",
+            "expert_escalations",
+            "classification_records",
+            "validation_results",
+            "audit_logs",
+        ):
+            db[collection_name].delete_many({"conversation_id": {"$in": ids}})
+    else:
+        canonical_id = str(conversation_id)
+
+    # Keep ip_sakti_rag's separate persistence in sync without making the
+    # user's delete button wait for a Render cold start. The local tombstone
+    # above already makes resurrection impossible on the backend.
+    background_tasks.add_task(rag_client.delete_conversation, str(conversation_id))
+
+    return {"success": True, "deleted_id": canonical_id, "permanent": True}
 
 
 

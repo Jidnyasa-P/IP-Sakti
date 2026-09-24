@@ -64,6 +64,8 @@ const LOCAL_STORAGE_ACTIVE_KEY = "ipsakti_sahayak_active_conv_id_v2";
 const LOCAL_STORAGE_ACTIVE_INDIA_KEY = "ipsakti_sahayak_active_india_id";
 const LOCAL_STORAGE_ACTIVE_INTL_KEY = "ipsakti_sahayak_active_intl_id";
 const LOCAL_STORAGE_JURISDICTION_KEY = "ipsakti_sahayak_jurisdiction_toggle";
+const LOCAL_STORAGE_DRAFT_INDIA_KEY = "ipsakti_sahayak_draft_india";
+const LOCAL_STORAGE_DRAFT_INTL_KEY = "ipsakti_sahayak_draft_intl";
 
 const DEFAULT_INITIAL_CONV: Conversation = {
   id: "conv-india-default-1",
@@ -298,7 +300,7 @@ function getInitialConversations(): Conversation[] {
       }
     } catch (e) {}
   }
-  return [DEFAULT_INITIAL_CONV, DEFAULT_INITIAL_INTL_CONV];
+  return [];
 }
 
 function getInitialIsInternational(): boolean {
@@ -310,6 +312,26 @@ function getInitialIsInternational(): boolean {
     } catch (e) {}
   }
   return false;
+}
+
+function getStoredDraft(isIntl: boolean): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return localStorage.getItem(
+      isIntl ? LOCAL_STORAGE_DRAFT_INTL_KEY : LOCAL_STORAGE_DRAFT_INDIA_KEY,
+    ) || "";
+  } catch {
+    return "";
+  }
+}
+
+function persistStoredDraft(isIntl: boolean, value: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const key = isIntl ? LOCAL_STORAGE_DRAFT_INTL_KEY : LOCAL_STORAGE_DRAFT_INDIA_KEY;
+    if (value.trim()) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
+  } catch {}
 }
 
 function getInitialActiveId(convs: Conversation[], isIntl: boolean): string {
@@ -381,15 +403,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
     const isIntl = getInitialIsInternational();
     const activeId = getInitialActiveId(initialConvs, isIntl);
     const active = initialConvs.find((c) => c.id === activeId);
-    return (
-      active?.messages ||
-      (isIntl
-        ? DEFAULT_INITIAL_INTL_CONV.messages
-        : DEFAULT_INITIAL_CONV.messages)
-    );
+    return active?.messages || [];
   });
 
-  const [inputValue, setInputValue] = useState("");
+  const [inputValue, setInputValue] = useState(() => getStoredDraft(getInitialIsInternational()));
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
@@ -423,7 +440,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
     { id: "regulatory", label: "Regulatory Affairs Expert" },
   ];
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(false);
+  const deletedConversationIdsRef = useRef<Set<string>>(new Set());
 
   const suggestedQuestions = isInternational
     ? [
@@ -450,6 +469,26 @@ export const ChatView: React.FC<ChatViewProps> = ({
           "What are the mandatory Schedule T Good Manufacturing Practices for Ayurvedic medicines?",
         ),
       ];
+
+  useEffect(() => {
+    persistStoredDraft(isInternational, inputValue);
+  }, [inputValue, isInternational]);
+
+  // Restore the last scroll position for this conversation only. This deliberately
+  // does not call scrollIntoView(), which used to move the whole website to its
+  // footer whenever ChatView mounted or messages changed.
+  useEffect(() => {
+    const node = messagesScrollRef.current;
+    if (!node || !activeConvId) return;
+    const key = `ipsakti_sahayak_scroll_${activeConvId}`;
+    let saved = 0;
+    try {
+      saved = Number(localStorage.getItem(key) || 0);
+    } catch {}
+    requestAnimationFrame(() => {
+      node.scrollTop = Number.isFinite(saved) && saved > 0 ? saved : 0;
+    });
+  }, [activeConvId]);
 
   // Helper to persist conversations to localStorage
   const persistConversations = (
@@ -505,6 +544,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
 
     setIsInternational(checked);
+    setInputValue(getStoredDraft(checked));
     const targetJur: Jurisdiction = checked ? "international" : "india";
     try {
       localStorage.setItem(LOCAL_STORAGE_JURISDICTION_KEY, targetJur);
@@ -711,6 +751,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   const deleteConversation = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    deletedConversationIdsRef.current.add(id);
 
     const updated = conversations.filter((c) => c.id !== id);
     const currentJur: Jurisdiction = isInternational
@@ -738,9 +779,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
       console.error("Failed to delete conversation:", err);
     }
 
-    // Do not discard a successful UI deletion just because an offline request
-    // could not reach the backend. The next successful server sync will decide
-    // whether the session still exists.
+    // The backend tombstone is the permanent source of truth. A later sync
+    // therefore cannot resurrect this id, even if an earlier request was stale.
 
     // Delete every client-side copy of the session so changing sections or
     // reopening Sahayak cannot resurrect it.
@@ -888,13 +928,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
     });
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, streamingText]);
+    if (!shouldAutoScrollRef.current) return;
+    const node = messagesScrollRef.current;
+    if (!node) return;
+    requestAnimationFrame(() => {
+      node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
+      // Keep following the same user-submitted turn until its answer is
+      // finished, but never enable automatic scrolling merely by mounting
+      // the chat or switching sections.
+      if (!loading) shouldAutoScrollRef.current = false;
+    });
+  }, [messages, streamingText, loading]);
 
   // Send query with streaming response and robust session storage
   const handleSend = async (
@@ -966,6 +1011,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     setRelevanceWarning(null);
     setJurisdictionWarning(null);
     setInputValue("");
+    shouldAutoScrollRef.current = true;
     setLoading(true);
     setStreamingText("");
 
@@ -1067,6 +1113,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
     let assistantMsg: StructuredChatMessage | null = null;
 
+    const requestConversationId = targetConvId;
+
     // NOTE: there is no POST /api/chat/stream route on the backend (chat.py
     // only implements /api/chat and /api/query, both non-streaming) -- an
     // earlier version of this function tried it first on every single
@@ -1089,6 +1137,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
         });
         if (syncRes.ok) {
           const syncData = await syncRes.json();
+          if (deletedConversationIdsRef.current.has(requestConversationId)) {
+            setLoading(false);
+            setStreamingText("");
+            return;
+          }
           assistantMsg = syncData.message || syncData;
 
           // The backend is authoritative for the persisted conversation ID.
@@ -1136,6 +1189,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
         console.warn("Direct chat endpoint notice:", syncErr);
         requestFailed = true;
       }
+    }
+
+    if (deletedConversationIdsRef.current.has(requestConversationId)) {
+      setLoading(false);
+      setStreamingText("");
+      return;
     }
 
     // FIXED: this used to silently swap in a hardcoded, fully fabricated
@@ -1321,7 +1380,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   );
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-slate-50 relative">
+    <div className="flex h-[calc(100dvh-4rem)] min-h-0 overflow-hidden bg-slate-50 relative">
       {/* Sidebar Overlay for Mobile */}
       {sidebarOpen && (
         <div
@@ -1488,7 +1547,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       </aside>
 
       {/* Main Assistant Chat Canvas */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden bg-white">
+      <main className="flex-1 min-w-0 min-h-0 flex flex-col h-full overflow-hidden bg-white">
         {/* Chat Header Toolbar with the Sahayak Jurisdiction Toggle */}
         <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-slate-200 bg-white flex items-center justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -1613,7 +1672,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
 
         {/* Message Thread */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+        <div
+          ref={messagesScrollRef}
+          onScroll={(e) => {
+            const node = e.currentTarget;
+            if (!activeConvId) return;
+            try {
+              localStorage.setItem(`ipsakti_sahayak_scroll_${activeConvId}`, String(node.scrollTop));
+            } catch {}
+          }}
+          className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-5 scroll-smooth"
+        >
           {messages.length === 0 ? (
             /* Empty State with Suggested Research Questions */
             <div className="max-w-2xl mx-auto py-8 text-center space-y-4">
@@ -1685,7 +1754,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               <div key={msg.id} className="flex flex-col items-start w-full">
                 {/* Message Bubble */}
                 <div
-                  className={`w-full max-w-3xl rounded-xl p-3.5 sm:p-4 shadow-2xs transition-all ${
+                  className={`w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl rounded-xl p-3.5 sm:p-4 shadow-2xs transition-all ${
                     msg.role === "user"
                       ? "bg-slate-900 text-white border border-slate-800"
                       : "bg-white border border-slate-200 text-slate-900 space-y-3"
@@ -2045,7 +2114,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           {/* Live Streaming Token Output */}
           {loading && streamingText && (
             <div className="flex flex-col items-start w-full">
-              <div className="w-full max-w-3xl rounded-xl p-3.5 bg-white border border-slate-200 text-slate-900 shadow-2xs space-y-2">
+              <div className="w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl rounded-xl p-3.5 bg-white border border-slate-200 text-slate-900 shadow-2xs space-y-2">
                 <div
                   className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wider ${
                     isInternational ? "text-indigo-800" : "text-emerald-800"
@@ -2073,7 +2142,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           {/* Loading Indicator when starting */}
           {loading && !streamingText && (
             <div className="flex flex-col items-start w-full">
-              <div className="w-full max-w-3xl rounded-xl p-3.5 bg-white border border-slate-200 text-slate-600 shadow-2xs flex items-center gap-3">
+              <div className="w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl rounded-xl p-3.5 bg-white border border-slate-200 text-slate-600 shadow-2xs flex items-center gap-3">
                 <div
                   className={`w-3.5 h-3.5 border-2 border-t-transparent rounded-full animate-spin shrink-0 ${
                     isInternational ? "border-indigo-700" : "border-emerald-700"
@@ -2088,7 +2157,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </div>
           )}
 
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Input Bar Section */}
@@ -2351,8 +2419,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       `Ask questions about IPR, AYUSH, or Traditional Knowledge in ${language.toUpperCase()}...`,
                     )
               }
-              disabled={loading}
-              className="flex-1 bg-transparent px-2 py-1.5 text-xs font-normal text-slate-900 placeholder:text-slate-400 focus:outline-hidden"
+              className="flex-1 min-w-0 bg-transparent px-2 py-1.5 text-xs font-normal text-slate-900 placeholder:text-slate-400 focus:outline-hidden"
             />
 
             {/* Submit Button */}

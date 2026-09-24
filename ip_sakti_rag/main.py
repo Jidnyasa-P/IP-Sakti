@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.config import settings
-from app.database.mongo import save_feedback
+from app.database.mongo import save_feedback, delete_conversation
 from app.pipeline import IPSaktiRAG
 
 # Use a lifespan context manager to initialize the RAG pipeline explicitly at startup
@@ -169,6 +169,13 @@ def document_source(document_id: str, x_internal_secret: str | None = Header(def
 def telemetry(x_internal_secret: str | None = Header(default=None)):
     _check_secret(x_internal_secret)
     return rag.get_telemetry()
+
+
+@app.delete("/api/conversations/{conversation_id}")
+def delete_chat_conversation(conversation_id: str, x_internal_secret: str | None = Header(default=None)):
+    _check_secret(x_internal_secret)
+    delete_conversation(conversation_id)
+    return {"success": True, "deleted_id": conversation_id, "permanent": True}
 
 
 @app.post("/api/conversations/{conversation_id}/feedback")

@@ -169,6 +169,24 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     }
   };
 
+  const deleteGrievance = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this grievance? This cannot be undone.')) return;
+
+    setGrievances((prev) => prev.filter((g) => g.id !== id));
+    try {
+      const res = await authFetch(`/api/workspace/grievances/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok && res.status !== 404) {
+        throw new Error(`Delete failed with status ${res.status}`);
+      }
+    } catch (err) {
+      console.error('Failed to delete grievance:', err);
+      await loadWorkspaceData();
+    }
+  };
+
   const deleteSavedItem = async (id: string) => {
     try {
       await authFetch(`/api/workspace/saved-research/${id}`, { method: 'DELETE' });
@@ -697,9 +715,19 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                         </div>
                         <h3 className="font-semibold text-slate-900 text-sm mt-2">{g.subject}</h3>
                       </div>
-                      <span className="text-[10px] text-slate-400 whitespace-nowrap">
-                        {g.created_at ? new Date(g.created_at).toLocaleString() : ''}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                          {g.created_at ? new Date(g.created_at).toLocaleString() : ''}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => deleteGrievance(e, g.id)}
+                          title="Delete grievance"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <p className="text-xs text-slate-600 mt-3 whitespace-pre-wrap">{g.description}</p>
                     {g.related_query && (

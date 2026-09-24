@@ -159,6 +159,17 @@ async def get_telemetry() -> dict:
     return await _request("GET", "/api/rag/telemetry")
 
 
+async def delete_conversation(conversation_id: str) -> dict:
+    """Delete the same conversation from the sibling RAG service.
+
+    Backend deletion is authoritative for the UI, while this call removes the
+    RAG service's own persisted chat copy so the two deployed services cannot
+    resurrect or retain the deleted session. Best-effort: local backend
+    deletion must not fail just because the RAG service is sleeping.
+    """
+    return await _request("DELETE", f"/api/conversations/{conversation_id}")
+
+
 async def submit_feedback(conversation_id: str, message_id: str, feedback: str, notes: str | None = None) -> dict:
     return await _request("POST", f"/api/conversations/{conversation_id}/feedback", json={
         "message_id": message_id, "feedback": feedback, "notes": notes,
