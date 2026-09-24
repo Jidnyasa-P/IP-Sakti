@@ -53,6 +53,12 @@ def save_chat(conversation_id: str, query: str, response: dict[str, Any]) -> Non
             "response": response,
             "created_at": datetime.now(timezone.utc),
         })
+        # Final race check: deletion can happen after the initial tombstone
+        # check but before persistence. If a delete marker now exists, clean
+        # up the just-written RAG copy so the deleted session cannot return.
+        if db.deleted_conversations.find_one({"conversation_id": conversation_id}):
+            db.conversations.delete_many({"conversation_id": conversation_id})
+            db.chat_messages.delete_many({"conversation_id": conversation_id})
     except Exception:
         # Persistence must never make a grounded answer unavailable.
         return

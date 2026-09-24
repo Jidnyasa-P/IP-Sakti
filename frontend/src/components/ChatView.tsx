@@ -66,6 +66,27 @@ const LOCAL_STORAGE_ACTIVE_INTL_KEY = "ipsakti_sahayak_active_intl_id";
 const LOCAL_STORAGE_JURISDICTION_KEY = "ipsakti_sahayak_jurisdiction_toggle";
 const LOCAL_STORAGE_DRAFT_INDIA_KEY = "ipsakti_sahayak_draft_india";
 const LOCAL_STORAGE_DRAFT_INTL_KEY = "ipsakti_sahayak_draft_intl";
+const LOCAL_STORAGE_DELETED_CONVS_KEY = "ipsakti_sahayak_deleted_conversation_ids_v1";
+
+function getDeletedConversationIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_DELETED_CONVS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function rememberDeletedConversationIds(ids: string[]) {
+  if (typeof window === "undefined" || ids.length === 0) return;
+  try {
+    const deleted = getDeletedConversationIds();
+    ids.forEach((id) => deleted.add(String(id)));
+    localStorage.setItem(LOCAL_STORAGE_DELETED_CONVS_KEY, JSON.stringify([...deleted]));
+  } catch {}
+}
 
 const DEFAULT_INITIAL_CONV: Conversation = {
   id: "conv-india-default-1",
@@ -293,9 +314,10 @@ function getInitialConversations(): Conversation[] {
       if (stored !== null) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
+          const deleted = getDeletedConversationIds();
           return parsed
             .map((c: Conversation) => normalizeConversation(c))
-            .filter((c): c is Conversation => c !== null);
+            .filter((c): c is Conversation => c !== null && !deleted.has(String(c.id)));
         }
       }
     } catch (e) {}
@@ -344,6 +366,7 @@ function getInitialActiveId(convs: Conversation[], isIntl: boolean): string {
       const storedId = localStorage.getItem(savedKey);
       if (
         storedId &&
+        !getDeletedConversationIds().has(String(storedId)) &&
         convs.some(
           (c) => c.id === storedId && (c.jurisdiction || "india") === targetJur,
         )
@@ -495,9 +518,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
     updated: Conversation[],
     newActiveId?: string,
   ) => {
+    const deleted = getDeletedConversationIds();
     const cleaned = updated
       .map((c) => normalizeConversation(c))
-      .filter((c): c is Conversation => c !== null);
+      .filter((c): c is Conversation => c !== null && !deleted.has(String(c.id)));
 
     setConversations(cleaned);
     if (typeof window !== "undefined") {
@@ -550,8 +574,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
       localStorage.setItem(LOCAL_STORAGE_JURISDICTION_KEY, targetJur);
     } catch (e) {}
 
+    const deletedIds = getDeletedConversationIds();
     const matchingConvs = currentConvs.filter(
-      (c) => (c.jurisdiction || "india") === targetJur,
+      (c) => (c.jurisdiction || "india") === targetJur && !deletedIds.has(String(c.id)),
     );
     const savedKey = checked
       ? LOCAL_STORAGE_ACTIVE_INTL_KEY
@@ -620,10 +645,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
         return;
       }
       const serverConvs: Conversation[] = await res.json();
+      const deletedIds = getDeletedConversationIds();
       const cleanedServerConvs = Array.isArray(serverConvs)
         ? serverConvs
             .map((c) => normalizeConversation(c))
-            .filter((c): c is Conversation => c !== null)
+            .filter((c): c is Conversation => c !== null && !deletedIds.has(String(c.id)))
         : [];
 
       // The authenticated backend is the source of truth. In particular,
@@ -683,6 +709,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   };
 
   const loadConversation = (id: string) => {
+    if (getDeletedConversationIds().has(String(id))) return;
     setActiveConvId(id);
     if (isInternational) {
       setActiveIntlConvId(id);
@@ -752,6 +779,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const deleteConversation = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     deletedConversationIdsRef.current.add(id);
+    rememberDeletedConversationIds([id]);
 
     const updated = conversations.filter((c) => c.id !== id);
     const currentJur: Jurisdiction = isInternational
@@ -771,7 +799,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       const deleteRes = await authFetch(`/api/conversations/${encodeURIComponent(id)}`, {
         method: "DELETE",
       });
-      if (deleteRes.ok || deleteRes.status === 404) {
+      if (deleteRes.ok || deleteRes.status === 404 || deleteRes.status === 410) {
       } else {
         throw new Error(`Delete failed with status ${deleteRes.status}`);
       }
@@ -1020,10 +1048,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
       (isInternational ? "international" : "india");
 
     // Ensure we have an active conversation of the right jurisdiction
-    let targetConvId = activeConvId;
+    let targetConvId = getDeletedConversationIds().has(String(activeConvId)) ? "" : activeConvId;
     let currentConv = conversations.find(
       (c) =>
-        c.id === targetConvId && (c.jurisdiction || "india") === currentJur,
+        c.id === targetConvId && (c.jurisdiction || "india") === currentJur && !getDeletedConversationIds().has(String(c.id)),
     );
 
     if (!currentConv) {
