@@ -57,8 +57,7 @@ async def analyze_product(body: ProductAnalyzeRequest, current_user: dict = Depe
 
 @router.get("/api/products")
 def list_products(current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    is_admin = "Admin" in current_user.get("roles", [])
-    query = {} if is_admin else {"user_id": current_user["id"]}
+    query = {"user_id": current_user["id"]}
     rows = db[PRODUCTS_COLLECTION].find(query).sort("created_at", -1)
     return [product_to_dict(r) for r in rows]
 

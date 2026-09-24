@@ -18,6 +18,7 @@ import { ActiveTab } from './Header';
 import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
 import { authFetch } from './auth/authStorage';
+import { useAuth } from '../context/AuthContext';
 
 const LOCAL_STORAGE_CONVS_KEY = 'ipsakti_sahayak_conversations_v2';
 const LOCAL_STORAGE_ACTIVE_KEY = 'ipsakti_sahayak_active_conv_id_v2';
@@ -25,23 +26,27 @@ const LOCAL_STORAGE_ACTIVE_INDIA_KEY = 'ipsakti_sahayak_active_india_id';
 const LOCAL_STORAGE_ACTIVE_INTL_KEY = 'ipsakti_sahayak_active_intl_id';
 const LOCAL_STORAGE_DELETED_CONVS_KEY = 'ipsakti_sahayak_deleted_conversation_ids_v1';
 
-function rememberDeletedConversationIds(ids: string[]) {
+function scopedStorageKey(baseKey: string, userId?: string): string {
+  return `${baseKey}:${userId || 'guest'}`;
+}
+
+function rememberDeletedConversationIds(ids: string[], userId?: string) {
   if (typeof window === 'undefined' || ids.length === 0) return;
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_DELETED_CONVS_KEY);
+    const raw = localStorage.getItem(scopedStorageKey(LOCAL_STORAGE_DELETED_CONVS_KEY, userId));
     const parsed = raw ? JSON.parse(raw) : [];
     const deleted = new Set<string>(Array.isArray(parsed) ? parsed.map(String) : []);
     ids.forEach((id) => deleted.add(String(id)));
-    localStorage.setItem(LOCAL_STORAGE_DELETED_CONVS_KEY, JSON.stringify([...deleted]));
+    localStorage.setItem(scopedStorageKey(LOCAL_STORAGE_DELETED_CONVS_KEY, userId), JSON.stringify([...deleted]));
   } catch {}
 }
 
-function clearDeletedConversationClientState() {
+function clearDeletedConversationClientState(userId?: string) {
   try {
-    localStorage.setItem(LOCAL_STORAGE_CONVS_KEY, JSON.stringify([]));
-    localStorage.removeItem(LOCAL_STORAGE_ACTIVE_KEY);
-    localStorage.removeItem(LOCAL_STORAGE_ACTIVE_INDIA_KEY);
-    localStorage.removeItem(LOCAL_STORAGE_ACTIVE_INTL_KEY);
+    localStorage.setItem(scopedStorageKey(LOCAL_STORAGE_CONVS_KEY, userId), JSON.stringify([]));
+    localStorage.removeItem(scopedStorageKey(LOCAL_STORAGE_ACTIVE_KEY, userId));
+    localStorage.removeItem(scopedStorageKey(LOCAL_STORAGE_ACTIVE_INDIA_KEY, userId));
+    localStorage.removeItem(scopedStorageKey(LOCAL_STORAGE_ACTIVE_INTL_KEY, userId));
   } catch {}
 }
 
@@ -62,6 +67,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onGrievanceOpened,
 }) => {
   const { t } = useTranslation();
+  const { currentUser } = useAuth();
+  const userId = currentUser?.id;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [products, setProducts] = useState<ProductAnalysisResult[]>([]);
   const [savedResearch, setSavedResearch] = useState<any[]>([]);
@@ -86,8 +93,14 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<'conversations' | 'products' | 'bookmarks' | 'notifications' | 'grievances'>('conversations');
 
   useEffect(() => {
-    loadWorkspaceData();
-  }, []);
+    if (userId) loadWorkspaceData();
+    else {
+      setConversations([]);
+      setProducts([]);
+      setSavedResearch([]);
+      setGrievances([]);
+    }
+  }, [userId]);
 
   const loadWorkspaceData = async () => {
     setIsLoading(true);
@@ -230,7 +243,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     e.stopPropagation();
     if (!window.confirm('Delete this research session? This cannot be undone.')) return;
 
-    rememberDeletedConversationIds([id]);
+    rememberDeletedConversationIds([id], userId);
     setConversations((prev) => prev.filter((c) => String(c.id) !== String(id)));
 
     try {
@@ -244,14 +257,15 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
       // source of truth, while this cache prevents an already-mounted Chat
       // view from restoring the deleted session before the next sync.
       try {
-        const cached = localStorage.getItem(LOCAL_STORAGE_CONVS_KEY);
+        const cached = localStorage.getItem(scopedStorageKey(LOCAL_STORAGE_CONVS_KEY, userId));
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed)) {
-            localStorage.setItem(LOCAL_STORAGE_CONVS_KEY, JSON.stringify(parsed.filter((c: any) => String(c?.id) !== String(id))));
+            localStorage.setItem(scopedStorageKey(LOCAL_STORAGE_CONVS_KEY, userId), JSON.stringify(parsed.filter((c: any) => String(c?.id) !== String(id))));
           }
         }
-        for (const key of [LOCAL_STORAGE_ACTIVE_KEY, LOCAL_STORAGE_ACTIVE_INDIA_KEY, LOCAL_STORAGE_ACTIVE_INTL_KEY]) {
+        for (const baseKey of [LOCAL_STORAGE_ACTIVE_KEY, LOCAL_STORAGE_ACTIVE_INDIA_KEY, LOCAL_STORAGE_ACTIVE_INTL_KEY]) {
+          const key = scopedStorageKey(baseKey, userId);
           if (localStorage.getItem(key) === id) localStorage.removeItem(key);
         }
       } catch {}
@@ -267,9 +281,9 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     if (conversations.length === 0) return;
     if (!window.confirm('Remove all research sessions? This permanently deletes all chat sessions and their messages.')) return;
 
-    rememberDeletedConversationIds(conversations.map((c) => String(c.id)));
+    rememberDeletedConversationIds(conversations.map((c) => String(c.id)), userId);
     setConversations([]);
-    clearDeletedConversationClientState();
+    clearDeletedConversationClientState(userId);
 
     try {
       const res = await authFetch('/api/conversations', { method: 'DELETE' });

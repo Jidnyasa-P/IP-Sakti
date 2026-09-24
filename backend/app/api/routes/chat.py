@@ -311,9 +311,11 @@ def list_conversations(current_user: dict = Depends(get_current_user), db=Depend
     Deleted conversation IDs are permanently filtered by their tombstones so
     an old/stale worker or client cannot make a removed session reappear.
     """
-    is_admin = "Admin" in current_user.get("roles", [])
     user_id = current_user["id"]
-    query = {} if is_admin else {"user_id": user_id}
+    # Conversations are private user-owned records. Admin role does not grant
+    # cross-user chat/workspace visibility; administrative telemetry has its
+    # own endpoints.
+    query = {"user_id": user_id}
 
     # Clean up only truly stale blank records from old deployments.
     stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=2)
@@ -323,7 +325,7 @@ def list_conversations(current_user: dict = Depends(get_current_user), db=Depend
         "created_at": {"$lt": stale_cutoff},
     })
 
-    tombstone_query = {} if is_admin else {"user_id": user_id}
+    tombstone_query = {"user_id": user_id}
     tombstone_ids = {
         str(row.get("conversation_id"))
         for row in db["deleted_conversations"].find(tombstone_query, {"conversation_id": 1})
@@ -349,8 +351,7 @@ def list_conversations(current_user: dict = Depends(get_current_user), db=Depend
 
 @router.get("/api/conversations/{conversation_id}")
 def get_conversation(conversation_id: str, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    is_admin = "Admin" in current_user.get("roles", [])
-    conv = _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)
+    conv = _get_owned_conversation(db, conversation_id, current_user["id"], False)
     canonical_id = str(conv["_id"])
     messages = conversation_service.recent_messages(db, canonical_id, limit=1000)
     return conversation_service.conversation_to_dict(conv, messages)
@@ -366,8 +367,7 @@ def create_conversation(body: NewConversationRequest, current_user: dict = Depen
 
 @router.patch("/api/conversations/{conversation_id}")
 def rename_conversation(conversation_id: str, body: RenameConversationRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    is_admin = "Admin" in current_user.get("roles", [])
-    conv = _get_owned_conversation(db, conversation_id, current_user["id"], is_admin)
+    conv = _get_owned_conversation(db, conversation_id, current_user["id"], False)
     canonical_id = str(conv["_id"])
     title = body.title.strip()
     if not title:
@@ -427,14 +427,12 @@ async def delete_conversation(
     current_user: dict = Depends(get_current_user),
     db=Depends(get_db),
 ):
-    is_admin = "Admin" in current_user.get("roles", [])
     user_id = current_user["id"]
 
     conv = db[CONVERSATIONS_COLLECTION].find_one(_conversation_lookup_filter(conversation_id))
 
-    # Verify ownership before creating any deletion marker. This prevents one
-    # user from writing a side-effecting tombstone for another user's chat.
-    if conv and not is_admin and conv.get("user_id") != user_id:
+    # Conversations are private to their owning account.
+    if conv and conv.get("user_id") != user_id:
         raise HTTPException(status_code=403, detail="You do not have access to this conversation.")
 
     tombstone_user_id = conv.get("user_id") if conv else user_id

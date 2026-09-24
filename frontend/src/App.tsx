@@ -16,7 +16,7 @@ import { CitationModal } from "./components/CitationModal";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { GuidedTour } from "./components/GuidedTour";
 import { Citation, normalizeRole } from "./types";
-import { Shield, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { LanguageProvider, useTranslation } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ExpertAdvisoryProvider } from "./context/ExpertAdvisoryContext";
@@ -234,7 +234,7 @@ function AppContent() {
       />
 
       {/* Main Viewport Container */}
-      <div className="flex-1 w-full pb-20 lg:pb-0">
+      <div className="flex-1 w-full pt-14 lg:pt-24 pb-20 lg:pb-0">
         <ErrorBoundary key={activeTab} onReset={() => setActiveTab("landing")}>
           {renderCurrentView()}
         </ErrorBoundary>
@@ -259,8 +259,8 @@ function AppContent() {
       <footer className="w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-6 mt-auto mb-14 lg:mb-0 transition-colors">
         <div className="w-full px-3 sm:px-5 lg:px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-emerald-800 text-amber-300 flex items-center justify-center shrink-0">
-              <Shield className="w-3.5 h-3.5" />
+            <div className="w-8 h-8 flex items-center justify-center shrink-0">
+              <img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="w-full h-full object-contain" />
             </div>
             <span className="font-serif font-bold text-slate-800 dark:text-slate-200 text-sm">
               {t("brand.name", "IP-SAKTI")} {t("brand.badge", "Sahayak")}

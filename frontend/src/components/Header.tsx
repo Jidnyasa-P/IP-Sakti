@@ -81,6 +81,8 @@ export const Header: React.FC<HeaderProps> = ({
   // Normalize role check for Expert
   const isExpert =
     isLoggedIn && currentUser && normalizeRole(currentUser.role) === "Expert";
+  const isAdminActive =
+    isLoggedIn && currentUser && normalizeRole(currentUser.role) === "Admin";
 
   const standardNavItems = [
     {
@@ -126,8 +128,13 @@ export const Header: React.FC<HeaderProps> = ({
     },
   ];
 
-  // Restrict navigation: Expert role ONLY sees the low-confidence query advisory queue
-  const navItems = isExpert ? expertNavItems : standardNavItems;
+  // Restrict navigation by the active role. Admin gets a visible console item
+  // whenever Admin is the currently active role.
+  const navItems = isExpert
+    ? expertNavItems
+    : isAdminActive
+      ? [...standardNavItems, { id: "admin" as ActiveTab, label: "Admin Console", icon: Settings }]
+      : standardNavItems;
 
   const currentLang = LANGUAGES_MAP[language] || SUPPORTED_LANGUAGES[0];
 
@@ -150,14 +157,14 @@ export const Header: React.FC<HeaderProps> = ({
     <>
       {/* Primary Top Header */}
       {/* Primary Top Header */}
-<header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs transition-all">
+<header className="fixed top-0 left-0 right-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs transition-all">
   <div className="w-full px-3 sm:px-4 lg:px-6 xl:px-8">
 
     {/* ========================================================= */}
     {/* TOP ROW — Logo + Right Utilities                         */}
     {/* ========================================================= */}
 
-    <div className="flex items-center justify-between min-h-[3.5rem] sm:min-h-[4rem] py-1 sm:py-1.5 gap-2">
+    <div className="flex items-center justify-between min-h-[3rem] sm:min-h-[3.25rem] py-0.5 gap-1.5 sm:gap-2">
 
       {/* Logo & Brand */}
       <div
@@ -165,8 +172,8 @@ export const Header: React.FC<HeaderProps> = ({
         onClick={() => handleNavClick(isExpert ? "expert" : "landing")}
         className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none min-w-0 shrink-0"
       >
-        <div className="w-8 h-8 sm:w-9 sm:h-9 min-w-[2rem] sm:min-w-[2.25rem] aspect-square rounded-lg sm:rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 flex items-center justify-center text-amber-300 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
-          <Shield className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+        <div className="w-9 h-9 sm:w-10 sm:h-10 min-w-[2.25rem] sm:min-w-[2.5rem] aspect-square flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+          <img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="w-full h-full object-contain" />
         </div>
 
         <div className="min-w-0 flex items-center">
@@ -189,7 +196,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* RIGHT SIDE UTILITIES                                      */}
       {/* ========================================================= */}
 
-      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
 
         {/* ------------------------------------------------------- */}
         {/* Language Switcher                                      */}
@@ -200,7 +207,7 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             id="language-selector-btn"
             onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 xl:px-3 xl:py-2 rounded-lg border text-xs font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-1.5 py-1 xl:px-2.5 xl:py-1.5 rounded-lg border text-xs font-medium transition-all shrink-0 ${
               language !== "en"
                 ? "border-emerald-300 bg-emerald-50/80 text-emerald-900 font-semibold shadow-2xs"
                 : "border-slate-200 hover:bg-slate-50 text-slate-700"
@@ -304,7 +311,7 @@ export const Header: React.FC<HeaderProps> = ({
               aria-label="Notifications"
               aria-expanded={notificationOpen}
               title="Notifications"
-              className={`relative flex items-center justify-center p-2 sm:p-2.5 rounded-lg border transition-all cursor-pointer shrink-0 ${
+              className={`relative flex items-center justify-center p-1.5 sm:p-2 rounded-lg border transition-all cursor-pointer shrink-0 ${
                 notificationOpen
                   ? "border-emerald-300 bg-emerald-50 text-emerald-800"
                   : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900"
@@ -490,7 +497,7 @@ export const Header: React.FC<HeaderProps> = ({
             id="header-walkthrough-btn"
             onClick={onOpenWalkthrough}
             title="How to Use IP-SAKTI Sahayak / उपयोग मार्गदर्शिका"
-            className="flex items-center gap-1.5 px-2 py-1.5 xl:px-3 xl:py-2 rounded-lg border border-emerald-300/80 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-950 font-medium text-xs transition-all cursor-pointer shadow-2xs shrink-0 select-none"
+            className="flex items-center gap-1.5 px-1.5 py-1 xl:px-2.5 xl:py-1.5 rounded-lg border border-emerald-300/80 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-950 font-medium text-xs transition-all cursor-pointer shadow-2xs shrink-0 select-none"
           >
             <HelpCircle className="w-4 h-4 text-emerald-800 shrink-0" />
 
@@ -505,23 +512,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Admin — Logged In Only                                  */}
         {/* ------------------------------------------------------- */}
 
-        {isLoggedIn &&
-          !isExpert &&
-          currentUser?.role === "ADMIN" && (
-            <button
-              type="button"
-              id="admin-nav-btn"
-              onClick={() => handleNavClick("admin")}
-              title={t("nav.admin", "Admin & Telemetry")}
-              className={`p-1.5 xl:p-2 rounded-xl transition-colors border shrink-0 ${
-                activeTab === "admin"
-                  ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-slate-200"
-              }`}
-            >
-              <Settings className="w-4 h-4 xl:w-[18px] xl:h-[18px]" />
-            </button>
-          )}
+        {/* Admin Console is shown in the primary navigation row when Admin is active. */}
 
 
         {/* ------------------------------------------------------- */}
@@ -609,7 +600,7 @@ export const Header: React.FC<HeaderProps> = ({
           type="button"
           id="mobile-menu-toggle-btn"
           onClick={() => setMobileMenuOpen(true)}
-          className="lg:hidden p-2 sm:p-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center justify-center shadow-xs shrink-0"
+          className="lg:hidden p-1.5 sm:p-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center justify-center shadow-xs shrink-0"
           aria-label="Open Navigation Menu"
         >
           <Menu className="w-5 h-5" />
@@ -626,7 +617,7 @@ export const Header: React.FC<HeaderProps> = ({
 
     {isLoggedIn && (
       <nav
-        className="hidden lg:flex items-center justify-center gap-3 xl:gap-5 2xl:gap-7 min-h-[4.25rem] border-t border-slate-100"
+        className="hidden lg:flex items-center justify-center gap-1.5 xl:gap-3 min-h-[2.75rem] xl:min-h-[3rem] border-t border-slate-100 overflow-x-auto px-1"
         aria-label="Primary Navigation"
       >
         {navItems.map((item) => {
@@ -638,7 +629,7 @@ export const Header: React.FC<HeaderProps> = ({
               key={item.id}
               id={`nav-${item.id}-btn`}
               onClick={() => handleNavClick(item.id)}
-              className={`flex items-center gap-2 px-2 py-2 rounded-lg text-sm xl:text-base font-medium transition-all shrink-0 ${
+              className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs xl:text-sm font-medium transition-all shrink-0 ${
                 isActive
                   ? "text-emerald-800 font-semibold"
                   : "text-slate-600 hover:text-slate-900"
@@ -682,13 +673,13 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Drawer Content */}
           <div
             id="mobile-nav-drawer"
-            className="fixed inset-y-0 right-0 w-[85%] max-w-xs sm:max-w-sm bg-white shadow-2xl z-50 flex flex-col p-4 sm:p-5 overflow-y-auto animate-in slide-in-from-right duration-200"
+            className="fixed inset-y-0 right-0 w-[88%] max-w-sm bg-white shadow-2xl z-50 flex flex-col p-4 sm:p-5 overflow-y-auto animate-in slide-in-from-right duration-200"
           >
             {/* Drawer Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 min-w-[2rem] aspect-square rounded-lg bg-emerald-800 text-amber-300 flex items-center justify-center shrink-0 shadow-2xs">
-                  <Shield className="w-4.5 h-4.5 shrink-0" />
+                <div className="w-9 h-9 min-w-[2.25rem] aspect-square flex items-center justify-center shrink-0">
+                  <img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="w-full h-full object-contain" />
                 </div>
                 <div className="flex items-center">
                   <span className="font-serif font-bold text-lg text-slate-900 leading-none">
@@ -871,21 +862,6 @@ export const Header: React.FC<HeaderProps> = ({
                       </button>
                     );
                   })}
-
-                  {!isExpert && currentUser?.role === "ADMIN" && (
-                    <button
-                      type="button"
-                      onClick={() => handleNavClick("admin")}
-                      className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors ${
-                        activeTab === "admin"
-                          ? "bg-slate-900 text-white"
-                          : "text-slate-700 hover:bg-slate-100"
-                      }`}
-                    >
-                      <Settings className="w-5 h-5" />
-                      <span>Admin & System Telemetry</span>
-                    </button>
-                  )}
                 </>
               ) : (
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 mt-2">

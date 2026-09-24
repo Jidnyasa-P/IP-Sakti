@@ -89,8 +89,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
     return (
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 bg-slate-50">
         <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xs p-6 text-center space-y-4">
-          <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto">
-            <Shield className="w-6 h-6" />
+          <div className="w-14 h-14 flex items-center justify-center mx-auto">
+            <img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="w-full h-full object-contain" />
           </div>
           <div>
             <h2 className="text-base font-semibold text-slate-900">Sign In Required</h2>

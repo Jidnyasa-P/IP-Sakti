@@ -55,9 +55,14 @@ def get_or_create_conversation(db, conversation_id: str | None, title_hint: str,
         except Exception:
             pass
         conv = collection.find_one({
-            "$or": [
-                *[{"_id": candidate} for candidate in candidates],
-                *[{"conversation_id": candidate} for candidate in candidates],
+            "$and": [
+                {"user_id": user_id},
+                {
+                    "$or": [
+                        *[{"_id": candidate} for candidate in candidates],
+                        *[{"conversation_id": candidate} for candidate in candidates],
+                    ]
+                },
             ]
         })
         if conv:
@@ -79,9 +84,14 @@ def get_or_create_conversation(db, conversation_id: str | None, title_hint: str,
         # `conversation_id_1` index wins that race, reuse the record that was
         # inserted by the other request rather than returning HTTP 500.
         existing = collection.find_one({
-            "$or": [
-                {"_id": new_id},
-                {"conversation_id": new_id},
+            "$and": [
+                {"user_id": user_id},
+                {
+                    "$or": [
+                        {"_id": new_id},
+                        {"conversation_id": new_id},
+                    ]
+                },
             ]
         })
         if existing:

@@ -36,8 +36,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSwitchToRegister }) => {
   return (
     <div className="w-full max-w-md mx-auto px-4 py-16 sm:py-24">
       <div className="text-center mb-8">
-        <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-emerald-800 to-teal-950 flex items-center justify-center text-amber-300 shadow-md mb-4">
-          <Shield className="w-6 h-6" />
+        <div className="w-14 h-14 mx-auto flex items-center justify-center mb-4">
+          <img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="w-full h-full object-contain" />
         </div>
         <h1 className="text-2xl font-serif font-bold text-slate-900">Welcome back</h1>
         <p className="text-sm text-slate-500 mt-1">Sign in to IP-SAKTI Sahayak</p>

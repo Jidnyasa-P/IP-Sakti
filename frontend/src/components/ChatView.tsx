@@ -47,6 +47,7 @@ import {
   QueryRelevanceResult,
 } from "../utils/queryRelevance";
 import { authFetch } from "./auth/authStorage";
+import { useAuth } from "../context/AuthContext";
 
 interface ChatViewProps {
   language: Language;
@@ -68,10 +69,14 @@ const LOCAL_STORAGE_DRAFT_INDIA_KEY = "ipsakti_sahayak_draft_india";
 const LOCAL_STORAGE_DRAFT_INTL_KEY = "ipsakti_sahayak_draft_intl";
 const LOCAL_STORAGE_DELETED_CONVS_KEY = "ipsakti_sahayak_deleted_conversation_ids_v1";
 
-function getDeletedConversationIds(): Set<string> {
+function scopedStorageKey(baseKey: string, userId?: string): string {
+  return `${baseKey}:${userId || "guest"}`;
+}
+
+function getDeletedConversationIds(userId?: string): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_DELETED_CONVS_KEY);
+    const raw = localStorage.getItem(scopedStorageKey(LOCAL_STORAGE_DELETED_CONVS_KEY, userId));
     const parsed = raw ? JSON.parse(raw) : [];
     return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
   } catch {
@@ -79,12 +84,12 @@ function getDeletedConversationIds(): Set<string> {
   }
 }
 
-function rememberDeletedConversationIds(ids: string[]) {
+function rememberDeletedConversationIds(ids: string[], userId?: string) {
   if (typeof window === "undefined" || ids.length === 0) return;
   try {
-    const deleted = getDeletedConversationIds();
+    const deleted = getDeletedConversationIds(userId);
     ids.forEach((id) => deleted.add(String(id)));
-    localStorage.setItem(LOCAL_STORAGE_DELETED_CONVS_KEY, JSON.stringify([...deleted]));
+    localStorage.setItem(scopedStorageKey(LOCAL_STORAGE_DELETED_CONVS_KEY, userId), JSON.stringify([...deleted]));
   } catch {}
 }
 
@@ -298,10 +303,10 @@ function createClientConversationId(jurisdiction: Jurisdiction): string {
   return `conv-${jurisdiction}-${randomId}`;
 }
 
-function getInitialConversations(): Conversation[] {
+function getInitialConversations(userId?: string): Conversation[] {
   if (typeof window !== "undefined") {
     try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_CONVS_KEY);
+      const stored = localStorage.getItem(scopedStorageKey(LOCAL_STORAGE_CONVS_KEY, userId));
       // FIXED ("2 chats keep appearing after deleting everything"): this
       // used to check `parsed.length > 0` and fall through to reseeding the
       // two hardcoded demo conversations whenever the stored list was
@@ -314,7 +319,7 @@ function getInitialConversations(): Conversation[] {
       if (stored !== null) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          const deleted = getDeletedConversationIds();
+          const deleted = getDeletedConversationIds(userId);
           return parsed
             .map((c: Conversation) => normalizeConversation(c))
             .filter((c): c is Conversation => c !== null && !deleted.has(String(c.id)));
@@ -325,10 +330,10 @@ function getInitialConversations(): Conversation[] {
   return [];
 }
 
-function getInitialIsInternational(): boolean {
+function getInitialIsInternational(userId?: string): boolean {
   if (typeof window !== "undefined") {
     try {
-      const savedMode = localStorage.getItem(LOCAL_STORAGE_JURISDICTION_KEY);
+      const savedMode = localStorage.getItem(scopedStorageKey(LOCAL_STORAGE_JURISDICTION_KEY, userId));
       if (savedMode === "international") return true;
       if (savedMode === "india") return false;
     } catch (e) {}
@@ -336,37 +341,37 @@ function getInitialIsInternational(): boolean {
   return false;
 }
 
-function getStoredDraft(isIntl: boolean): string {
+function getStoredDraft(isIntl: boolean, userId?: string): string {
   if (typeof window === "undefined") return "";
   try {
     return localStorage.getItem(
-      isIntl ? LOCAL_STORAGE_DRAFT_INTL_KEY : LOCAL_STORAGE_DRAFT_INDIA_KEY,
+      scopedStorageKey(isIntl ? LOCAL_STORAGE_DRAFT_INTL_KEY : LOCAL_STORAGE_DRAFT_INDIA_KEY, userId),
     ) || "";
   } catch {
     return "";
   }
 }
 
-function persistStoredDraft(isIntl: boolean, value: string) {
+function persistStoredDraft(isIntl: boolean, value: string, userId?: string) {
   if (typeof window === "undefined") return;
   try {
-    const key = isIntl ? LOCAL_STORAGE_DRAFT_INTL_KEY : LOCAL_STORAGE_DRAFT_INDIA_KEY;
+    const key = scopedStorageKey(isIntl ? LOCAL_STORAGE_DRAFT_INTL_KEY : LOCAL_STORAGE_DRAFT_INDIA_KEY, userId);
     if (value.trim()) localStorage.setItem(key, value);
     else localStorage.removeItem(key);
   } catch {}
 }
 
-function getInitialActiveId(convs: Conversation[], isIntl: boolean): string {
+function getInitialActiveId(convs: Conversation[], isIntl: boolean, userId?: string): string {
   const targetJur: Jurisdiction = isIntl ? "international" : "india";
   const savedKey = isIntl
     ? LOCAL_STORAGE_ACTIVE_INTL_KEY
     : LOCAL_STORAGE_ACTIVE_INDIA_KEY;
   if (typeof window !== "undefined") {
     try {
-      const storedId = localStorage.getItem(savedKey);
+      const storedId = localStorage.getItem(scopedStorageKey(savedKey, userId));
       if (
         storedId &&
-        !getDeletedConversationIds().has(String(storedId)) &&
+        !getDeletedConversationIds(userId).has(String(storedId)) &&
         convs.some(
           (c) => c.id === storedId && (c.jurisdiction || "india") === targetJur,
         )
@@ -397,39 +402,43 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onRaiseGrievance,
 }) => {
   const { t } = useTranslation();
+  const { currentUser } = useAuth();
+  const userId = currentUser?.id;
 
   const [isInternational, setIsInternational] = useState<boolean>(() =>
-    getInitialIsInternational(),
+    getInitialIsInternational(userId),
   );
   const [conversations, setConversations] = useState<Conversation[]>(() =>
-    getInitialConversations(),
+    getInitialConversations(userId),
   );
 
   const [activeConvId, setActiveConvId] = useState<string>(() => {
-    const initialConvs = getInitialConversations();
-    const isIntl = getInitialIsInternational();
-    return getInitialActiveId(initialConvs, isIntl);
+    const initialConvs = getInitialConversations(userId);
+    const isIntl = getInitialIsInternational(userId);
+    return getInitialActiveId(initialConvs, isIntl, userId);
   });
 
   const [activeIndiaConvId, setActiveIndiaConvId] = useState<string>(() => {
-    const initialConvs = getInitialConversations();
-    return getInitialActiveId(initialConvs, false);
+    const initialConvs = getInitialConversations(userId);
+    return getInitialActiveId(initialConvs, false, userId);
   });
 
   const [activeIntlConvId, setActiveIntlConvId] = useState<string>(() => {
-    const initialConvs = getInitialConversations();
-    return getInitialActiveId(initialConvs, true);
+    const initialConvs = getInitialConversations(userId);
+    return getInitialActiveId(initialConvs, true, userId);
   });
 
   const [messages, setMessages] = useState<StructuredChatMessage[]>(() => {
-    const initialConvs = getInitialConversations();
-    const isIntl = getInitialIsInternational();
-    const activeId = getInitialActiveId(initialConvs, isIntl);
+    const initialConvs = getInitialConversations(userId);
+    const isIntl = getInitialIsInternational(userId);
+    const activeId = getInitialActiveId(initialConvs, isIntl, userId);
     const active = initialConvs.find((c) => c.id === activeId);
     return active?.messages || [];
   });
 
-  const [inputValue, setInputValue] = useState(() => getStoredDraft(getInitialIsInternational()));
+  const [inputValue, setInputValue] = useState(() => getStoredDraft(getInitialIsInternational(userId), userId));
+
+  const storageKey = (baseKey: string) => scopedStorageKey(baseKey, userId);
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
@@ -494,7 +503,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       ];
 
   useEffect(() => {
-    persistStoredDraft(isInternational, inputValue);
+    persistStoredDraft(isInternational, inputValue, userId);
   }, [inputValue, isInternational]);
 
   // Restore the last scroll position for this conversation only. This deliberately
@@ -503,7 +512,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   useEffect(() => {
     const node = messagesScrollRef.current;
     if (!node || !activeConvId) return;
-    const key = `ipsakti_sahayak_scroll_${activeConvId}`;
+    const key = storageKey(`ipsakti_sahayak_scroll_${activeConvId}`);
     let saved = 0;
     try {
       saved = Number(localStorage.getItem(key) || 0);
@@ -518,7 +527,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     updated: Conversation[],
     newActiveId?: string,
   ) => {
-    const deleted = getDeletedConversationIds();
+    const deleted = getDeletedConversationIds(userId);
     const cleaned = updated
       .map((c) => normalizeConversation(c))
       .filter((c): c is Conversation => c !== null && !deleted.has(String(c.id)));
@@ -528,20 +537,22 @@ export const ChatView: React.FC<ChatViewProps> = ({
       try {
         // Keep a compatibility snapshot for an offline refresh, but never
         // use it as the authoritative source when the backend is reachable.
-        localStorage.setItem(LOCAL_STORAGE_CONVS_KEY, JSON.stringify(cleaned));
+        localStorage.setItem(storageKey(LOCAL_STORAGE_CONVS_KEY), JSON.stringify(cleaned));
         if (newActiveId) {
-          localStorage.setItem(LOCAL_STORAGE_ACTIVE_KEY, newActiveId);
+          localStorage.setItem(storageKey(LOCAL_STORAGE_ACTIVE_KEY), newActiveId);
           if (isInternational) {
-            localStorage.setItem(LOCAL_STORAGE_ACTIVE_INTL_KEY, newActiveId);
+            localStorage.setItem(storageKey(LOCAL_STORAGE_ACTIVE_INTL_KEY), newActiveId);
           } else {
-            localStorage.setItem(LOCAL_STORAGE_ACTIVE_INDIA_KEY, newActiveId);
+            localStorage.setItem(storageKey(LOCAL_STORAGE_ACTIVE_INDIA_KEY), newActiveId);
           }
         } else {
-          localStorage.removeItem(LOCAL_STORAGE_ACTIVE_KEY);
+          localStorage.removeItem(storageKey(LOCAL_STORAGE_ACTIVE_KEY));
           localStorage.removeItem(
-            isInternational
-              ? LOCAL_STORAGE_ACTIVE_INTL_KEY
-              : LOCAL_STORAGE_ACTIVE_INDIA_KEY,
+            storageKey(
+              isInternational
+                ? LOCAL_STORAGE_ACTIVE_INTL_KEY
+                : LOCAL_STORAGE_ACTIVE_INDIA_KEY,
+            ),
           );
         }
       } catch (e) {}
@@ -561,20 +572,20 @@ export const ChatView: React.FC<ChatViewProps> = ({
       setConversations(currentConvs);
       try {
         localStorage.setItem(
-          LOCAL_STORAGE_CONVS_KEY,
+          storageKey(LOCAL_STORAGE_CONVS_KEY),
           JSON.stringify(currentConvs),
         );
       } catch (e) {}
     }
 
     setIsInternational(checked);
-    setInputValue(getStoredDraft(checked));
+    setInputValue(getStoredDraft(checked, userId));
     const targetJur: Jurisdiction = checked ? "international" : "india";
     try {
-      localStorage.setItem(LOCAL_STORAGE_JURISDICTION_KEY, targetJur);
+      localStorage.setItem(storageKey(LOCAL_STORAGE_JURISDICTION_KEY), targetJur);
     } catch (e) {}
 
-    const deletedIds = getDeletedConversationIds();
+    const deletedIds = getDeletedConversationIds(userId);
     const matchingConvs = currentConvs.filter(
       (c) => (c.jurisdiction || "india") === targetJur && !deletedIds.has(String(c.id)),
     );
@@ -582,7 +593,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       ? LOCAL_STORAGE_ACTIVE_INTL_KEY
       : LOCAL_STORAGE_ACTIVE_INDIA_KEY;
     let targetId =
-      typeof window !== "undefined" ? localStorage.getItem(savedKey) || "" : "";
+      typeof window !== "undefined" ? localStorage.getItem(storageKey(savedKey)) || "" : "";
     let targetConv = matchingConvs.find((c) => c.id === targetId);
 
     if (!targetConv && matchingConvs.length > 0) {
@@ -602,8 +613,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
     setJurisdictionWarning(null);
 
     try {
-      localStorage.setItem(savedKey, targetId);
-      localStorage.setItem(LOCAL_STORAGE_ACTIVE_KEY, targetId);
+      localStorage.setItem(storageKey(savedKey), targetId);
+      localStorage.setItem(storageKey(LOCAL_STORAGE_ACTIVE_KEY), targetId);
     } catch (e) {}
   };
 
@@ -632,10 +643,29 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }, 50);
   };
 
-  // Sync with backend on mount
+  // A chat cache is account-scoped. When the authenticated account changes,
+  // immediately replace the visible state before syncing with the server.
   useEffect(() => {
+    if (!userId) {
+      setConversations([]);
+      setActiveConvId("");
+      setActiveIndiaConvId("");
+      setActiveIntlConvId("");
+      setMessages([]);
+      return;
+    }
+    const localConvs = getInitialConversations(userId);
+    const intl = getInitialIsInternational(userId);
+    const activeId = getInitialActiveId(localConvs, intl, userId);
+    const active = localConvs.find((c) => c.id === activeId);
+    setConversations(localConvs);
+    setIsInternational(intl);
+    setActiveConvId(activeId);
+    setActiveIndiaConvId(getInitialActiveId(localConvs, false, userId));
+    setActiveIntlConvId(getInitialActiveId(localConvs, true, userId));
+    setMessages(active?.messages || []);
     fetchServerConversations();
-  }, []);
+  }, [userId]);
 
   const fetchServerConversations = async () => {
     try {
@@ -645,7 +675,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         return;
       }
       const serverConvs: Conversation[] = await res.json();
-      const deletedIds = getDeletedConversationIds();
+      const deletedIds = getDeletedConversationIds(userId);
       const cleanedServerConvs = Array.isArray(serverConvs)
         ? serverConvs
             .map((c) => normalizeConversation(c))
@@ -659,7 +689,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       setConversations(cleanedServerConvs);
       try {
         localStorage.setItem(
-          LOCAL_STORAGE_CONVS_KEY,
+          storageKey(LOCAL_STORAGE_CONVS_KEY),
           JSON.stringify(cleanedServerConvs),
         );
       } catch (e) {}
@@ -695,11 +725,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
         }
         setMessages([]);
         try {
-          localStorage.removeItem(LOCAL_STORAGE_ACTIVE_KEY);
+          localStorage.removeItem(storageKey(LOCAL_STORAGE_ACTIVE_KEY));
           localStorage.removeItem(
-            isInternational
-              ? LOCAL_STORAGE_ACTIVE_INTL_KEY
-              : LOCAL_STORAGE_ACTIVE_INDIA_KEY,
+            storageKey(
+              isInternational
+                ? LOCAL_STORAGE_ACTIVE_INTL_KEY
+                : LOCAL_STORAGE_ACTIVE_INDIA_KEY,
+            ),
           );
         } catch (e) {}
       }
@@ -709,23 +741,23 @@ export const ChatView: React.FC<ChatViewProps> = ({
   };
 
   const loadConversation = (id: string) => {
-    if (getDeletedConversationIds().has(String(id))) return;
+    if (getDeletedConversationIds(userId).has(String(id))) return;
     setActiveConvId(id);
     if (isInternational) {
       setActiveIntlConvId(id);
       try {
-        localStorage.setItem(LOCAL_STORAGE_ACTIVE_INTL_KEY, id);
+        localStorage.setItem(storageKey(LOCAL_STORAGE_ACTIVE_INTL_KEY), id);
       } catch (e) {}
     } else {
       setActiveIndiaConvId(id);
       try {
-        localStorage.setItem(LOCAL_STORAGE_ACTIVE_INDIA_KEY, id);
+        localStorage.setItem(storageKey(LOCAL_STORAGE_ACTIVE_INDIA_KEY), id);
       } catch (e) {}
     }
 
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem(LOCAL_STORAGE_ACTIVE_KEY, id);
+        localStorage.setItem(storageKey(LOCAL_STORAGE_ACTIVE_KEY), id);
       } catch (e) {}
     }
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
@@ -779,7 +811,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const deleteConversation = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     deletedConversationIdsRef.current.add(id);
-    rememberDeletedConversationIds([id]);
+    rememberDeletedConversationIds([id], userId);
 
     const updated = conversations.filter((c) => c.id !== id);
     const currentJur: Jurisdiction = isInternational
@@ -813,21 +845,22 @@ export const ChatView: React.FC<ChatViewProps> = ({
     // Delete every client-side copy of the session so changing sections or
     // reopening Sahayak cannot resurrect it.
     try {
-      const cached = localStorage.getItem(LOCAL_STORAGE_CONVS_KEY);
+      const cached = localStorage.getItem(storageKey(LOCAL_STORAGE_CONVS_KEY));
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
           localStorage.setItem(
-            LOCAL_STORAGE_CONVS_KEY,
-            JSON.stringify(parsed.filter((c: any) => c?.id !== id)),
+            storageKey(LOCAL_STORAGE_CONVS_KEY),
+            JSON.stringify(parsed.filter((c: any) => String(c?.id) !== String(id))),
           );
         }
       }
-      for (const key of [
+      for (const baseKey of [
         LOCAL_STORAGE_ACTIVE_KEY,
         LOCAL_STORAGE_ACTIVE_INDIA_KEY,
         LOCAL_STORAGE_ACTIVE_INTL_KEY,
       ]) {
+        const key = storageKey(baseKey);
         if (localStorage.getItem(key) === id) localStorage.removeItem(key);
       }
     } catch (cacheErr) {}
@@ -1048,10 +1081,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
       (isInternational ? "international" : "india");
 
     // Ensure we have an active conversation of the right jurisdiction
-    let targetConvId = getDeletedConversationIds().has(String(activeConvId)) ? "" : activeConvId;
+    let targetConvId = getDeletedConversationIds(userId).has(String(activeConvId)) ? "" : activeConvId;
     let currentConv = conversations.find(
       (c) =>
-        c.id === targetConvId && (c.jurisdiction || "india") === currentJur && !getDeletedConversationIds().has(String(c.id)),
+        c.id === targetConvId && (c.jurisdiction || "india") === currentJur && !getDeletedConversationIds(userId).has(String(c.id)),
     );
 
     if (!currentConv) {
@@ -1067,7 +1100,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         textToSend.slice(0, 45) + (textToSend.length > 45 ? "..." : "");
       currentConv = {
         id: targetConvId,
-        user_id: "user-default",
+        user_id: userId || "",
         title: newTitle,
         language,
         jurisdiction: currentJur,
@@ -1082,7 +1115,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         setActiveIndiaConvId(targetConvId);
       }
       if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_ACTIVE_KEY, targetConvId);
+        localStorage.setItem(storageKey(LOCAL_STORAGE_ACTIVE_KEY), targetConvId);
       }
     }
 
@@ -1182,7 +1215,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             setActiveConvId(canonicalConversationId);
             if (isInternational) setActiveIntlConvId(canonicalConversationId);
             else setActiveIndiaConvId(canonicalConversationId);
-            localStorage.setItem(LOCAL_STORAGE_ACTIVE_KEY, canonicalConversationId);
+            localStorage.setItem(storageKey(LOCAL_STORAGE_ACTIVE_KEY), canonicalConversationId);
           }
 
           // Server-side scope guard is authoritative. If it blocks a
@@ -1706,7 +1739,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             const node = e.currentTarget;
             if (!activeConvId) return;
             try {
-              localStorage.setItem(`ipsakti_sahayak_scroll_${activeConvId}`, String(node.scrollTop));
+              localStorage.setItem(storageKey(`ipsakti_sahayak_scroll_${activeConvId}`), String(node.scrollTop));
             } catch {}
           }}
           className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-5 scroll-smooth"

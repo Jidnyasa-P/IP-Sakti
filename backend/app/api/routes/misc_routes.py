@@ -27,8 +27,7 @@ async def research_search(query: str = "", authority: str = "", topic: str = "",
 
 @router.get("/api/workspace/saved-research")
 def list_saved_research(current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    is_admin = "Admin" in current_user.get("roles", [])
-    query = {} if is_admin else {"user_id": current_user["id"]}
+    query = {"user_id": current_user["id"]}
     rows = db[SAVED_RESEARCH_COLLECTION].find(query).sort("created_at", -1)
     return [saved_research_to_dict(r) for r in rows]
 
@@ -47,8 +46,7 @@ def save_research(body: SaveResearchRequest, current_user: dict = Depends(get_cu
 def delete_saved_research(research_id: str, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     row = db[SAVED_RESEARCH_COLLECTION].find_one({"_id": research_id})
     if row:
-        is_admin = "Admin" in current_user.get("roles", [])
-        if not is_admin and row.get("user_id") != current_user["id"]:
+        if row.get("user_id") != current_user["id"]:
             raise HTTPException(status_code=403, detail="You do not have access to this saved item.")
         db[SAVED_RESEARCH_COLLECTION].delete_one({"_id": research_id})
     return {"success": True}

@@ -1,300 +1,124 @@
 import React, { useState } from 'react';
-import {
-  Shield,
-  Lock,
-  Mail,
-  ArrowRight,
-  UserPlus,
-  AlertCircle,
-  CheckCircle2,
-  Scale,
-  Eye,
-  EyeOff,
-} from 'lucide-react';
+import { Shield, LogIn, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { ActiveTab } from './Header';
-import { UserRole, ALL_ROLES, ExpertCertificate } from '../types';
-import { ExpertCertificateUpload, ExpertCertificateData } from './ExpertCertificateUpload';
 
 interface LoginViewProps {
-  setActiveTab: (tab: ActiveTab) => void;
-  targetTabAfterLogin?: ActiveTab;
+  onSwitchToRegister: () => void;
 }
 
-export const LoginView: React.FC<LoginViewProps> = ({
-  setActiveTab,
-  targetTabAfterLogin = 'chat',
-}) => {
-  const { login, isLoading, currentUser } = useAuth();
-
+export const LoginView: React.FC<LoginViewProps> = ({ onSwitchToRegister }) => {
+  const { login, authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
-  const [selectedRole, setSelectedRole] = useState<UserRole>('Practitioner');
-  const [expertCertificate, setExpertCertificate] =
-    useState<Partial<ExpertCertificateData> | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const isExpertSelected = selectedRole === 'Expert';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (!email.trim() || !password) {
-      setError('Please enter your email address and password.');
+      setError('Please enter both email and password.');
+      return;
+    }
+    if (!acknowledged) {
+      setError('Please acknowledge the statutory advisory notice before signing in.');
       return;
     }
 
-    if (isExpertSelected) {
-      if (!expertCertificate?.fileName) {
-        setError(
-          'Mandatory Proof Required: You must upload a verified certificate file (PDF, PNG, JPG) to sign in as an Expert.'
-        );
-        return;
-      }
-      if (!expertCertificate?.certificateId?.trim()) {
-        setError('Mandatory Proof Required: Registration / Certificate Number is required.');
-        return;
-      }
-      if (!expertCertificate?.issuingAuthority?.trim()) {
-        setError('Mandatory Proof Required: Issuing Statutory Authority is required.');
-        return;
-      }
-    }
-
-    const certPayload: ExpertCertificate | undefined =
-      isExpertSelected && expertCertificate?.fileName
-        ? {
-            fileName: expertCertificate.fileName,
-            fileSize: expertCertificate.fileSize || 428000,
-            fileType: expertCertificate.fileType || 'application/pdf',
-            fileDataUrl: expertCertificate.fileDataUrl,
-            certificateId: expertCertificate.certificateId!.trim(),
-            certificateType:
-              expertCertificate.certificateType ||
-              'CGPDTM Registered Patent Agent (Rule 110, Patents Rules 2003)',
-            issuingAuthority: expertCertificate.issuingAuthority!.trim(),
-            uploadedAt: expertCertificate.uploadedAt || new Date().toISOString(),
-            status: 'Verified',
-          }
-        : undefined;
-
-    const result = await login(email, password, certPayload, rememberMe);
-
-    if (result.success) {
-      const userRole = result.user?.role;
-      if (userRole === 'Expert' || userRole === 'EXPERT' || isExpertSelected) {
-        setActiveTab('expert');
-      } else {
-        setActiveTab(targetTabAfterLogin || 'chat');
-      }
-    } else {
-      setError(result.error || 'Failed to authenticate. Please check your credentials.');
+    try {
+      await login(email, password);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     }
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-slate-50 flex items-center justify-center px-4 py-10 sm:py-14">
-      <div className="w-full max-w-md">
-        <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-800 shadow-sm">
-            <Shield className="h-5 w-5" />
+    <div className="w-full max-w-md mx-auto px-4 py-16 sm:py-24">
+      <div className="text-center mb-8">
+        <div className="w-14 h-14 mx-auto flex items-center justify-center mb-4">
+          <img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="w-full h-full object-contain" />
+        </div>
+        <h1 className="text-2xl font-serif font-bold text-slate-900">Welcome back</h1>
+        <p className="text-sm text-slate-500 mt-1">Sign in to IP-SAKTI Sahayak</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-2xl shadow-xs p-6 sm:p-8 space-y-5">
+        {error && (
+          <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <span>{error}</span>
           </div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-800">
-            IP-SAKTI Sahayak
-          </p>
-          <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-slate-900">
-            Sign in to your account
-          </h1>
-          <p className="mt-1.5 text-sm text-slate-500">
-            Continue to your IP and regulatory workspace.
-          </p>
+        )}
+
+        <div>
+          <label htmlFor="login-email" className="block text-xs font-semibold text-slate-700 mb-1.5">
+            Email
+          </label>
+          <input
+            id="login-email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
+          />
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-          {currentUser && (
-            <div className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs text-emerald-950">
-              <div className="flex min-w-0 items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-700" />
-                <span className="truncate">
-                  Signed in as <strong>{currentUser.name}</strong>
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveTab('profile')}
-                className="shrink-0 font-semibold text-emerald-800 hover:underline"
-              >
-                Profile
-              </button>
-            </div>
-          )}
-
-          {error && (
-            <div
-              role="alert"
-              className="mb-5 flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs leading-relaxed text-rose-800"
-            >
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label
-                htmlFor="login-email"
-                className="mb-1.5 block text-xs font-semibold text-slate-700"
-              >
-                Email address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  id="login-email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="you@organization.in"
-                  className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="login-password"
-                className="mb-1.5 block text-xs font-semibold text-slate-700"
-              >
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  id="login-password"
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(value => !value)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700"
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-1.5 flex items-center justify-between">
-                <label className="block text-xs font-semibold text-slate-700">
-                  Profile
-                </label>
-                <span className="text-[11px] text-slate-400">
-                  Select only if applicable
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {ALL_ROLES.map(role => {
-                  const selected = selectedRole === role;
-                  return (
-                    <button
-                      key={role}
-                      type="button"
-                      onClick={() => {
-                        setSelectedRole(role);
-                        setError(null);
-                        if (role !== 'Expert') setExpertCertificate(null);
-                      }}
-                      className={`rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
-                        selected
-                          ? 'border-emerald-700 bg-emerald-50 text-emerald-900'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      {role}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {isExpertSelected && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <div className="mb-3 flex items-center gap-2 border-b border-slate-200 pb-2.5">
-                  <Scale className="h-4 w-4 text-emerald-800" />
-                  <span className="text-xs font-semibold text-slate-800">
-                    Expert certificate
-                  </span>
-                  <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-rose-700">
-                    Required
-                  </span>
-                </div>
-                <ExpertCertificateUpload
-                  certificateData={expertCertificate}
-                  onChange={setExpertCertificate}
-                />
-              </div>
-            )}
-
-            <label className="flex cursor-pointer items-center gap-2.5 text-xs text-slate-600">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={e => setRememberMe(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-700"
-              />
-              <span>Remember me on this device</span>
-            </label>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isLoading ? (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              ) : (
-                <ArrowRight className="h-4 w-4" />
-              )}
-              <span>{isLoading ? 'Signing in…' : 'Sign in'}</span>
-            </button>
-          </form>
-
-          <div className="mt-5 border-t border-slate-100 pt-5 text-center text-xs text-slate-500">
-            New to IP-SAKTI Sahayak?{' '}
-            <button
-              type="button"
-              onClick={() => setActiveTab('register')}
-              className="font-semibold text-emerald-800 hover:underline"
-            >
-              Create an account
-            </button>
-          </div>
+        <div>
+          <label htmlFor="login-password" className="block text-xs font-semibold text-slate-700 mb-1.5">
+            Password
+          </label>
+          <input
+            id="login-password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
+          />
         </div>
+
+        <label
+          htmlFor="login-disclaimer-ack"
+          className="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50/60 border border-amber-900/20 cursor-pointer"
+        >
+          <input
+            id="login-disclaimer-ack"
+            type="checkbox"
+            checked={acknowledged}
+            onChange={(e) => setAcknowledged(e.target.checked)}
+            className="w-4 h-4 mt-0.5 text-emerald-800 rounded-sm focus:ring-emerald-700 flex-shrink-0"
+          />
+          <span className="text-xs text-amber-900 leading-relaxed">
+            I understand that IP-SAKTI Sahayak provides AI-assisted research and decision support only, and does not constitute formal legal counsel or a binding regulatory determination.
+          </span>
+        </label>
 
         <button
-          type="button"
-          onClick={() => setActiveTab('landing')}
-          className="mt-4 flex w-full items-center justify-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800"
+          type="submit"
+          id="login-submit-btn"
+          disabled={authLoading || !acknowledged}
+          className="w-full px-4 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium text-sm transition-all shadow-md flex items-center justify-center gap-2"
         >
-          ← Back to landing page
+          {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+          <span>{authLoading ? 'Signing in…' : 'Sign In'}</span>
         </button>
-      </div>
+
+        <p className="text-center text-xs text-slate-500 pt-2">
+          Don't have an account?{' '}
+          <button
+            type="button"
+            id="go-to-register-btn"
+            onClick={onSwitchToRegister}
+            className="font-semibold text-emerald-800 hover:text-emerald-900 hover:underline"
+          >
+            Register
+          </button>
+        </p>
+      </form>
     </div>
   );
 };
