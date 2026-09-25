@@ -183,12 +183,12 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </>)}
 
               {forgotStep === 'request' ? (
-                <button type="button" disabled={isLoading || !forgotEmail.trim()} onClick={async () => { setError(null); setForgotMessage(null); const result = await requestForgotPassword(forgotEmail.trim()); if (result.success) { setForgotStep('reset'); setForgotMessage('If the account exists, a 6-digit verification code has been sent to your email.'); } else setError(result.error || 'Could not start password reset.'); }} className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60">Send OTP</button>
+                <button type="button" disabled={isLoading || !forgotEmail.trim()} onClick={async () => { setError(null); setForgotMessage(null); const result = await requestForgotPassword(forgotEmail.trim()); if (result.success) { setForgotStep('reset'); setForgotMessage('If the account exists, a 6-digit verification code has been sent to your email.'); } else setError(result.error || 'Could not start password reset.'); }} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-900 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60">{isLoading ? 'Sending verification code…' : 'Send verification code'}</button>
               ) : (
                 <button type="button" disabled={isLoading || forgotOtp.length !== 6 || !forgotPasswordValue || forgotPasswordValue !== forgotConfirmPassword} onClick={async () => { setError(null); const result = await forgotPassword(forgotEmail.trim(), forgotOtp, forgotPasswordValue); if (result.success) { setForgotMode(false); setForgotStep('request'); setForgotOtp(''); setForgotPasswordValue(''); setForgotConfirmPassword(''); setForgotMessage(null); setSuccessMessage('Password reset successfully. Please sign in with your new password.'); setError(null); } else setError(result.error || 'Could not reset your password.'); }} className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60">Reset password</button>
               )}
 
-              <div className="text-center text-xs"><button type="button" onClick={() => { setForgotMode(false); setForgotStep('request'); setForgotMessage(null); setError(null); setSuccessMessage(null); }} className="font-semibold text-emerald-800 hover:underline">Back to sign in</button></div>
+              <div className="text-center pt-1"><button type="button" onClick={() => { setForgotMode(false); setForgotStep('request'); setForgotMessage(null); setError(null); setSuccessMessage(null); }} className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-slate-400">Back to sign in</button></div>
             </div>
           ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -300,7 +300,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </div>
             )}
 
-            <button type="button" onClick={() => { setForgotMode(true); setForgotEmail(email); setError(null); setSuccessMessage(null); setForgotMessage(null); }} className="-mb-2 text-left text-xs font-semibold text-emerald-800 hover:underline">Forgot password?</button>
+            <button type="button" onClick={() => { setForgotMode(true); setForgotEmail(email); setError(null); setSuccessMessage(null); setForgotMessage(null); }} className="-mb-2 inline-flex w-fit items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100 hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-700/15">Forgot password?</button>
 
             <label className="flex cursor-pointer items-center gap-2.5 text-xs text-slate-600">
               <input

@@ -159,11 +159,28 @@ export async function resendRegistrationOtp(email: string): Promise<void> {
 }
 
 export async function requestForgotPassword(email: string): Promise<void> {
-  const res = await fetch(apiUrl('/api/auth/forgot-password/request'), {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
-  });
-  if (!res.ok) throw new Error(await parseErrorMessage(res, 'Could not start password reset.'));
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const res = await fetch(apiUrl('/api/auth/forgot-password/request'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      throw new Error(await parseErrorMessage(res, 'Could not start password reset.'));
+    }
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('The email service is taking longer than expected. Please wait a moment and try again.');
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 export async function confirmForgotPassword(email: string, otp: string, newPassword: string): Promise<void> {

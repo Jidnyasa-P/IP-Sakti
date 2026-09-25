@@ -264,7 +264,10 @@ def _consume_security_otp(db, user_doc: dict, otp: str, purpose: str) -> None:
     if not row:
         raise HTTPException(status_code=400, detail="Invalid verification code.")
     now = datetime.now(timezone.utc)
-    if row["expires_at"] < now:
+    expires_at = row.get("expires_at")
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at < now:
         raise HTTPException(status_code=400, detail="Verification code has expired.")
     if row.get("attempts", 0) >= get_settings().otp_max_attempts:
         raise HTTPException(status_code=429, detail="Too many incorrect attempts. Request a new code.")

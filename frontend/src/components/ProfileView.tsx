@@ -65,6 +65,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
   const [newPassword, setNewPassword] = useState('');
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
   const [securityError, setSecurityError] = useState<string | null>(null);
+  const [securityLoading, setSecurityLoading] = useState(false);
 
   // Sync state with currentUser changes
   useEffect(() => {
@@ -183,24 +184,38 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
   };
 
   const startSecurityAction = async () => {
+    if (securityLoading) return;
     setSecurityError(null); setSecurityMessage(null);
     if (!currentPassword) { setSecurityError('Enter your current password.'); return; }
-    const result = securityMode === 'change' ? await requestChangePassword(currentPassword) : await requestDeleteAccount(currentPassword);
-    if (result.success) { setSecurityStep(2); setSecurityMessage('A verification code has been sent to your email.'); }
-    else setSecurityError(result.error || 'Could not start this security action.');
+    setSecurityLoading(true);
+    try {
+      const result = securityMode === 'change' ? await requestChangePassword(currentPassword) : await requestDeleteAccount(currentPassword);
+      if (result.success) { setSecurityStep(2); setSecurityMessage('A verification code has been sent to your email.'); }
+      else setSecurityError(result.error || 'Could not start this security action.');
+    } finally {
+      setSecurityLoading(false);
+    }
   };
 
   const finishSecurityAction = async () => {
+    if (securityLoading) return;
     setSecurityError(null);
-    if (securityMode === 'change') {
-      if (newPassword.length < 8) { setSecurityError('New password must be at least 8 characters.'); return; }
-      const result = await confirmChangePassword(securityOtp, newPassword);
-      if (result.success) { setSecurityMessage('Password changed successfully.'); setTimeout(closeSecurity, 900); }
-      else setSecurityError(result.error || 'Could not change password.');
-    } else {
-      const result = await confirmDeleteAccount(securityOtp);
-      if (result.success) { setActiveTab('landing'); }
-      else setSecurityError(result.error || 'Could not delete account.');
+    if (!securityOtp || securityOtp.length !== 6) { setSecurityError('Enter the 6-digit verification code.'); return; }
+    if (securityMode === 'change' && newPassword.length < 8) { setSecurityError('New password must be at least 8 characters.'); return; }
+
+    setSecurityLoading(true);
+    try {
+      if (securityMode === 'change') {
+        const result = await confirmChangePassword(securityOtp, newPassword);
+        if (result.success) { setSecurityMessage('Password changed successfully.'); setTimeout(closeSecurity, 900); }
+        else setSecurityError(result.error || 'Could not change password.');
+      } else {
+        const result = await confirmDeleteAccount(securityOtp);
+        if (result.success) { setActiveTab('landing'); }
+        else setSecurityError(result.error || 'Could not delete account.');
+      }
+    } finally {
+      setSecurityLoading(false);
     }
   };
 
@@ -1060,14 +1075,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
               <div className="space-y-3">
                 <p className="text-xs text-slate-500">First verify your current password. We will then send a one-time code to your registered email.</p>
                 <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Current password" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs" />
-                <button type="button" onClick={startSecurityAction} className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold">Send OTP</button>
+                <button type="button" disabled={securityLoading} onClick={startSecurityAction} className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed">{securityLoading ? 'Sending verification code…' : 'Send OTP'}</button>
               </div>
             ) : (
               <div className="space-y-3">
                 <input inputMode="numeric" maxLength={6} value={securityOtp} onChange={e => setSecurityOtp(e.target.value.replace(/\D/g, ''))} placeholder="6-digit OTP" className="w-full text-center tracking-[0.3em] px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm" />
                 {securityMode === 'change' && <input type="password" minLength={8} value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs" />}
                 {securityMode === 'delete' && <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-3">This action permanently deletes your account and cannot be undone.</p>}
-                <button type="button" onClick={finishSecurityAction} className={`w-full py-2.5 rounded-xl text-white text-xs font-semibold ${securityMode === 'delete' ? 'bg-rose-700 hover:bg-rose-800' : 'bg-slate-900 hover:bg-slate-800'}`}>{securityMode === 'delete' ? 'Delete Account' : 'Change Password'}</button>
+                <button type="button" disabled={securityLoading} onClick={finishSecurityAction} className={`w-full py-2.5 rounded-xl text-white text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${securityMode === 'delete' ? 'bg-rose-700 hover:bg-rose-800' : 'bg-slate-900 hover:bg-slate-800'}`}>{securityLoading ? 'Verifying…' : (securityMode === 'delete' ? 'Delete Account' : 'Change Password')}</button>
               </div>
             )}
           </div>
