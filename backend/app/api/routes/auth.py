@@ -8,6 +8,7 @@ from app.schemas.auth import (
     EmailOTPRequest, ResendOTPRequest, ForgotPasswordRequest,
     ForgotPasswordConfirmRequest, ChangePasswordRequest,
     ChangePasswordConfirmRequest, DeleteAccountRequest, DeleteAccountConfirmRequest,
+    OrganizationRoleCreateRequest,
 )
 from app.services import auth_service
 from app.core.security import create_access_token
@@ -64,6 +65,33 @@ def add_role(body: AddRoleRequest, current_user: dict = Depends(get_current_user
 @router.post("/active-role")
 def set_active_role(body: SetActiveRoleRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     return auth_service.set_active_role(db, current_user["id"], body.role)
+
+
+@router.get("/organization-roles")
+def list_organization_roles(current_user: dict = Depends(get_current_user), db=Depends(get_db)):
+    return {"roles": auth_service.list_organization_roles(db, current_user["id"])}
+
+
+@router.post("/organization-roles")
+def add_organization_role(
+    body: OrganizationRoleCreateRequest,
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    role = auth_service.add_organization_role(
+        db, current_user["id"], body.name, body.description
+    )
+    return {"success": True, "role": role}
+
+
+@router.delete("/organization-roles/{role_id}")
+def delete_organization_role(
+    role_id: str,
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    auth_service.delete_organization_role(db, current_user["id"], role_id)
+    return {"success": True}
 
 
 @router.post("/forgot-password/request")

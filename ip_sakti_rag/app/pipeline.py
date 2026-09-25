@@ -21,7 +21,7 @@ from app.classification import classify_product
 from app.database.mongo import save_chat
 from app.config import settings
 from app.generation.grounded_generator import generate_grounded_answer
-from app.ingestion.metadata import load_processed_documents
+from app.ingestion.metadata import load_manifest, load_processed_documents
 from app.jurisdiction import detect_jurisdiction
 from app.retrieval.graph import KnowledgeGraphContext
 from app.retrieval.tkdl_connector import TKDLConnector
@@ -54,7 +54,26 @@ from app.schemas import (
 class IPSaktiRAG:
     def __init__(self):
         chunks = _load_chunks(settings.processed_chunks_file)
-        self.documents: list[DocumentMetadata] = load_processed_documents(settings.processed_documents_file)
+        processed_documents = load_processed_documents(settings.processed_documents_file)
+
+        # Official statutory URLs are authoritative only when they come from
+        # the current manifest.json. The processed JSONL may be stale after a
+        # manifest-only URL correction, so overlay the current manifest URL at
+        # service startup without changing any other document metadata.
+        manifest_by_id = {
+            meta.id: meta
+            for meta in load_manifest(settings.documents_dir).values()
+        }
+        self.documents: list[DocumentMetadata] = [
+            doc.model_copy(
+                update={
+                    "url": manifest_by_id.get(doc.id).url
+                    if manifest_by_id.get(doc.id) is not None
+                    else None
+                }
+            )
+            for doc in processed_documents
+        ]
         self.retriever = HybridRetriever(chunks, self.documents)
         self.graph = KnowledgeGraphContext()
         self.tkdl = TKDLConnector()
@@ -360,7 +379,7 @@ class IPSaktiRAG:
         summary, official url, chunk_count...), so those chunk dicts were
         being rendered as if they were documents: `doc.summary`/`doc.url`/
         `doc.chunk_count`/`doc.id` are all undefined on a DocumentChunk,
-        which is why result cards showed no "Official Source" link and
+        which is why result cards showed no official link and
         "Inspect Sections" opened nothing. Now returns real DocumentMetadata
         for the matched documents (ranked by their best-matching chunk),
         plus the matching chunks themselves for the "Inspect Sections" panel.

@@ -238,9 +238,11 @@ function AppContent() {
       />
 
       {/* Main Viewport Container */}
-      <div className="flex-1 w-full pt-14 lg:pt-24 pb-20 lg:pb-0">
+      <div className="flex-1 w-full min-w-0 pt-14 xl:pt-24 pb-20 xl:pb-0">
         <ErrorBoundary key={activeTab} onReset={() => setActiveTab("landing")}>
-          {renderCurrentView()}
+          <main className="w-full max-w-[1800px] mx-auto min-w-0">
+            {renderCurrentView()}
+          </main>
         </ErrorBoundary>
       </div>
 

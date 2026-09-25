@@ -21,6 +21,41 @@ EXPERT_TYPES = {
 }
 
 
+def _default_organization_role() -> dict:
+    return {
+        "id": "org-role-admin",
+        "name": "Admin",
+        "description": "Organization-level administrator who manages organizational roles and oversight.",
+        "is_default": True,
+        "created_at": datetime.now(timezone.utc),
+    }
+
+
+def _ensure_organization_roles(db, user_doc: dict) -> dict:
+    roles = user_doc.get("roles") or [user_doc.get("role")]
+    organization_roles = list(user_doc.get("organization_roles") or [])
+    if "Organization" in roles and not any(item.get("id") == "org-role-admin" for item in organization_roles):
+        organization_roles.insert(0, _default_organization_role())
+        db[COLLECTION].update_one(
+            {"_id": user_doc["_id"]},
+            {"$set": {"organization_roles": organization_roles, "updated_at": datetime.now(timezone.utc)}},
+        )
+        user_doc["organization_roles"] = organization_roles
+    else:
+        user_doc["organization_roles"] = organization_roles
+    return user_doc
+
+
+def _require_organization(db, user_id: str) -> dict:
+    user_doc = db[COLLECTION].find_one({"_id": user_id})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found.")
+    roles = user_doc.get("roles") or [user_doc.get("role")]
+    if "Organization" not in roles:
+        raise HTTPException(status_code=403, detail="Organization role is required for organization role management.")
+    return _ensure_organization_roles(db, user_doc)
+
+
 def _validate_roles(roles: list[str]) -> None:
     unknown = [r for r in roles if r not in ALLOWED_ROLES]
     if unknown:
@@ -110,6 +145,7 @@ def register_user(db, name: str, email: str, password: str, roles: list[str], pr
         "password_hash": hash_password(password),
         "roles": roles,
         "role": roles[0],
+        "organization_roles": [_default_organization_role()] if "Organization" in roles else [],
         "preferred_language": preferred_language,
         "expert_type": expert_type,
         "created_at": datetime.now(timezone.utc),
@@ -133,6 +169,8 @@ def authenticate_user(db, email: str, password: str) -> dict:
     user_doc = db[COLLECTION].find_one({"email": email_normalized})
     if not user_doc or not verify_password(password, user_doc.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    user_doc = _ensure_organization_roles(db, user_doc)
 
     if get_settings().require_email_verification and not user_doc.get("email_verified", True):
         raise HTTPException(status_code=403, detail="Please verify your email before signing in.", headers={"X-Auth-Code": "email_not_verified"})
@@ -187,6 +225,7 @@ def verify_email(db, email: str, otp: str) -> dict:
         roles=pending.get("roles") or [pending["role"]],
         preferred_language=pending.get("preferred_language", "en"),
         expert_type=pending.get("expert_type"),
+        organization_roles=pending.get("organization_roles"),
     )
     user_doc["email_verified"] = True
     user_doc["email_verified_at"] = now
@@ -210,7 +249,9 @@ def resend_otp(db, email: str) -> None:
 
 def get_user_by_id(db, user_id: str) -> dict | None:
     user_doc = db[COLLECTION].find_one({"_id": user_id})
-    return to_dict(user_doc) if user_doc else None
+    if not user_doc:
+        return None
+    return to_dict(_ensure_organization_roles(db, user_doc))
 
 
 def get_user_doc(db, user_id: str) -> dict | None:
@@ -236,7 +277,7 @@ def add_role(db, user_id: str, role: str, expert_type: str | None = None) -> dic
             updates["expert_type"] = expert_type
         db[COLLECTION].update_one({"_id": user_id}, {"$set": updates})
         user_doc.update(updates)
-    return to_dict(user_doc)
+    return to_dict(_ensure_organization_roles(db, user_doc))
 
 
 def set_active_role(db, user_id: str, role: str) -> dict:
@@ -248,7 +289,67 @@ def set_active_role(db, user_id: str, role: str) -> dict:
         raise HTTPException(status_code=400, detail="This role is not available for this account.")
     db[COLLECTION].update_one({"_id": user_id}, {"$set": {"role": role, "updated_at": datetime.now(timezone.utc)}})
     user_doc["role"] = role
-    return to_dict(user_doc)
+    return to_dict(_ensure_organization_roles(db, user_doc))
+
+
+def list_organization_roles(db, user_id: str) -> list[dict]:
+    user_doc = _require_organization(db, user_id)
+    roles = user_doc.get("organization_roles") or []
+    return [
+        {
+            **item,
+            "created_at": item.get("created_at").isoformat()
+            if item.get("created_at") else None,
+        }
+        for item in roles
+    ]
+
+
+def add_organization_role(db, user_id: str, name: str, description: str = "") -> dict:
+    user_doc = _require_organization(db, user_id)
+    clean_name = " ".join(name.split())
+    clean_description = description.strip()
+    if len(clean_name) < 2 or len(clean_name) > 60:
+        raise HTTPException(status_code=400, detail="Organization role name must be between 2 and 60 characters.")
+    existing = [item.get("name", "").strip().casefold() for item in user_doc.get("organization_roles") or []]
+    if clean_name.casefold() in existing:
+        raise HTTPException(status_code=409, detail="That organization role already exists.")
+
+    role = {
+        "id": f"org-role-{secrets.token_hex(6)}",
+        "name": clean_name,
+        "description": clean_description[:240],
+        "is_default": False,
+        "created_at": datetime.now(timezone.utc),
+    }
+    roles = [*(user_doc.get("organization_roles") or []), role]
+    db[COLLECTION].update_one(
+        {"_id": user_id},
+        {"$set": {"organization_roles": roles, "updated_at": datetime.now(timezone.utc)}},
+    )
+    return {
+        **role,
+        "created_at": role["created_at"].isoformat(),
+    }
+
+
+def delete_organization_role(db, user_id: str, role_id: str) -> None:
+    user_doc = _require_organization(db, user_id)
+    roles = user_doc.get("organization_roles") or []
+    target = next((item for item in roles if item.get("id") == role_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="Organization role not found.")
+    if target.get("is_default") or target.get("id") == "org-role-admin":
+        raise HTTPException(status_code=400, detail="The default organization Admin role cannot be removed.")
+    db[COLLECTION].update_one(
+        {"_id": user_id},
+        {
+            "$set": {
+                "organization_roles": [item for item in roles if item.get("id") != role_id],
+                "updated_at": datetime.now(timezone.utc),
+            }
+        },
+    )
 
 
 def request_security_otp(db, user_doc: dict, purpose: str, current_password: str | None = None) -> None:

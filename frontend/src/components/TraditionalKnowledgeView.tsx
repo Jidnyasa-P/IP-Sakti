@@ -522,7 +522,7 @@ export const TraditionalKnowledgeView: React.FC<
                       </div>
                       <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
                         <span className="text-[10px] text-slate-400 font-medium">
-                          Official Reference
+                          Official link
                         </span>
                         <span className="inline-flex items-center gap-1 font-semibold text-emerald-800 group-hover:text-emerald-950 group-hover:underline">
                           <span>View Full Citation</span>

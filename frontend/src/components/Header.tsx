@@ -520,7 +520,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* ------------------------------------------------------- */}
 
         {isLoggedIn && currentUser ? (
-          <div className="hidden md:flex items-center gap-1.5 pl-1.5 xl:pl-2 border-l border-slate-200 shrink-0">
+          <div className="hidden xl:flex items-center gap-1.5 pl-1.5 xl:pl-2 border-l border-slate-200 shrink-0">
 
             <button
               type="button"
@@ -562,7 +562,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           </div>
         ) : (
-          <div className="hidden md:flex items-center gap-1.5 xl:gap-2 pl-1.5 xl:pl-2 border-l border-slate-200 shrink-0">
+          <div className="hidden xl:flex items-center gap-1.5 xl:gap-2 pl-1.5 xl:pl-2 border-l border-slate-200 shrink-0">
 
             <button
               type="button"
@@ -600,7 +600,7 @@ export const Header: React.FC<HeaderProps> = ({
           type="button"
           id="mobile-menu-toggle-btn"
           onClick={() => setMobileMenuOpen(true)}
-          className="lg:hidden p-1.5 sm:p-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center justify-center shadow-xs shrink-0"
+          className="xl:hidden p-1.5 sm:p-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center justify-center shadow-xs shrink-0"
           aria-label="Open Navigation Menu"
         >
           <Menu className="w-5 h-5" />
@@ -617,7 +617,7 @@ export const Header: React.FC<HeaderProps> = ({
 
     {isLoggedIn && (
       <nav
-        className="hidden lg:flex items-center justify-center gap-1.5 xl:gap-3 min-h-[2.75rem] xl:min-h-[3rem] border-t border-slate-100 overflow-x-auto px-1"
+        className="hidden xl:flex items-center justify-center gap-1.5 xl:gap-3 min-h-[2.75rem] xl:min-h-[3rem] border-t border-slate-100 overflow-x-auto px-1"
         aria-label="Primary Navigation"
       >
         {navItems.map((item) => {
@@ -663,7 +663,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Mobile Slide-Out Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-50 xl:hidden">
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
@@ -972,7 +972,7 @@ export const Header: React.FC<HeaderProps> = ({
 {isLoggedIn && (
   <nav
     id="mobile-bottom-nav"
-    className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 py-1 px-1 sm:px-2 flex justify-around items-center shadow-lg"
+    className="xl:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 py-1 px-1 sm:px-2 flex justify-around items-center shadow-lg"
     aria-label="Mobile Bottom Navigation"
   >
         <button

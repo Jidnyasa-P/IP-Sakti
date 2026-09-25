@@ -279,7 +279,7 @@ export const ResearchView: React.FC<ResearchViewProps> = ({ onOpenCitation, onSa
                         className="inline-flex items-center gap-1 font-medium text-[11px] text-emerald-800 hover:text-emerald-950 hover:underline"
                         title="Open official statutory portal"
                       >
-                        <span>Official Source</span>
+                        <span>Official link</span>
                         <ExternalLink className="w-3 h-3" />
                       </a>
                     )}

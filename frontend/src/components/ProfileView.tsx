@@ -26,10 +26,11 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ActiveTab } from './Header';
-import { Language, UserRole, ALL_ROLES, ROLE_DEFINITIONS, normalizeRole, SUPPORTED_LANGUAGES, LANGUAGES_MAP, ExpertCertificate } from '../types';
+import { Language, UserRole, ALL_ROLES, ROLE_DEFINITIONS, normalizeRole, SUPPORTED_LANGUAGES, LANGUAGES_MAP, ExpertCertificate, OrganizationRole } from '../types';
 import { useTranslation } from '../context/LanguageContext';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { ExpertVerificationModal } from './ExpertVerificationModal';
+import { authFetch } from './auth/authStorage';
 
 interface ProfileViewProps {
   setActiveTab: (tab: ActiveTab) => void;
@@ -67,6 +68,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
   const [securityError, setSecurityError] = useState<string | null>(null);
   const [securityLoading, setSecurityLoading] = useState(false);
 
+  const [organizationRoles, setOrganizationRoles] = useState<OrganizationRole[]>([]);
+  const [organizationRoleName, setOrganizationRoleName] = useState('');
+  const [organizationRoleDescription, setOrganizationRoleDescription] = useState('');
+  const [organizationRoleLoading, setOrganizationRoleLoading] = useState(false);
+  const [organizationRoleError, setOrganizationRoleError] = useState<string | null>(null);
+  const hasOrganizationRole = Boolean(
+    currentUser?.roles?.some((item) => normalizeRole(item) === 'Organization') ||
+    normalizeRole(currentUser?.role) === 'Organization'
+  );
+
   // Sync state with currentUser changes
   useEffect(() => {
     if (currentUser) {
@@ -81,6 +92,83 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
       setEditSelectedRoles(currentRoles);
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!hasOrganizationRole) {
+      setOrganizationRoles([]);
+      setOrganizationRoleError(null);
+      return () => { active = false; };
+    }
+
+    authFetch('/api/auth/organization-roles')
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Could not load organization roles.');
+        return res.json();
+      })
+      .then((data) => {
+        if (active) {
+          setOrganizationRoles(Array.isArray(data?.roles) ? data.roles : []);
+          setOrganizationRoleError(null);
+        }
+      })
+      .catch((err) => {
+        if (active) setOrganizationRoleError(err instanceof Error ? err.message : 'Could not load organization roles.');
+      });
+
+    return () => { active = false; };
+  }, [hasOrganizationRole]);
+
+  const handleAddOrganizationRole = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (organizationRoleLoading) return;
+    const nameValue = organizationRoleName.trim();
+    if (nameValue.length < 2) {
+      setOrganizationRoleError('Role name must contain at least 2 characters.');
+      return;
+    }
+
+    setOrganizationRoleLoading(true);
+    setOrganizationRoleError(null);
+    try {
+      const res = await authFetch('/api/auth/organization-roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nameValue, description: organizationRoleDescription.trim() }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.detail || 'Could not add organization role.');
+      }
+      const payload = await res.json();
+      if (payload?.role) setOrganizationRoles((previous) => [...previous, payload.role]);
+      setOrganizationRoleName('');
+      setOrganizationRoleDescription('');
+    } catch (err) {
+      setOrganizationRoleError(err instanceof Error ? err.message : 'Could not add organization role.');
+    } finally {
+      setOrganizationRoleLoading(false);
+    }
+  };
+
+  const handleDeleteOrganizationRole = async (roleId: string) => {
+    if (organizationRoleLoading) return;
+    setOrganizationRoleLoading(true);
+    setOrganizationRoleError(null);
+    try {
+      const res = await authFetch(`/api/auth/organization-roles/${encodeURIComponent(roleId)}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.detail || 'Could not remove organization role.');
+      }
+      setOrganizationRoles((previous) => previous.filter((item) => item.id !== roleId));
+    } catch (err) {
+      setOrganizationRoleError(err instanceof Error ? err.message : 'Could not remove organization role.');
+    } finally {
+      setOrganizationRoleLoading(false);
+    }
+  };
 
   // Close edit dropdown on click outside
   useEffect(() => {
@@ -695,6 +783,63 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
                     </p>
                   </div>
                 </div>
+
+                {hasOrganizationRole && (
+                  <section className="p-4 sm:p-5 bg-white border border-purple-200 rounded-2xl shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 border-b border-slate-100 pb-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-purple-700 shrink-0" />
+                          <h3 className="text-sm font-semibold text-slate-900">Organization Role Monitor</h3>
+                        </div>
+                        <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
+                          Define and monitor organization-specific roles. These roles are separate from platform-level access roles.
+                        </p>
+                      </div>
+                      <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-purple-50 text-purple-900 border border-purple-200 shrink-0 self-start">
+                        {organizationRoles.length} Organization Roles
+                      </span>
+                    </div>
+
+                    {organizationRoleError && (
+                      <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800" role="alert">{organizationRoleError}</div>
+                    )}
+
+                    <form onSubmit={handleAddOrganizationRole} className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)_auto] gap-2.5 items-end">
+                      <label className="min-w-0">
+                        <span className="block text-[11px] font-semibold text-slate-700 mb-1">Role name</span>
+                        <input value={organizationRoleName} onChange={(e) => setOrganizationRoleName(e.target.value)} maxLength={60} placeholder="e.g. IP Counsel" className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600" />
+                      </label>
+                      <label className="min-w-0">
+                        <span className="block text-[11px] font-semibold text-slate-700 mb-1">Responsibilities / description</span>
+                        <input value={organizationRoleDescription} onChange={(e) => setOrganizationRoleDescription(e.target.value)} maxLength={240} placeholder="What this role monitors or manages" className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600" />
+                      </label>
+                      <button type="submit" disabled={organizationRoleLoading} className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-purple-800 hover:bg-purple-900 disabled:opacity-60 text-white text-xs font-semibold transition-colors whitespace-nowrap">
+                        <Plus className="w-3.5 h-3.5" />
+                        {organizationRoleLoading ? 'Saving...' : 'Add Role'}
+                      </button>
+                    </form>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {organizationRoles.map((item) => (
+                        <div key={item.id} className="min-w-0 p-3 rounded-xl border border-slate-200 bg-slate-50 flex flex-col gap-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-slate-900 truncate">{item.name}</div>
+                              {item.is_default && <span className="inline-flex mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200">Default</span>}
+                            </div>
+                            {!item.is_default && (
+                              <button type="button" onClick={() => handleDeleteOrganizationRole(item.id)} disabled={organizationRoleLoading} title="Remove organization role" className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-50 shrink-0">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 leading-snug break-words">{item.description || 'Organization-defined role.'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
                 {/* Statutory Accreditation Card (Expert Role) */}
                 {((currentUser.roles || [currentUser.role]).map(normalizeRole).includes('Expert') || currentUser.expertCertificate) && (

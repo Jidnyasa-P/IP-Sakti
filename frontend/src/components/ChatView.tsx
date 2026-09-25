@@ -2155,7 +2155,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                                   {/* Single action to open the popup with both links */}
                                   <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                                     <span className="text-[10px] text-slate-400 font-medium">
-                                      Official Reference
+                                      Official link
                                     </span>
                                     <span
                                       className={`inline-flex items-center gap-1 font-semibold text-xs group-hover:underline ${

@@ -158,6 +158,14 @@ export interface ExpertCertificate {
   status: 'Verified' | 'Pending_Verification';
 }
 
+export interface OrganizationRole {
+  id: string;
+  name: string;
+  description?: string;
+  is_default?: boolean;
+  created_at?: string | null;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -170,6 +178,7 @@ export interface User {
   organization?: string;
   expertCertificate?: ExpertCertificate;
   expert_type?: string;
+  organization_roles?: OrganizationRole[];
 }
 
 export interface DocumentMetadata {

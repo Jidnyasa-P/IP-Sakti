@@ -27,6 +27,16 @@ COLLECTION = "users"
 ALLOWED_ROLES = {"Practitioner", "Researcher", "Expert", "Admin", "Organization", "Startup"}
 
 
+def _default_organization_roles() -> list[dict]:
+    return [{
+        "id": "org-role-admin",
+        "name": "Admin",
+        "description": "Organization-level administrator who manages organizational roles and oversight.",
+        "is_default": True,
+        "created_at": datetime.now(timezone.utc),
+    }]
+
+
 def new_user(
     id: str,
     name: str,
@@ -36,14 +46,19 @@ def new_user(
     roles: list[str] | None = None,
     preferred_language: str = "en",
     expert_type: str | None = None,
+    organization_roles: list[dict] | None = None,
 ) -> dict:
+    normalized_roles = list(dict.fromkeys(roles or [role]))
+    if "Organization" in normalized_roles and organization_roles is None:
+        organization_roles = _default_organization_roles()
     return {
         "_id": id,
         "name": name,
         "email": email,
         "password_hash": password_hash,
         "role": role,
-        "roles": roles or [role],
+        "roles": normalized_roles,
+        "organization_roles": organization_roles or [],
         "preferred_language": preferred_language,
         "expert_type": expert_type,
         "email_verified": False,
@@ -62,6 +77,14 @@ def to_dict(doc: dict) -> dict:
         "email": doc.get("email"),
         "role": doc.get("role"),
         "roles": doc.get("roles") or [doc.get("role")],
+        "organization_roles": [
+            {
+                **item,
+                "created_at": item.get("created_at").isoformat()
+                if item.get("created_at") else None,
+            }
+            for item in (doc.get("organization_roles") or [])
+        ],
         "preferred_language": doc.get("preferred_language", "en"),
         "expert_type": doc.get("expert_type"),
         "email_verified": doc.get("email_verified", True),

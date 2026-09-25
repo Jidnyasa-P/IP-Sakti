@@ -62,12 +62,26 @@ class DeleteAccountConfirmRequest(BaseModel):
     otp: str = Field(min_length=6, max_length=8, pattern=r"^\d+$")
 
 
+class OrganizationRoleCreateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=60)
+    description: str = Field(default="", max_length=240)
+
+
+class OrganizationRolePublic(BaseModel):
+    id: str
+    name: str
+    description: str = ""
+    is_default: bool = False
+    created_at: Optional[str] = None
+
+
 class UserPublic(BaseModel):
     id: str
     name: str
     email: str
     role: str
     roles: list[str]
+    organization_roles: list[OrganizationRolePublic] = Field(default_factory=list)
     preferred_language: str
     expert_type: Optional[str] = None
     email_verified: bool = True
