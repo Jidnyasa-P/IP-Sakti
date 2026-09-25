@@ -95,9 +95,10 @@ def _send_resend(
         RESEND_API_URL,
         data=json.dumps(payload).encode("utf-8"),
         headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "IP-SAKTI-Sahayak/1.0",
         },
         method="POST",
     )
