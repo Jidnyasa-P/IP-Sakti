@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import require_role
 from app.database.session import get_db
 from app.models.expert_escalation import COLLECTION
+from app.services import email_service
 
 router = APIRouter(prefix="/api/expert-escalations")
 
@@ -34,6 +35,10 @@ def _to_dict(doc: dict) -> dict:
 @router.get("")
 def list_escalations(status: str | None = None, current_user: dict = Depends(require_role("Expert", "Admin")), db=Depends(get_db)):
     query = {"status": status} if status else {}
+    if "Admin" not in current_user.get("roles", []):
+        if not current_user.get("expert_type"):
+            return []
+        query["expert_type"] = current_user["expert_type"]
     rows = db[COLLECTION].find(query).sort("created_at", -1)
     return [_to_dict(r) for r in rows]
 
@@ -46,4 +51,11 @@ def update_escalation_status(escalation_id: str, status: str, current_user: dict
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Escalation not found.")
     doc = db[COLLECTION].find_one({"_id": escalation_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Escalation not found.")
+    if "Admin" not in current_user.get("roles", []) and doc.get("expert_type") != current_user.get("expert_type"):
+        raise HTTPException(status_code=403, detail="This escalation is assigned to another expert type.")
+    requester = db["users"].find_one({"_id": doc.get("user_id")})
+    if requester:
+        email_service.send_escalation_update(requester["email"], requester.get("name", "User"), status)
     return _to_dict(doc)

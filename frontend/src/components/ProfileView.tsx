@@ -30,14 +30,13 @@ import { Language, UserRole, ALL_ROLES, ROLE_DEFINITIONS, normalizeRole, SUPPORT
 import { useTranslation } from '../context/LanguageContext';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { ExpertVerificationModal } from './ExpertVerificationModal';
-import { changePassword, sendChangePasswordOtp, deleteAccount, authFetch } from './auth/authStorage';
 
 interface ProfileViewProps {
   setActiveTab: (tab: ActiveTab) => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
-  const { currentUser, logout, updateProfile, setActiveRole, addRole, removeRole } = useAuth();
+  const { currentUser, logout, updateProfile, setActiveRole, addRole, removeRole, requestChangePassword, confirmChangePassword, requestDeleteAccount, confirmDeleteAccount } = useAuth();
   const { setLanguage } = useTranslation();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -59,15 +58,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [isExpertModalOpen, setIsExpertModalOpen] = useState(false);
+  const [securityMode, setSecurityMode] = useState<'change' | 'delete' | null>(null);
+  const [securityStep, setSecurityStep] = useState<1 | 2>(1);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [securityOtp, setSecurityOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
   const [securityError, setSecurityError] = useState<string | null>(null);
-  const [changeCurrentPassword, setChangeCurrentPassword] = useState('');
-  const [changeOtp, setChangeOtp] = useState('');
-  const [changeNewPassword, setChangeNewPassword] = useState('');
-  const [changeOtpSent, setChangeOtpSent] = useState(false);
-  const [deletePassword, setDeletePassword] = useState('');
-  const [deleteOtp, setDeleteOtp] = useState('');
-  const [deleteOtpSent, setDeleteOtpSent] = useState(false);
 
   // Sync state with currentUser changes
   useEffect(() => {
@@ -94,40 +91,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  if (!currentUser) {
-    return (
-      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 bg-slate-50">
-        <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xs p-6 text-center space-y-4">
-          <div className="w-14 h-14 flex items-center justify-center mx-auto">
-            <img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="w-full h-full object-contain" />
-          </div>
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">Sign In Required</h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Please sign in or register to view and customize your statutory profile.
-            </p>
-          </div>
-          <div className="pt-2 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab('login')}
-              className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl"
-            >
-              Sign In to Your Account
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('landing')}
-              className="w-full py-2 px-4 text-xs text-slate-600 hover:text-slate-900 font-medium"
-            >
-              Return to Landing Page
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhotoError(null);
@@ -195,14 +158,50 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
 
   const languagesMap = LANGUAGES_MAP;
 
+  if (!currentUser) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 bg-slate-50">
+        <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xs p-6 text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto"><Shield className="w-6 h-6" /></div>
+          <div><h2 className="text-base font-semibold text-slate-900">Sign In Required</h2><p className="text-xs text-slate-500 mt-1">Please sign in or register to view and customize your statutory profile.</p></div>
+          <div className="pt-2 flex flex-col gap-2"><button type="button" onClick={() => setActiveTab('login')} className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl">Sign In to Your Account</button><button type="button" onClick={() => setActiveTab('landing')} className="w-full py-2 px-4 text-xs text-slate-600 hover:text-slate-900 font-medium">Return to Landing Page</button></div>
+        </div>
+      </div>
+    );
+  }
+
   const activeRoleNormalized = normalizeRole(currentUser.role);
   const roleMeta = ROLE_DEFINITIONS[activeRoleNormalized] || {
-    id: activeRoleNormalized,
-    label: activeRoleNormalized,
-    badge: activeRoleNormalized,
+    id: activeRoleNormalized, label: activeRoleNormalized, badge: activeRoleNormalized,
     title: `${activeRoleNormalized} Profile`,
     desc: 'Authorized access to the IP-SAKTI AYUSH and Patent Decision Engine.',
     pillBg: 'bg-emerald-50 text-emerald-900 border-emerald-200'
+  };
+
+  const closeSecurity = () => {
+    setSecurityMode(null); setSecurityStep(1); setCurrentPassword(''); setSecurityOtp(''); setNewPassword(''); setSecurityMessage(null); setSecurityError(null);
+  };
+
+  const startSecurityAction = async () => {
+    setSecurityError(null); setSecurityMessage(null);
+    if (!currentPassword) { setSecurityError('Enter your current password.'); return; }
+    const result = securityMode === 'change' ? await requestChangePassword(currentPassword) : await requestDeleteAccount(currentPassword);
+    if (result.success) { setSecurityStep(2); setSecurityMessage('A verification code has been sent to your email.'); }
+    else setSecurityError(result.error || 'Could not start this security action.');
+  };
+
+  const finishSecurityAction = async () => {
+    setSecurityError(null);
+    if (securityMode === 'change') {
+      if (newPassword.length < 8) { setSecurityError('New password must be at least 8 characters.'); return; }
+      const result = await confirmChangePassword(securityOtp, newPassword);
+      if (result.success) { setSecurityMessage('Password changed successfully.'); setTimeout(closeSecurity, 900); }
+      else setSecurityError(result.error || 'Could not change password.');
+    } else {
+      const result = await confirmDeleteAccount(securityOtp);
+      if (result.success) { setActiveTab('landing'); }
+      else setSecurityError(result.error || 'Could not delete account.');
+    }
   };
 
   return (
@@ -1037,32 +1036,43 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ setActiveTab }) => {
         </div>
       </div>
 
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-8">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-5">
-          <div><h3 className="text-sm font-semibold text-slate-900">Account security</h3><p className="text-xs text-slate-500 mt-1">Change your password or permanently delete your account.</p></div>
-          {securityError && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{securityError}</div>}
-          {securityMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{securityMessage}</div>}
-          <div className="grid lg:grid-cols-2 gap-5">
-            <div className="rounded-xl border border-slate-200 p-4 space-y-3">
-              <h4 className="text-xs font-semibold text-slate-800">Change password</h4>
-              <input type="password" value={changeCurrentPassword} onChange={e => setChangeCurrentPassword(e.target.value)} placeholder="Current password" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-xs" />
-              <input type="password" value={changeNewPassword} onChange={e => setChangeNewPassword(e.target.value)} placeholder="New password" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-xs" />
-              {!changeOtpSent ? <button type="button" onClick={async () => { try { if (!changeCurrentPassword) throw new Error('Enter your current password first.'); await sendChangePasswordOtp(); setChangeOtpSent(true); setSecurityError(null); setSecurityMessage('OTP sent to your registered email.'); } catch (err) { setSecurityError(err instanceof Error ? err.message : 'Could not send OTP.'); setSecurityMessage(null); } }} className="w-full rounded-lg bg-slate-900 px-3 py-2.5 text-xs font-semibold text-white">Verify & send OTP</button> : <>
-                <input value={changeOtp} onChange={e => setChangeOtp(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" placeholder="Email OTP" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-xs text-center tracking-[0.25em]" />
-                <button type="button" onClick={async () => { try { await changePassword(changeCurrentPassword, changeOtp, changeNewPassword); setSecurityMessage('Password changed successfully.'); setSecurityError(null); setChangeCurrentPassword(''); setChangeNewPassword(''); setChangeOtp(''); setChangeOtpSent(false); } catch (err) { setSecurityError(err instanceof Error ? err.message : 'Could not change password.'); } }} className="w-full rounded-lg bg-emerald-800 px-3 py-2.5 text-xs font-semibold text-white">Change password</button>
-              </>}
-            </div>
-            <div className="rounded-xl border border-rose-200 bg-rose-50/30 p-4 space-y-3">
-              <h4 className="text-xs font-semibold text-rose-800">Delete account</h4><p className="text-[11px] text-slate-600">This permanently removes your account and application data.</p>
-              <input type="password" value={deletePassword} onChange={e => setDeletePassword(e.target.value)} placeholder="Current password" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-xs" />
-              {!deleteOtpSent ? <button type="button" onClick={async () => { try { if (!deletePassword) throw new Error('Enter your current password first.'); const res = await authFetch('/api/auth/delete-account/send-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: deletePassword }) }); if (!res.ok) throw new Error('Could not send OTP.'); setDeleteOtpSent(true); setSecurityMessage('OTP sent to your registered email.'); setSecurityError(null); } catch (err) { setSecurityError(err instanceof Error ? err.message : 'Could not send OTP.'); } }} className="w-full rounded-lg border border-rose-300 bg-white px-3 py-2.5 text-xs font-semibold text-rose-700">Send deletion OTP</button> : <>
-                <input value={deleteOtp} onChange={e => setDeleteOtp(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" placeholder="Email OTP" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-xs text-center tracking-[0.25em]" />
-                <button type="button" onClick={async () => { if (!window.confirm('Delete your account permanently? This cannot be undone.')) return; try { await deleteAccount(deletePassword, deleteOtp); logout(); setActiveTab('landing'); } catch (err) { setSecurityError(err instanceof Error ? err.message : 'Could not delete account.'); } }} className="w-full rounded-lg bg-rose-700 px-3 py-2.5 text-xs font-semibold text-white">Delete account permanently</button>
-              </>}
-            </div>
+      {/* Account Security */}
+      <div className="max-w-4xl mx-auto mt-5 bg-white border border-slate-200 rounded-2xl shadow-xs p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Account Security</h2>
+            <p className="text-[11px] text-slate-500 mt-1">Manage your password or permanently delete your account.</p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => { setSecurityMode('change'); setSecurityStep(1); setSecurityMessage(null); setSecurityError(null); }} className="px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">Change Password</button>
+            <button type="button" onClick={() => { setSecurityMode('delete'); setSecurityStep(1); setSecurityMessage(null); setSecurityError(null); }} className="px-3 py-2 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold">Delete Account</button>
           </div>
         </div>
-      </section>
+      </div>
+
+      {securityMode && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between"><h3 className="text-base font-semibold text-slate-900">{securityMode === 'change' ? 'Change Password' : 'Delete Account'}</h3><button type="button" onClick={closeSecurity} className="text-slate-400 hover:text-slate-800">✕</button></div>
+            {securityError && <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">{securityError}</div>}
+            {securityMessage && <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">{securityMessage}</div>}
+            {securityStep === 1 ? (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-500">First verify your current password. We will then send a one-time code to your registered email.</p>
+                <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Current password" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs" />
+                <button type="button" onClick={startSecurityAction} className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold">Send OTP</button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <input inputMode="numeric" maxLength={6} value={securityOtp} onChange={e => setSecurityOtp(e.target.value.replace(/\D/g, ''))} placeholder="6-digit OTP" className="w-full text-center tracking-[0.3em] px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm" />
+                {securityMode === 'change' && <input type="password" minLength={8} value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs" />}
+                {securityMode === 'delete' && <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-3">This action permanently deletes your account and cannot be undone.</p>}
+                <button type="button" onClick={finishSecurityAction} className={`w-full py-2.5 rounded-xl text-white text-xs font-semibold ${securityMode === 'delete' ? 'bg-rose-700 hover:bg-rose-800' : 'bg-slate-900 hover:bg-slate-800'}`}>{securityMode === 'delete' ? 'Delete Account' : 'Change Password'}</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Camera Capture Modal */}
       <CameraCaptureModal

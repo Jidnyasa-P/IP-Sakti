@@ -14,10 +14,12 @@ def new_expert_escalation(
     recommended: bool = False,
     status: str = "pending",
     expert_type: str | None = None,
+    user_id: str | None = None,
 ) -> dict:
     return {
         "_id": id,
         "conversation_id": conversation_id,
+        "user_id": user_id,
         "recommended": recommended,
         "reason": reason,
         "case_summary": case_summary,

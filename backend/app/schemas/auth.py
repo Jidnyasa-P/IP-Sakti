@@ -1,11 +1,4 @@
-"""Pydantic request/response models for /api/auth/*.
-
-Field names and shapes mirror exactly what the frontend already sends —
-see frontend/src/context/AuthContext.tsx's RegisterParams and the
-`register`/`login` calls in RegisterView.tsx / LoginView.tsx — so no
-frontend request-building code needs to change, only authStorage.ts's
-transport (localStorage -> fetch).
-"""
+"""Pydantic request/response models for authentication and account security."""
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
 
@@ -26,10 +19,47 @@ class LoginRequest(BaseModel):
 
 class AddRoleRequest(BaseModel):
     role: str
+    expert_type: Optional[str] = None
 
 
 class SetActiveRoleRequest(BaseModel):
     role: str
+
+
+class EmailOTPRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=6, max_length=8, pattern=r"^\d+$")
+
+
+class ResendOTPRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordConfirmRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=6, max_length=8, pattern=r"^\d+$")
+    new_password: str = Field(min_length=6)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1)
+
+
+class ChangePasswordConfirmRequest(BaseModel):
+    otp: str = Field(min_length=6, max_length=8, pattern=r"^\d+$")
+    new_password: str = Field(min_length=6)
+
+
+class DeleteAccountRequest(BaseModel):
+    current_password: str = Field(min_length=1)
+
+
+class DeleteAccountConfirmRequest(BaseModel):
+    otp: str = Field(min_length=6, max_length=8, pattern=r"^\d+$")
 
 
 class UserPublic(BaseModel):
@@ -39,39 +69,12 @@ class UserPublic(BaseModel):
     role: str
     roles: list[str]
     preferred_language: str
+    expert_type: Optional[str] = None
+    email_verified: bool = True
+    email_verified_at: Optional[str] = None
     created_at: Optional[str] = None
 
 
 class AuthResponse(BaseModel):
     token: str
     user: UserPublic
-
-
-class VerifyEmailRequest(BaseModel):
-    email: EmailStr
-    otp: str = Field(min_length=6, max_length=6)
-
-
-class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
-
-
-class ResetPasswordRequest(BaseModel):
-    email: EmailStr
-    otp: str = Field(min_length=6, max_length=6)
-    new_password: str = Field(min_length=6)
-
-
-class ChangePasswordRequest(BaseModel):
-    current_password: str
-    otp: str = Field(min_length=6, max_length=6)
-    new_password: str = Field(min_length=6)
-
-
-class DeleteAccountRequest(BaseModel):
-    password: str
-    otp: str = Field(min_length=6, max_length=6)
-
-
-class PasswordVerificationRequest(BaseModel):
-    password: str

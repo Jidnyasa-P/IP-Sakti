@@ -49,6 +49,8 @@ def new_user(
         "email_verified": False,
         "email_verified_at": None,
         "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+        "last_login_at": None,
     }
 
 
@@ -62,6 +64,7 @@ def to_dict(doc: dict) -> dict:
         "roles": doc.get("roles") or [doc.get("role")],
         "preferred_language": doc.get("preferred_language", "en"),
         "expert_type": doc.get("expert_type"),
-        "email_verified": bool(doc.get("email_verified", False)),
+        "email_verified": doc.get("email_verified", True),
+        "email_verified_at": doc.get("email_verified_at").isoformat() if doc.get("email_verified_at") else None,
         "created_at": doc["created_at"].isoformat() if doc.get("created_at") else None,
     }

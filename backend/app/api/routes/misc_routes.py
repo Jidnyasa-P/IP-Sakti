@@ -6,19 +6,20 @@ from app.database.session import get_db
 from app.models.citation import COLLECTION as SAVED_RESEARCH_COLLECTION, new_saved_research, to_dict as saved_research_to_dict
 from app.models.grievance import COLLECTION as GRIEVANCE_COLLECTION, new_grievance, to_dict as grievance_to_dict
 from app.schemas.chat import SaveResearchRequest, TranslateRequest, GrievanceCreateRequest, ContactRequest
-from app.services.email_service import send_contact_confirmation, send_contact_admin, send_email
 from app.translation.translation_service import get_translation_provider
 import app.rag_client as rag_client
+from app.core.config import get_settings
+from app.services import email_service
 
 router = APIRouter()
 
 
 @router.post("/api/contact")
 def contact(body: ContactRequest):
-    if not body.email or "@" not in body.email:
-        raise HTTPException(status_code=400, detail="Please provide a valid email address.")
-    send_contact_confirmation(body.email, body.name, body.subject)
-    send_contact_admin(body.name, body.email, body.subject, body.message)
+    settings = get_settings()
+    email_service.send_contact_confirmation(body.email, body.name, body.subject)
+    if settings.contact_recipient:
+        email_service.send_contact_admin(settings.contact_recipient, body.name, body.email, body.subject, body.message)
     return {"success": True, "message": "Your message has been received. A confirmation email has been sent."}
 
 
@@ -37,7 +38,8 @@ async def research_search(query: str = "", authority: str = "", topic: str = "",
 
 @router.get("/api/workspace/saved-research")
 def list_saved_research(current_user: dict = Depends(get_current_user), db=Depends(get_db)):
-    query = {"user_id": current_user["id"]}
+    is_admin = "Admin" in current_user.get("roles", [])
+    query = {} if is_admin else {"user_id": current_user["id"]}
     rows = db[SAVED_RESEARCH_COLLECTION].find(query).sort("created_at", -1)
     return [saved_research_to_dict(r) for r in rows]
 
@@ -56,7 +58,8 @@ def save_research(body: SaveResearchRequest, current_user: dict = Depends(get_cu
 def delete_saved_research(research_id: str, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     row = db[SAVED_RESEARCH_COLLECTION].find_one({"_id": research_id})
     if row:
-        if row.get("user_id") != current_user["id"]:
+        is_admin = "Admin" in current_user.get("roles", [])
+        if not is_admin and row.get("user_id") != current_user["id"]:
             raise HTTPException(status_code=403, detail="You do not have access to this saved item.")
         db[SAVED_RESEARCH_COLLECTION].delete_one({"_id": research_id})
     return {"success": True}
@@ -131,7 +134,7 @@ def create_grievance(
         related_query=(body.related_query or "").strip() or None,
     )
     db[GRIEVANCE_COLLECTION].insert_one(record)
-    send_email(current_user["email"], "Your IP-SAKTI grievance was received", f"Hello {current_user.get('name', 'there')},\n\nYour grievance \"{record['subject']}\" has been received successfully.\n\nRegards,\nIP-SAKTI Sahayak")
+    email_service.send_grievance_confirmation(current_user["email"], current_user["name"], record["subject"])
     return grievance_to_dict(record)
 
 

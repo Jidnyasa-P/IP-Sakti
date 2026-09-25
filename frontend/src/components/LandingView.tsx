@@ -21,6 +21,7 @@ import { ActiveTab } from './Header';
 import { DisclaimerBanner } from './DisclaimerBanner';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { authFetch } from './auth/authStorage';
 
 interface LandingViewProps {
   setActiveTab: (tab: ActiveTab) => void;
@@ -36,6 +37,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
 
   const [contactSent, setContactSent] = useState(false);
   const [contactError, setContactError] = useState<string | null>(null);
+  const [contactSending, setContactSending] = useState(false);
 
   const handleActionClick = (targetTab: ActiveTab) => {
     if (isLoggedIn) {
@@ -79,17 +81,29 @@ export const LandingView: React.FC<LandingViewProps> = ({
   const handleContactSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setContactError(null);
+    setContactSent(false);
+    setContactSending(true);
     const form = event.currentTarget;
     const data = new FormData(form);
     try {
-      const res = await fetch(`${(import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')}/api/contact`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: data.get('name'), email: data.get('email'), subject: data.get('subject'), message: data.get('message') }),
+      const res = await authFetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: data.get('name'), email: data.get('email'), subject: data.get('subject'), message: data.get('message')
+        }),
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.detail || 'Could not send your message.');
-      setContactSent(true); form.reset();
-    } catch (err) { setContactError(err instanceof Error ? err.message : 'Could not send your message.'); }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || 'We could not send your message. Please try again.');
+      }
+      setContactSent(true);
+      form.reset();
+    } catch (err) {
+      setContactError(err instanceof Error ? err.message : 'We could not send your message.');
+    } finally {
+      setContactSending(false);
+    }
   };
 
   return (
@@ -349,13 +363,16 @@ export const LandingView: React.FC<LandingViewProps> = ({
             <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3">
               <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-3 text-sm font-semibold transition-colors">
                 <Send className="w-4 h-4" />
-                Send Message
+                {contactSending ? 'Sending...' : 'Send Message'}
               </button>
+              {contactError && (
+                <span className="text-sm text-rose-300 font-medium">{contactError}</span>
+              )}
               {contactSent && (
-                <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">Confirmation sent to your email.
+                <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+                  Thanks! Your message has been recorded for this session.
                 </span>
               )}
-              {contactError && <span className="text-sm text-rose-700 dark:text-rose-400 font-medium">{contactError}</span>}
             </div>
           </form>
         </div>

@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from bson import ObjectId
+from pymongo.errors import DuplicateKeyError
 
 from app.api.deps import get_current_user
 from app.database.session import get_db
@@ -10,21 +11,42 @@ from app.models.conversation import _json_safe
 from app.models.expert_escalation import COLLECTION as EXPERT_ESCALATIONS_COLLECTION, new_expert_escalation
 from app.models.feedback import COLLECTION as FEEDBACK_COLLECTION, new_feedback
 from app.schemas.chat import ChatRequest, QueryRequest, FeedbackRequest, NewConversationRequest, RenameConversationRequest
-from app.services import conversation_service, audit_service, expert_escalation_service
+from app.services import conversation_service, audit_service, expert_escalation_service, email_service
 from app.services.conversation_service import ConversationDeletedError
-from app.services.email_service import send_query_email, send_expert_request_email
 import app.rag_client as rag_client
 
 router = APIRouter()
 
 
-def current_user_email(db, user_id: str) -> str | None:
-    user = db["users"].find_one({"_id": user_id})
-    return user.get("email") if user else None
+def _mark_conversation_deleted(db, conversation_id: str, user_id: str, deleted_at: datetime) -> None:
+    """Create/update a deletion tombstone atomically and idempotently.
 
-def current_user_name(db, user_id: str) -> str:
-    user = db["users"].find_one({"_id": user_id})
-    return user.get("name", "there") if user else "there"
+    The deleted_conversations collection has a unique index on conversation_id.
+    A plain upsert can still raise DuplicateKeyError when two delete requests
+    arrive at the same time (for example, a double-click or retry). Treat that
+    race as success because the desired final state is already a tombstone.
+    """
+    value = str(conversation_id)
+    try:
+        db["deleted_conversations"].update_one(
+            {"conversation_id": value},
+            {
+                "$set": {"deleted_at": deleted_at},
+                "$setOnInsert": {
+                    "conversation_id": value,
+                    "user_id": user_id,
+                },
+            },
+            upsert=True,
+        )
+    except DuplicateKeyError:
+        # Another concurrent request inserted the same tombstone. Verify the
+        # marker exists; either way the conversation is already permanently
+        # deleted from the application's point of view.
+        db["deleted_conversations"].update_one(
+            {"conversation_id": value},
+            {"$set": {"deleted_at": deleted_at}},
+        )
 
 
 def _conversation_id_candidates(conversation_id: str) -> list:
@@ -102,25 +124,7 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
         })
         if conversation_id else None
     )
-
-    if existing_conv:
-        # Use the authenticated user's canonical stored ID.
-        working_conversation_id = str(existing_conv["_id"])
-    elif conversation_id:
-        requested_id = str(conversation_id)
-        # If the requested ID belongs to another account, never send that ID
-        # to the RAG service or attempt to persist it. Allocate a new ID for
-        # this user so accounts remain completely isolated.
-        foreign_conv = db[CONVERSATIONS_COLLECTION].find_one(
-            _conversation_lookup_filter(requested_id)
-        )
-        working_conversation_id = (
-            conversation_service.new_conversation_id()
-            if foreign_conv
-            else requested_id
-        )
-    else:
-        working_conversation_id = conversation_service.new_conversation_id()
+    working_conversation_id = existing_conv["_id"] if existing_conv else (conversation_id or conversation_service.new_conversation_id())
 
     # All retrieval + reasoning happens in the ip_sakti_rag microservice now.
     # FIXED: `jurisdiction` (the India/International toggle's value) used to
@@ -241,9 +245,8 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
             recommended=True,
             reason=escalation.reason,
             case_summary=escalation.case_summary,
+            user_id=user_id,
         ))
-
-    send_query_email(user_email := current_user_email(db, user_id), current_user_name(db, user_id), query) if user_email else None
 
     return {
         "conversation_id": conv["_id"],
@@ -399,11 +402,7 @@ async def delete_all_conversations(
             aliases.add(str(conv.get("conversation_id")))
         all_ids.update(aliases)
         for conversation_id in aliases:
-            db["deleted_conversations"].update_one(
-                {"conversation_id": conversation_id, "user_id": user_id},
-                {"$set": {"conversation_id": conversation_id, "user_id": user_id, "deleted_at": now}},
-                upsert=True,
-            )
+            _mark_conversation_deleted(db, conversation_id, user_id, now)
 
     if all_ids:
         db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": {"$in": list(all_ids)}})
@@ -464,17 +463,7 @@ async def delete_conversation(
     tombstone_ids = set(message_ids if conv else [str(conversation_id)])
     now = datetime.now(timezone.utc)
     for deleted_id in tombstone_ids:
-        db["deleted_conversations"].update_one(
-            {"conversation_id": deleted_id, "user_id": tombstone_user_id},
-            {
-                "$set": {
-                    "conversation_id": deleted_id,
-                    "user_id": tombstone_user_id,
-                    "deleted_at": now,
-                }
-            },
-            upsert=True,
-        )
+        _mark_conversation_deleted(db, deleted_id, tombstone_user_id, now)
 
     if conv:
         db[CHAT_MESSAGES_COLLECTION].delete_many({"conversation_id": {"$in": message_id_values}})

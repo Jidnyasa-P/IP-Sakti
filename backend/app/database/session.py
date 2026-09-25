@@ -28,7 +28,6 @@ _using_mock = False
 # collection_name -> list of (field_name, index_kwargs)
 COLLECTION_INDEXES = {
     "users": [("email", {"unique": True})],
-    "email_otps": [("email", {}), ("expires_at", {})],
     "conversations": [("user_id", {}), ("updated_at", {})],
     "deleted_conversations": [("conversation_id", {"unique": True}), ("user_id", {}), ("deleted_at", {})],
     "chat_messages": [("conversation_id", {}), ("created_at", {}), ("sequence", {})],
@@ -40,6 +39,7 @@ COLLECTION_INDEXES = {
     "feedback": [("conversation_id", {}), ("message_id", {})],
     "expert_escalations": [("conversation_id", {}), ("status", {})],
     "grievances": [("user_id", {}), ("created_at", {}), ("status", {})],
+    "email_otps": [("email", {}), ("purpose", {}), ("created_at", {})],
     "audit_logs": [("conversation_id", {}), ("created_at", {})],
     "user_ingested_documents": [("status", {}), ("created_at", {})],
 }

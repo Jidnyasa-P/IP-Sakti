@@ -45,6 +45,14 @@ import {
   dummySetActiveRole,
   getSessionUser,
   verifySession,
+  verifyEmail,
+  resendRegistrationOtp,
+  requestForgotPassword,
+  confirmForgotPassword,
+  requestChangePassword,
+  confirmChangePassword,
+  requestDeleteAccount,
+  confirmDeleteAccount,
 } from '../components/auth/authStorage';
 
 export interface RegisterData {
@@ -57,7 +65,7 @@ export interface RegisterData {
   photo_url?: string;
   organization?: string;
   expertCertificate?: ExpertCertificate;
-  expert_type?: 'ayurveda' | 'legal' | 'regulatory';
+  expert_type?: string;
 }
 
 export interface AuthContextType {
@@ -82,7 +90,17 @@ export interface AuthContextType {
   ) => Promise<{
     success: boolean;
     error?: string;
+    verificationRequired?: boolean;
+    email?: string;
   }>;
+  verifyRegistration: (email: string, otp: string) => Promise<{ success: boolean; error?: string }>;
+  resendRegistrationOtp: (email: string) => Promise<{ success: boolean; error?: string }>;
+  forgotPassword: (email: string, otp: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  requestForgotPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  requestChangePassword: (currentPassword: string) => Promise<{ success: boolean; error?: string }>;
+  confirmChangePassword: (otp: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  requestDeleteAccount: (currentPassword: string) => Promise<{ success: boolean; error?: string }>;
+  confirmDeleteAccount: (otp: string) => Promise<{ success: boolean; error?: string }>;
 
   logout: () => void;
 
@@ -136,6 +154,9 @@ function mergeClientOnlyFields(
 
     expertCertificate:
       serverUser.expertCertificate ?? previous.expertCertificate,
+
+    expert_type:
+      serverUser.expert_type ?? previous.expert_type,
   };
 }
 
@@ -199,7 +220,7 @@ export const AuthProvider: React.FC<{
     email: string,
     password?: string,
     expertCertificate?: ExpertCertificate,
-    rememberMe = true
+    rememberMe?: boolean
   ): Promise<{
     success: boolean;
     user?: User;
@@ -227,11 +248,7 @@ export const AuthProvider: React.FC<{
        * dummyLogin() performs the actual backend request and stores
        * the JWT in localStorage.
        */
-      const user = await dummyLogin(
-        email.trim(),
-        password,
-        rememberMe
-      );
+      const user = await dummyLogin(email.trim(), password, rememberMe);
 
       const mergedUser: User = expertCertificate
         ? {
@@ -272,6 +289,8 @@ export const AuthProvider: React.FC<{
   ): Promise<{
     success: boolean;
     error?: string;
+    verificationRequired?: boolean;
+    email?: string;
   }> => {
     setIsLoading(true);
 
@@ -318,7 +337,7 @@ export const AuthProvider: React.FC<{
       /*
        * REAL BACKEND REGISTER
        */
-      await dummyRegister({
+      const response = await dummyRegister({
         name: data.name.trim(),
         email: data.email.trim(),
         password: data.password,
@@ -327,8 +346,12 @@ export const AuthProvider: React.FC<{
         expert_type: data.expert_type,
       });
 
-      // Registration now requires email OTP verification before a session is created.
-      return { success: true };
+      // Registration now requires email verification before a session is created.
+      return {
+        success: true,
+        verificationRequired: response.email_verification?.required !== false,
+        email: data.email.trim(),
+      };
     } catch (err: unknown) {
       return {
         success: false,
@@ -340,6 +363,46 @@ export const AuthProvider: React.FC<{
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const verifyRegistration = async (email: string, otp: string) => {
+    try { await verifyEmail(email, otp); return { success: true }; }
+    catch (err) { return { success: false, error: err instanceof Error ? err.message : 'Verification failed.' }; }
+  };
+
+  const resendRegistration = async (email: string) => {
+    try { await resendRegistrationOtp(email); return { success: true }; }
+    catch (err) { return { success: false, error: err instanceof Error ? err.message : 'Could not resend the code.' }; }
+  };
+
+  const requestForgot = async (email: string) => {
+    try { await requestForgotPassword(email); return { success: true };
+    } catch (err) { return { success: false, error: err instanceof Error ? err.message : 'Could not start password reset.' }; }
+  };
+
+  const forgot = async (email: string, otp: string, newPassword: string) => {
+    try { await confirmForgotPassword(email, otp, newPassword); return { success: true };
+    } catch (err) { return { success: false, error: err instanceof Error ? err.message : 'Could not reset your password.' }; }
+  };
+
+  const requestChange = async (currentPassword: string) => {
+    try { await requestChangePassword(currentPassword); return { success: true };
+    } catch (err) { return { success: false, error: err instanceof Error ? err.message : 'Could not start password change.' }; }
+  };
+
+  const confirmChange = async (otp: string, newPassword: string) => {
+    try { await confirmChangePassword(otp, newPassword); return { success: true };
+    } catch (err) { return { success: false, error: err instanceof Error ? err.message : 'Could not change your password.' }; }
+  };
+
+  const requestDelete = async (currentPassword: string) => {
+    try { await requestDeleteAccount(currentPassword); return { success: true };
+    } catch (err) { return { success: false, error: err instanceof Error ? err.message : 'Could not start account deletion.' }; }
+  };
+
+  const confirmDelete = async (otp: string) => {
+    try { await confirmDeleteAccount(otp); setCurrentUser(null); return { success: true };
+    } catch (err) { return { success: false, error: err instanceof Error ? err.message : 'Could not delete your account.' }; }
   };
 
   /**
@@ -485,6 +548,14 @@ export const AuthProvider: React.FC<{
         authLoading: isLoading,
         login,
         register,
+        verifyRegistration,
+        resendRegistrationOtp: resendRegistration,
+        forgotPassword: forgot,
+        requestForgotPassword: requestForgot,
+        requestChangePassword: requestChange,
+        confirmChangePassword: confirmChange,
+        requestDeleteAccount: requestDelete,
+        confirmDeleteAccount: confirmDelete,
         logout,
         updateProfile,
         setActiveRole,

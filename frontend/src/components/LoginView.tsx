@@ -14,7 +14,6 @@ import { useAuth } from '../context/AuthContext';
 import { ActiveTab } from './Header';
 import { UserRole, ALL_ROLES, ExpertCertificate } from '../types';
 import { ExpertCertificateUpload, ExpertCertificateData } from './ExpertCertificateUpload';
-import { forgotPassword, resetPassword } from './auth/authStorage';
 
 interface LoginViewProps {
   setActiveTab: (tab: ActiveTab) => void;
@@ -25,7 +24,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
   setActiveTab,
   targetTabAfterLogin = 'chat',
 }) => {
-  const { login, isLoading, currentUser } = useAuth();
+  const { login, isLoading, currentUser, requestForgotPassword, forgotPassword } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,16 +35,20 @@ export const LoginView: React.FC<LoginViewProps> = ({
     useState<Partial<ExpertCertificateData> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [forgotMode, setForgotMode] = useState(false);
-  const [forgotOtpSent, setForgotOtpSent] = useState(false);
+  const [forgotStep, setForgotStep] = useState<'request' | 'reset'>('request');
+  const [forgotEmail, setForgotEmail] = useState('');
   const [forgotOtp, setForgotOtp] = useState('');
-  const [newPassword, setNewPassword] = useState('');
+  const [forgotPasswordValue, setForgotPasswordValue] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
   const [forgotMessage, setForgotMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const isExpertSelected = selectedRole === 'Expert';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
 
     if (!email.trim() || !password) {
       setError('Please enter your email address and password.');
@@ -100,27 +103,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
     }
   };
 
-  if (forgotMode) {
-    return (
-      <div className="min-h-[calc(100vh-4rem)] bg-slate-50 flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md">
-          <div className="mb-6 text-center"><div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center"><img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="h-full w-full object-contain" /></div><h1 className="text-2xl font-semibold text-slate-900">Reset your password</h1><p className="mt-1.5 text-sm text-slate-500">We will verify your email before changing the password.</p></div>
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-            {error && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{error}</div>}
-            {forgotMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{forgotMessage}</div>}
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email address" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-            {!forgotOtpSent ? <button type="button" onClick={async () => { try { await forgotPassword(email); setForgotOtpSent(true); setForgotMessage('If the account exists, a password reset OTP has been sent.'); setError(null); } catch (err) { setError(err instanceof Error ? err.message : 'Could not send OTP.'); } }} className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Send OTP</button> : <>
-              <input value={forgotOtp} onChange={e => setForgotOtp(e.target.value.replace(/\D/g, '').slice(0,6))} inputMode="numeric" placeholder="6-digit OTP" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-center tracking-[0.3em]" />
-              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-              <button type="button" onClick={async () => { try { await resetPassword(email, forgotOtp, newPassword); setForgotMode(false); setForgotOtpSent(false); setForgotMessage(null); setError(null); alert('Password reset successfully. Please sign in with your new password.'); } catch (err) { setError(err instanceof Error ? err.message : 'Could not reset password.'); } }} className="w-full rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white">Reset password</button>
-            </>}
-            <button type="button" onClick={() => { setForgotMode(false); setForgotOtpSent(false); setError(null); }} className="w-full text-xs font-semibold text-slate-500 hover:text-slate-800">Back to sign in</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-50 flex items-center justify-center px-4 py-10 sm:py-14">
       <div className="w-full max-w-md">
@@ -158,6 +140,12 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </div>
           )}
 
+          {successMessage && (
+            <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs leading-relaxed text-emerald-900">
+              {successMessage}
+            </div>
+          )}
+
           {error && (
             <div
               role="alert"
@@ -168,6 +156,41 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </div>
           )}
 
+          {forgotMode ? (
+            <div className="space-y-5">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">Forgot password</h2>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">Use the OTP sent to your registered email to set a new password.</p>
+              </div>
+
+              {forgotMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs leading-relaxed text-emerald-900">{forgotMessage}</div>}
+              {error && <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs leading-relaxed text-rose-800"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" /><span>{error}</span></div>}
+
+              <div>
+                <label htmlFor="forgot-email" className="mb-1.5 block text-xs font-semibold text-slate-700">Email address</label>
+                <div className="relative"><Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input id="forgot-email" type="email" required autoComplete="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="you@organization.in" className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10" /></div>
+              </div>
+
+              {forgotStep === 'reset' && (<>
+                <div>
+                  <label htmlFor="forgot-otp" className="mb-1.5 block text-xs font-semibold text-slate-700">Verification code</label>
+                  <input id="forgot-otp" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={forgotOtp} onChange={e => setForgotOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Enter 6-digit OTP" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm tracking-[0.3em] text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10" />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div><label htmlFor="forgot-new-password" className="mb-1.5 block text-xs font-semibold text-slate-700">New password</label><input id="forgot-new-password" type="password" value={forgotPasswordValue} onChange={e => setForgotPasswordValue(e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10" /></div>
+                  <div><label htmlFor="forgot-confirm-password" className="mb-1.5 block text-xs font-semibold text-slate-700">Confirm password</label><input id="forgot-confirm-password" type="password" value={forgotConfirmPassword} onChange={e => setForgotConfirmPassword(e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10" /></div>
+                </div>
+              </>)}
+
+              {forgotStep === 'request' ? (
+                <button type="button" disabled={isLoading || !forgotEmail.trim()} onClick={async () => { setError(null); setForgotMessage(null); const result = await requestForgotPassword(forgotEmail.trim()); if (result.success) { setForgotStep('reset'); setForgotMessage('If the account exists, a 6-digit verification code has been sent to your email.'); } else setError(result.error || 'Could not start password reset.'); }} className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60">Send OTP</button>
+              ) : (
+                <button type="button" disabled={isLoading || forgotOtp.length !== 6 || !forgotPasswordValue || forgotPasswordValue !== forgotConfirmPassword} onClick={async () => { setError(null); const result = await forgotPassword(forgotEmail.trim(), forgotOtp, forgotPasswordValue); if (result.success) { setForgotMode(false); setForgotStep('request'); setForgotOtp(''); setForgotPasswordValue(''); setForgotConfirmPassword(''); setForgotMessage(null); setSuccessMessage('Password reset successfully. Please sign in with your new password.'); setError(null); } else setError(result.error || 'Could not reset your password.'); }} className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60">Reset password</button>
+              )}
+
+              <div className="text-center text-xs"><button type="button" onClick={() => { setForgotMode(false); setForgotStep('request'); setForgotMessage(null); setError(null); setSuccessMessage(null); }} className="font-semibold text-emerald-800 hover:underline">Back to sign in</button></div>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label
@@ -277,9 +300,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </div>
             )}
 
-            <div className="flex justify-end">
-              <button type="button" onClick={() => { setForgotMode(true); setError(null); }} className="text-xs font-semibold text-emerald-800 hover:underline">Forgot password?</button>
-            </div>
+            <button type="button" onClick={() => { setForgotMode(true); setForgotEmail(email); setError(null); setSuccessMessage(null); setForgotMessage(null); }} className="-mb-2 text-left text-xs font-semibold text-emerald-800 hover:underline">Forgot password?</button>
 
             <label className="flex cursor-pointer items-center gap-2.5 text-xs text-slate-600">
               <input
@@ -304,6 +325,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <span>{isLoading ? 'Signing in…' : 'Sign in'}</span>
             </button>
           </form>
+          )}
 
           <div className="mt-5 border-t border-slate-100 pt-5 text-center text-xs text-slate-500">
             New to IP-SAKTI Sahayak?{' '}
