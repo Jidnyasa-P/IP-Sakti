@@ -457,7 +457,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
   } | null>(null);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
+  const [attachmentContext, setAttachmentContext] = useState("");
   const [attachmentProcessing, setAttachmentProcessing] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [attachmentKind, setAttachmentKind] = useState<"document" | "image" | null>(null);
   const [grievanceNotice, setGrievanceNotice] = useState<string | null>(null);
@@ -937,15 +939,31 @@ export const ChatView: React.FC<ChatViewProps> = ({
     setAttachmentMenuOpen(false);
     if (attachmentInputRef.current) {
       attachmentInputRef.current.accept =
-        kind === "image" ? "image/*" : ".pdf,.doc,.docx,.txt,.md,.csv";
+        kind === "image" ? "image/*" : ".pdf,.docx,.txt,.md,.csv,.json";
       attachmentInputRef.current.click();
     }
   };
 
-  const handleAttachmentSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAttachmentSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-    setSelectedAttachment(file);
     if (e.target) e.target.value = "";
+    if (!file) return;
+
+    setSelectedAttachment(file);
+    setAttachmentContext("");
+    setAttachmentError(null);
+
+    try {
+      const context = await extractAttachmentContext(file);
+      setAttachmentContext(context);
+      if (!context) {
+        setAttachmentError("No readable content was found in this attachment.");
+      }
+    } catch (err) {
+      setAttachmentError(
+        err instanceof Error ? err.message : "Could not read the attachment.",
+      );
+    }
   };
 
   const requestExpertReview = async (msg: StructuredChatMessage, expertType: string) => {
@@ -1033,18 +1051,25 @@ export const ChatView: React.FC<ChatViewProps> = ({
     const textToSend = queryText || inputValue;
     if (!textToSend.trim() || loading) return;
 
-    let attachmentContext = "";
-    if (selectedAttachment) {
+    let attachmentContextForRequest = attachmentContext;
+    if (selectedAttachment && !attachmentContextForRequest && !attachmentProcessing) {
       try {
-        attachmentContext = await extractAttachmentContext(selectedAttachment);
+        attachmentContextForRequest = await extractAttachmentContext(selectedAttachment);
+        setAttachmentContext(attachmentContextForRequest);
       } catch (err) {
         setRelevanceWarning(null);
         setJurisdictionWarning(null);
         setLoading(false);
         setAttachmentProcessing(false);
-        window.alert(err instanceof Error ? err.message : "Could not read the attachment.");
+        setAttachmentError(
+          err instanceof Error ? err.message : "Could not read the attachment.",
+        );
         return;
       }
+    }
+    if (selectedAttachment && !attachmentContextForRequest) {
+      setAttachmentError("The attachment has not been read successfully yet.");
+      return;
     }
 
     // 1. RULE: Relevance Validation Check
@@ -1228,12 +1253,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
             conversation_id: targetConvId,
             language,
             jurisdiction: currentJur,
-            attachment_context: attachmentContext || undefined,
+            attachment_context: attachmentContextForRequest || undefined,
+            attachment_name: selectedAttachment?.name || undefined,
           }),
         });
         if (syncRes.ok) {
           const syncData = await syncRes.json();
-          if (selectedAttachment) setSelectedAttachment(null);
+          if (selectedAttachment) {
+            setSelectedAttachment(null);
+            setAttachmentContext("");
+            setAttachmentError(null);
+          }
           if (deletedConversationIdsRef.current.has(requestConversationId)) {
             setLoading(false);
             setStreamingText("");
@@ -1345,6 +1375,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       jurisdiction: currentJur,
       scope_blocked: assistantMsg.scope_blocked,
       expert_escalation: assistantMsg.expert_escalation,
+      attachment_name: syncData.attachment_used ? syncData.attachment_name : undefined,
     };
 
     const finalMessages = [...canonicalUserMessages, finalAssistantMsg];
@@ -1923,6 +1954,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
                         <p className="text-xs text-slate-800 leading-relaxed font-normal whitespace-pre-line">
                           {msg.answer || msg.content}
                         </p>
+                        {msg.attachment_name && (
+                          <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-800">
+                            <Paperclip className="w-3 h-3" />
+                            Attachment referenced: {msg.attachment_name}
+                          </div>
+                        )}
                       </div>
 
                       {msg.confidence && (() => {
@@ -2450,15 +2487,34 @@ export const ChatView: React.FC<ChatViewProps> = ({
           />
 
           {selectedAttachment && (
-            <div className="mb-2 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-slate-700 shadow-sm">
-              <span className="flex items-center gap-1.5 truncate">
-                {attachmentKind === "image" ? <ImagePlus className="w-3.5 h-3.5" /> : <Paperclip className="w-3.5 h-3.5" />}
-                <span className="truncate">{selectedAttachment.name}</span><span className="ml-2 shrink-0 text-[10px] font-semibold text-emerald-700">{attachmentProcessing ? "Reading…" : "Attached"}</span>
+            <div className={`mb-2 flex items-center justify-between rounded-xl border px-3 py-2 text-xs shadow-sm ${
+              attachmentError
+                ? "border-rose-200 bg-rose-50/80 text-rose-800"
+                : "border-emerald-200 bg-emerald-50/70 text-slate-700"
+            }`}>
+              <span className="flex min-w-0 items-center gap-1.5">
+                {attachmentKind === "image" ? <ImagePlus className="w-3.5 h-3.5 shrink-0" /> : <Paperclip className="w-3.5 h-3.5 shrink-0" />}
+                <span className="truncate">{selectedAttachment.name}</span>
+                <span className={`ml-2 shrink-0 text-[10px] font-semibold ${attachmentError ? "text-rose-700" : "text-emerald-700"}`}>
+                  {attachmentProcessing ? "Reading…" : attachmentError ? "Could not read" : attachmentContext ? "Read" : "Attached"}
+                </span>
               </span>
-              <button type="button" onClick={() => setSelectedAttachment(null)} className="p-1 text-slate-400 hover:text-slate-700" title="Remove attachment">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedAttachment(null);
+                  setAttachmentContext("");
+                  setAttachmentError(null);
+                }}
+                className="p-1 text-slate-400 hover:text-slate-700"
+                title="Remove attachment"
+              >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
+          )}
+          {attachmentError && selectedAttachment && (
+            <p className="mb-2 px-1 text-[10px] text-rose-700">{attachmentError}</p>
           )}
 
           <form
@@ -2523,7 +2579,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <button
               type="submit"
               id="sahayak-send-btn"
-              disabled={!inputValue.trim() || loading || attachmentProcessing}
+              disabled={!inputValue.trim() || loading || attachmentProcessing || Boolean(attachmentError)}
               className={`p-2 rounded-lg transition-colors flex items-center justify-center ${
                 inputValue.trim() && !loading
                   ? isInternational

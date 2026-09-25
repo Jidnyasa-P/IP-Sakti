@@ -35,6 +35,8 @@ import json
 import re
 import traceback
 
+import httpx
+
 from app.config import settings
 from app.schemas import DocumentChunk
 

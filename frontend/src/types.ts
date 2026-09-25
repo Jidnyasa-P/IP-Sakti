@@ -254,6 +254,7 @@ export interface StructuredChatMessage {
   // message. Rendered as a plain warning bubble, not the full
   // citations/confidence "grounded opinion" card. See ChatView.tsx.
   scope_blocked?: boolean;
+  attachment_name?: string;
   expert_escalation?: {
     recommended?: boolean;
     reason?: string;

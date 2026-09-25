@@ -90,7 +90,7 @@ def _get_owned_conversation(db, conversation_id: str, user_id: str, is_admin: bo
     return conv
 
 
-async def _handle_query(db, query: str, conversation_id: str | None, language: str, user_id: str, jurisdiction: str | None = None, attachment_context: str | None = None) -> dict:
+async def _handle_query(db, query: str, conversation_id: str | None, language: str, user_id: str, jurisdiction: str | None = None, attachment_context: str | None = None, attachment_name: str | None = None) -> dict:
     if not query:
         raise HTTPException(status_code=400, detail="Query is required.")
 
@@ -267,13 +267,18 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
 async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     query = body.resolved_query()
     outcome = await _handle_query(
-        db, query, body.conversation_id, body.language, user_id=current_user["id"], jurisdiction=body.resolved_jurisdiction(),
+        db, query, body.conversation_id, body.language, user_id=current_user["id"],
+        jurisdiction=body.resolved_jurisdiction(), attachment_context=body.attachment_context,
+        attachment_name=body.attachment_name,
     )
+    attachment_used = bool(body.attachment_context and body.attachment_context.strip())
     return {
         "conversation_id": _json_safe(outcome["conversation_id"]),
         "message": outcome["message"],
         "retrieval_metadata": outcome["result"].get("retrieval_metadata", {}),
         "scope_blocked": outcome["scope_blocked"],
+        "attachment_used": attachment_used,
+        "attachment_name": body.attachment_name if attachment_used else None,
     }
 
 
