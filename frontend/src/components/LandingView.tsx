@@ -16,6 +16,7 @@ import {
   Send,
   Mail,
   FileText,
+  AlertTriangle,
 } from 'lucide-react';
 import { ActiveTab } from './Header';
 import { DisclaimerBanner } from './DisclaimerBanner';
@@ -26,11 +27,13 @@ import { authFetch } from './auth/authStorage';
 interface LandingViewProps {
   setActiveTab: (tab: ActiveTab) => void;
   onOpenWalkthrough?: () => void;
+  onRaiseGrievance?: () => void;
 }
 
 export const LandingView: React.FC<LandingViewProps> = ({
   setActiveTab,
   onOpenWalkthrough,
+  onRaiseGrievance,
 }) => {
   const { t } = useTranslation();
   const { currentUser, isLoggedIn } = useAuth();
@@ -361,10 +364,23 @@ export const LandingView: React.FC<LandingViewProps> = ({
             </label>
 
             <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3">
-              <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-3 text-sm font-semibold transition-colors">
-                <Send className="w-4 h-4" />
-                {contactSending ? 'Sending...' : 'Send Message'}
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <button type="submit" disabled={contactSending} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-3 text-sm font-semibold transition-colors disabled:opacity-60">
+                  <Send className="w-4 h-4" />
+                  {contactSending ? 'Sending...' : 'Send Message'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isLoggedIn) onRaiseGrievance?.();
+                    else setActiveTab('login');
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-5 py-3 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/50"
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  Raise a Grievance
+                </button>
+              </div>
               {contactError && (
                 <span className="text-sm text-rose-300 font-medium">{contactError}</span>
               )}

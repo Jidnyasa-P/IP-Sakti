@@ -140,6 +140,55 @@ class GroqClient:
         else:
             print("[llm_client] STARTUP: LLM_API_KEY not set -- no secondary LLM if Gemini fails (offline fallback still applies).")
 
+    def generate_image_context(self, image_bytes: bytes, mime_type: str, timeout_s: float = 25.0) -> str:
+        """Read a user image and return concise text/visual context for RAG.
+
+        Uses Groq's current multimodal Qwen model without changing the main
+        text-generation model configured for the application.
+        """
+        if not self.available:
+            return ""
+        import base64
+        try:
+            image_b64 = base64.b64encode(image_bytes).decode("ascii")
+            resp = httpx.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.LLM_API_KEY.strip()}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "qwen/qwen3.8-27b",
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    "Analyze this user-provided image for an IP, AYUSH, regulatory, "
+                                    "or product-research question. Extract all readable text, labels, "
+                                    "ingredients, claims, dates, numbers, tables, and other facts that "
+                                    "could materially affect the answer. Do not invent unreadable details. "
+                                    "Return concise plain text context only."
+                                ),
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:{mime_type};base64,{image_b64}"},
+                            },
+                        ],
+                    }],
+                    "temperature": 0.1,
+                    "max_completion_tokens": 2500,
+                },
+                timeout=timeout_s,
+            )
+            resp.raise_for_status()
+            return (resp.json().get("choices", [{}])[0].get("message", {}).get("content") or "").strip()
+        except Exception:
+            print(f"[llm_client] Groq image analysis failed -- attachment will not be interpreted:\n{traceback.format_exc()}")
+            return ""
+
     def generate_json(self, prompt: str, timeout_s: float = 12.0) -> dict:
         if not self.available:
             return {}

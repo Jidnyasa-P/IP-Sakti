@@ -1,8 +1,8 @@
 # requirements-server.txt
 #
 # Minimal dependency set for RUNNING the FastAPI service (main.py) — this is
-# what you point Render's build at. Deliberately excludes ingestion-only
-# packages (pypdf, pdf2image, pytesseract, beautifulsoup4, lxml) and the
+# what you point Render's build at. Deliberately excludes OCR/rendering-only packages (pdf2image, pytesseract,
+# beautifulsoup4, lxml) and the
 # unused local-embedding ML stack (torch, transformers, sentence-transformers,
 # scikit-learn, scipy) that were never removed from requirements.txt after
 # embeddings moved to the Gemini API — those alone are 1-2GB+ and would
@@ -49,3 +49,7 @@ neo4j==5.24.0
 
 # Bhashini translation client (optional — safe to keep even if unused)
 requests==2.34.2
+
+# Runtime chat attachments: extract PDF/DOCX text before RAG reasoning.
+pypdf==6.18.1
+python-docx==1.2.0

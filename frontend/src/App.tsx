@@ -17,6 +17,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { GuidedTour } from "./components/GuidedTour";
 import { Citation, normalizeRole } from "./types";
 import { ExternalLink } from "lucide-react";
+import { LegalPolicyModal, LegalDocument } from "./components/LegalPolicyModal";
 import { LanguageProvider, useTranslation } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ExpertAdvisoryProvider } from "./context/ExpertAdvisoryContext";
@@ -29,6 +30,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("landing");
   const { currentLanguage, setLanguage, t } = useTranslation();
   const [activeCitation, setActiveCitation] = useState<Citation | null>(null);
+  const [legalDocument, setLegalDocument] = useState<LegalDocument | null>(null);
   const [pendingGrievance, setPendingGrievance] = useState<{
     conversationId?: string;
     messageId?: string;
@@ -146,6 +148,7 @@ function AppContent() {
           <LandingView
             setActiveTab={setActiveTab}
             onOpenWalkthrough={handleStartTour}
+            onRaiseGrievance={() => handleRaiseGrievance({})}
           />
         );
       }
@@ -166,6 +169,7 @@ function AppContent() {
           <LandingView
             setActiveTab={setActiveTab}
             onOpenWalkthrough={handleStartTour}
+            onRaiseGrievance={() => handleRaiseGrievance({})}
           />
         );
       case "chat":
@@ -255,10 +259,13 @@ function AppContent() {
         onSkip={handleSkipTour}
       />
 
+      <LegalPolicyModal document={legalDocument} onClose={() => setLegalDocument(null)} />
+
       {/* Persistent Official Portals Footer */}
-      <footer className="w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-6 mt-auto mb-14 lg:mb-0 transition-colors">
-        <div className="w-full px-3 sm:px-5 lg:px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
-          <div className="flex items-center gap-2">
+      <footer className="w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-7 mt-auto mb-14 lg:mb-0 transition-colors">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+            <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 flex items-center justify-center shrink-0">
               <img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="w-full h-full object-contain" />
             </div>
@@ -275,8 +282,7 @@ function AppContent() {
           </div>
 
           {/* Official Statutory Portal Links — URLs are resolved from manifest-backed document metadata. */}
-          {officialPortalLinks.length > 0 && (
-            <div className="flex flex-wrap items-center gap-4 text-[11px]">
+            <div className="flex flex-wrap items-center justify-center lg:justify-end gap-x-5 gap-y-2 text-[11px]">
               {officialPortalLinks.map((link) => (
                 <a
                   key={link.id}
@@ -289,8 +295,15 @@ function AppContent() {
                   <ExternalLink className="w-3 h-3" />
                 </a>
               ))}
+              <span className="hidden lg:inline text-slate-300 dark:text-slate-700">|</span>
+              <button type="button" onClick={() => setLegalDocument("terms")} className="font-semibold hover:text-emerald-700 dark:hover:text-emerald-400 hover:underline">Terms & Conditions</button>
+              <button type="button" onClick={() => setLegalDocument("privacy")} className="font-semibold hover:text-emerald-700 dark:hover:text-emerald-400 hover:underline">Privacy Policy</button>
             </div>
-          )}
+          </div>
+          <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-4 text-[10px] text-slate-400 dark:text-slate-500">
+            <span>AI-assisted research and decision support • Verify important information against current official sources.</span>
+            <span>© {new Date().getFullYear()} IP-SAKTI Sahayak</span>
+          </div>
         </div>
       </footer>
     </div>

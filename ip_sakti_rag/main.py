@@ -49,6 +49,12 @@ def _check_secret(x_internal_secret: str | None) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
+class AttachmentRequest(BaseModel):
+    filename: str
+    content_type: str
+    data_base64: str
+
+
 class ChatRequest(BaseModel):
     query: str | None = None
     message: str | None = None
@@ -57,6 +63,7 @@ class ChatRequest(BaseModel):
     # "india" | "international" -- the toggle's value, enforced server-side
     # by app/safety/scope_guard.py (see app/pipeline.py's answer_query).
     jurisdiction: str | None = None
+    attachment_context: str | None = None
 
 
 class FeedbackRequest(BaseModel):
@@ -81,7 +88,76 @@ def chat(payload: ChatRequest, x_internal_secret: str | None = Header(default=No
     query = (payload.query or payload.message or "").strip()
     if not query:
         raise HTTPException(status_code=400, detail="Query is required.")
-    return rag.answer_query(query=query, language=payload.language, conversation_id=payload.conversation_id, jurisdiction=payload.jurisdiction)
+    return rag.answer_query(
+        query=query, language=payload.language, conversation_id=payload.conversation_id,
+        jurisdiction=payload.jurisdiction, attachment_context=payload.attachment_context,
+    )
+
+
+@app.post("/api/attachment/context")
+def attachment_context(payload: AttachmentRequest, x_internal_secret: str | None = Header(default=None)):
+    _check_secret(x_internal_secret)
+    import base64
+    from io import BytesIO
+
+    try:
+        raw = base64.b64decode(payload.data_base64, validate=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid attachment data.")
+
+    if not raw:
+        raise HTTPException(status_code=400, detail="The selected attachment is empty.")
+    if len(raw) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Attachments must be 10 MB or smaller.")
+
+    filename = payload.filename or "attachment"
+    content_type = (payload.content_type or "application/octet-stream").lower()
+    suffix = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+
+    # Text-bearing documents are extracted locally in the RAG service.
+    text = ""
+    if content_type == "application/pdf" or suffix == "pdf":
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(BytesIO(raw))
+            pages = []
+            for page in reader.pages[:30]:
+                pages.append(page.extract_text() or "")
+            text = "\n\n".join(pages).strip()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Could not read this PDF: {exc}")
+    elif suffix == "docx" or content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        try:
+            from docx import Document
+            doc = Document(BytesIO(raw))
+            text = "\n".join(p.text for p in doc.paragraphs if p.text.strip()).strip()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Could not read this DOCX file: {exc}")
+    elif content_type.startswith("text/") or suffix in {"txt", "md", "csv", "json"}:
+        try:
+            text = raw.decode("utf-8", errors="replace").strip()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Could not read this text file: {exc}")
+    elif content_type.startswith("image/"):
+        from app.generation.llm_client import GroqClient
+        vision = GroqClient()
+        text = vision.generate_image_context(raw, content_type)
+        if not text:
+            raise HTTPException(
+                status_code=503,
+                detail="The image could not be analyzed right now. Please retry once the vision model is available.",
+            )
+    else:
+        raise HTTPException(status_code=415, detail="Supported attachments are PDF, DOCX, TXT, MD, CSV, JSON, and common image formats.")
+
+    text = text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="No readable content was found in this attachment.")
+
+    # Keep the attachment context bounded so one large file cannot crowd out
+    # the user's actual question or the retrieved legal evidence.
+    text = text[:16000]
+    return {"success": True, "filename": filename, "context": text}
 
 
 @app.post("/api/products/analyze")

@@ -144,7 +144,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     if (!openGrievanceOnLoad) return;
     setActiveSubTab('grievances');
     setGrievanceForm({
-      category: 'Low-confidence AI response',
+      category: openGrievanceOnLoad.query || openGrievanceOnLoad.response ? 'Low-confidence AI response' : 'General query',
       subject: openGrievanceOnLoad.query
         ? `Concern about response: ${openGrievanceOnLoad.query.slice(0, 80)}`
         : '',

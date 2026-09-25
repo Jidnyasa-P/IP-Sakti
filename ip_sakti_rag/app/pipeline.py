@@ -63,7 +63,7 @@ class IPSaktiRAG:
     # ------------------------------------------------------------------
     # 1. Core chat / RAG endpoint  (-> POST /api/chat, /api/chat/stream)
     # ------------------------------------------------------------------
-    def answer_query(self, query: str, language: str | None = None, conversation_id: str | None = None, jurisdiction: str | None = None) -> dict:
+    def answer_query(self, query: str, language: str | None = None, conversation_id: str | None = None, jurisdiction: str | None = None, attachment_context: str | None = None) -> dict:
         started = datetime.now(timezone.utc)
 
         # Enforce the selected India/International mode before any retrieval
@@ -107,10 +107,16 @@ class IPSaktiRAG:
             return out
 
         jurisdictions = detect_jurisdiction(query)
-        classification = classify_product(query)
+        attachment_context = (attachment_context or "").strip()[:16000]
+        working_query = query
+        if attachment_context:
+            working_query = (
+                f"{query}\n\n[USER ATTACHMENT CONTEXT]\n{attachment_context}"
+            )
+        classification = classify_product(working_query)
 
         retrieval = self.retriever.retrieve(
-            query=query,
+            query=working_query,
             language=language,
             jurisdiction_filter="International" if selected_jurisdiction == "international" else "India",
             top_k=settings.top_k,
@@ -118,7 +124,7 @@ class IPSaktiRAG:
 
         graph_context = self.graph.get_context([classification.category])
         generated = generate_grounded_answer(
-            query=query,
+            query=working_query,
             language=retrieval.detected_language,
             chunks=retrieval.top_chunks,
             graph_context=graph_context.__dict__,

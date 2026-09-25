@@ -18,6 +18,9 @@ class ChatRequest(BaseModel):
     # target_market) -- see resolved_jurisdiction() below for which wins.
     jurisdiction: Optional[str] = None
     target_market: Optional[str] = None
+    # Extracted text/visual context from a user attachment. The raw file is
+    # processed transiently and is not persisted as a conversation message.
+    attachment_context: Optional[str] = None
 
     def resolved_query(self) -> str:
         return (self.query or self.message or "").strip()

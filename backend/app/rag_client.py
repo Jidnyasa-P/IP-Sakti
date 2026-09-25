@@ -83,7 +83,7 @@ async def health() -> dict:
     return await _request("GET", "/api/health")
 
 
-async def chat(query: str, language: str | None = None, conversation_id: str | None = None, jurisdiction: str | None = None) -> dict:
+async def chat(query: str, language: str | None = None, conversation_id: str | None = None, jurisdiction: str | None = None, attachment_context: str | None = None) -> dict:
     # Legacy MongoDB conversation records can still contain ObjectId values
     # for `_id`. HTTP/JSON cannot serialize ObjectId, so normalize the ID at
     # the service boundary before sending it to the RAG microservice.
@@ -96,6 +96,24 @@ async def chat(query: str, language: str | None = None, conversation_id: str | N
         "language": language,
         "conversation_id": safe_conversation_id,
         "jurisdiction": jurisdiction,
+        "attachment_context": attachment_context,
+    })
+
+
+async def analyze_attachment(filename: str, content_type: str, content: bytes) -> dict:
+    """Send one user attachment to the RAG service for transient extraction.
+
+    The main backend never writes the uploaded bytes to disk; the RAG service
+    returns only extracted/understood context, which is then used for the
+    current chat request.
+    """
+    import base64
+
+    encoded = base64.b64encode(content).decode("ascii")
+    return await _request("POST", "/api/attachment/context", json={
+        "filename": filename,
+        "content_type": content_type,
+        "data_base64": encoded,
     })
 
 

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, File, UploadFile
 from bson import ObjectId
 from pymongo.errors import DuplicateKeyError
 
@@ -90,7 +90,7 @@ def _get_owned_conversation(db, conversation_id: str, user_id: str, is_admin: bo
     return conv
 
 
-async def _handle_query(db, query: str, conversation_id: str | None, language: str, user_id: str, jurisdiction: str | None = None) -> dict:
+async def _handle_query(db, query: str, conversation_id: str | None, language: str, user_id: str, jurisdiction: str | None = None, attachment_context: str | None = None) -> dict:
     if not query:
         raise HTTPException(status_code=400, detail="Query is required.")
 
@@ -132,7 +132,13 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
     # rag_client.chat() -- the toggle had zero effect on the backend. Now
     # forwarded through so ip_sakti_rag's scope guard can enforce it
     # (see ip_sakti_rag/app/safety/scope_guard.py).
-    rag_result = await rag_client.chat(query=query, language=language, conversation_id=working_conversation_id, jurisdiction=jurisdiction)
+    rag_result = await rag_client.chat(
+        query=query,
+        language=language,
+        conversation_id=working_conversation_id,
+        jurisdiction=jurisdiction,
+        attachment_context=attachment_context,
+    )
 
     # A delete may have happened while the RAG request was running. Never
     # recreate that deleted session after the user explicitly removed it.
@@ -303,6 +309,35 @@ async def query_endpoint(body: QueryRequest, current_user: dict = Depends(get_cu
         "conflicts": [],
         "validation_status": "validated",
     }
+
+
+@router.post("/api/chat/attachment-context")
+async def chat_attachment_context(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Extract useful text/visual context from a chat attachment.
+
+    Raw bytes are forwarded in memory to the RAG service and are not stored by
+    this API. A short extracted context is returned for the subsequent chat
+    request so the answer can use the attachment alongside the user's query.
+    """
+    del current_user  # authentication is required; user data is not needed here
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="The selected attachment is empty.")
+    max_bytes = 10 * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail="Attachments must be 10 MB or smaller.")
+
+    try:
+        return await rag_client.analyze_attachment(
+            filename=file.filename or "attachment",
+            content_type=file.content_type or "application/octet-stream",
+            content=content,
+        )
+    except rag_client.RagServiceError as exc:
+        raise exc
 
 
 @router.get("/api/conversations")

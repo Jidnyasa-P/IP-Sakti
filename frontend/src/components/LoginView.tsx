@@ -300,17 +300,18 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </div>
             )}
 
-            <button type="button" onClick={() => { setForgotMode(true); setForgotEmail(email); setError(null); setSuccessMessage(null); setForgotMessage(null); }} className="-mb-2 inline-flex w-fit items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100 hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-700/15">Forgot password?</button>
-
-            <label className="flex cursor-pointer items-center gap-2.5 text-xs text-slate-600">
+            <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex min-w-0 cursor-pointer items-center gap-2.5 text-xs text-slate-600">
               <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={e => setRememberMe(e.target.checked)}
                 className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-700"
               />
-              <span>Remember me on this device</span>
-            </label>
+                <span>Remember me on this device</span>
+              </label>
+              <button type="button" onClick={() => { setForgotMode(true); setForgotEmail(email); setError(null); setSuccessMessage(null); setForgotMessage(null); }} className="inline-flex shrink-0 items-center justify-center rounded-lg bg-white px-3.5 py-2 text-xs font-semibold text-emerald-800 shadow-sm ring-1 ring-emerald-200 transition hover:bg-emerald-50 hover:ring-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-700/20">Forgot password?</button>
+            </div>
 
             <button
               type="submit"

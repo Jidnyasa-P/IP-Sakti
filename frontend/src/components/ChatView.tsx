@@ -457,6 +457,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   } | null>(null);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
+  const [attachmentProcessing, setAttachmentProcessing] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [attachmentKind, setAttachmentKind] = useState<"document" | "image" | null>(null);
   const [grievanceNotice, setGrievanceNotice] = useState<string | null>(null);
@@ -1002,6 +1003,25 @@ export const ChatView: React.FC<ChatViewProps> = ({
     });
   }, [messages, streamingText, loading]);
 
+  const extractAttachmentContext = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    setAttachmentProcessing(true);
+    try {
+      const res = await authFetch("/api/chat/attachment-context", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.detail || "Could not read the attachment.");
+      }
+      return String(data?.context || "").trim();
+    } finally {
+      setAttachmentProcessing(false);
+    }
+  };
+
   // Send query with streaming response and robust session storage
   const handleSend = async (
     queryText?: string,
@@ -1012,6 +1032,20 @@ export const ChatView: React.FC<ChatViewProps> = ({
   ) => {
     const textToSend = queryText || inputValue;
     if (!textToSend.trim() || loading) return;
+
+    let attachmentContext = "";
+    if (selectedAttachment) {
+      try {
+        attachmentContext = await extractAttachmentContext(selectedAttachment);
+      } catch (err) {
+        setRelevanceWarning(null);
+        setJurisdictionWarning(null);
+        setLoading(false);
+        setAttachmentProcessing(false);
+        window.alert(err instanceof Error ? err.message : "Could not read the attachment.");
+        return;
+      }
+    }
 
     // 1. RULE: Relevance Validation Check
     // Prevent clearly unrelated questions (e.g., general programming, pure math, entertainment, general shopping)
@@ -1194,10 +1228,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
             conversation_id: targetConvId,
             language,
             jurisdiction: currentJur,
+            attachment_context: attachmentContext || undefined,
           }),
         });
         if (syncRes.ok) {
           const syncData = await syncRes.json();
+          if (selectedAttachment) setSelectedAttachment(null);
           if (deletedConversationIdsRef.current.has(requestConversationId)) {
             setLoading(false);
             setStreamingText("");
@@ -2414,10 +2450,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
           />
 
           {selectedAttachment && (
-            <div className="mb-2 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700">
+            <div className="mb-2 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-slate-700 shadow-sm">
               <span className="flex items-center gap-1.5 truncate">
                 {attachmentKind === "image" ? <ImagePlus className="w-3.5 h-3.5" /> : <Paperclip className="w-3.5 h-3.5" />}
-                <span className="truncate">{selectedAttachment.name}</span>
+                <span className="truncate">{selectedAttachment.name}</span><span className="ml-2 shrink-0 text-[10px] font-semibold text-emerald-700">{attachmentProcessing ? "Reading…" : "Attached"}</span>
               </span>
               <button type="button" onClick={() => setSelectedAttachment(null)} className="p-1 text-slate-400 hover:text-slate-700" title="Remove attachment">
                 <X className="w-3.5 h-3.5" />
@@ -2487,7 +2523,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <button
               type="submit"
               id="sahayak-send-btn"
-              disabled={!inputValue.trim() || loading}
+              disabled={!inputValue.trim() || loading || attachmentProcessing}
               className={`p-2 rounded-lg transition-colors flex items-center justify-center ${
                 inputValue.trim() && !loading
                   ? isInternational
@@ -2496,7 +2532,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   : "bg-slate-200 text-slate-400 cursor-not-allowed"
               }`}
             >
-              <Send className="w-3.5 h-3.5" />
+              {attachmentProcessing ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Send className="w-3.5 h-3.5" />}
             </button>
           </form>
 
