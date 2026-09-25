@@ -976,7 +976,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         body: JSON.stringify({
           conversation_id: activeConvId,
           query: messages.find((m) => m.role === "user")?.content || "Low-confidence consultation",
-          reason: `Confidence score below 70% (${Math.round((msg.confidence.score <= 1 ? msg.confidence.score * 100 : msg.confidence.score))}%).`,
+          reason: `Confidence score below 80% (${Math.round((msg.confidence.score <= 1 ? msg.confidence.score * 100 : msg.confidence.score))}%).`,
           expert_type: expertType,
         }),
       });
@@ -1965,7 +1965,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       {msg.confidence && (() => {
                         const rawScore = msg.confidence.score;
                         const score = rawScore <= 1 ? rawScore * 100 : rawScore;
-                        if (score >= 70) return null;
+                        if (score >= 80) return null;
                         const requested = expertRequestedMsgIds.has(msg.id);
                         const pickerOpen = expertPickerOpenMsgId === msg.id;
                         return (
@@ -1975,7 +1975,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                               <div>
                                 <p className="text-xs font-semibold text-amber-900">Low confidence — expert review recommended</p>
                                 <p className="text-[11px] leading-relaxed text-amber-800 mt-0.5">
-                                  The confidence score is below 70%. Choose how you'd like to proceed: get this reviewed by a qualified expert, or raise a grievance.
+                                  The confidence score is below 80%. Choose how you'd like to proceed: get this reviewed by a qualified expert, or raise a grievance.
                                 </p>
                               </div>
                             </div>

@@ -50,7 +50,7 @@ const INDIA_SPECIFIC_TERMS: { regex: RegExp; label: string }[] = [
 const INTERNATIONAL_INDICATORS: { regex: RegExp; label: string }[] = [
   // International organizations / treaties / frameworks
   {
-    regex: /\b(pct|patent\s*cooperation\s*treaty)\b/i,
+    regex: /\b(international|internationally|pct|patent\s*cooperation\s*treaty)\b/i,
     label: "PCT / International Patent System",
   },
   {
