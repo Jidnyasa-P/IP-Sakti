@@ -1,8 +1,8 @@
 """Email delivery for IP-SAKTI Sahayak.
 
-Supports Resend HTTPS API for production/Render deployments, while retaining
+Supports Brevo HTTPS API for production/Render deployments, while retaining
 SMTP, console, and in-memory backends for local development and testing.
-No additional third-party dependency is required for Resend.
+No additional third-party dependency is required for Brevo.
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from app.core.logging import logger
 
 OUTBOX: list[dict] = []
 
-RESEND_API_URL = "https://api.resend.com/emails"
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 
 
 def clear_outbox() -> None:
@@ -37,11 +37,11 @@ def _backend() -> str:
         and settings.smtp_password
     )
 
-    resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
+    brevo_api_key = os.getenv("BREVO_API_KEY", "").strip()
 
     if settings.email_backend == "auto":
-        if resend_api_key:
-            return "resend"
+        if brevo_api_key:
+            return "brevo"
         if configured_smtp:
             return "smtp"
         return "memory" if settings.app_env == "test" else "console"
@@ -59,7 +59,7 @@ def _record(to: str, subject: str, text: str, template: str) -> None:
     })
 
 
-def _send_resend(
+def _send_brevo(
     to: str,
     subject: str,
     text: str,
@@ -67,38 +67,33 @@ def _send_resend(
     template: str,
 ) -> bool:
     settings = get_settings()
-    api_key = os.getenv("RESEND_API_KEY", "").strip()
+    api_key = os.getenv("BREVO_API_KEY", "").strip()
 
     if not api_key:
         logger.error(
-            f"[email:{template}] RESEND_API_KEY is not configured."
+            f"[email:{template}] BREVO_API_KEY is not configured."
         )
         return False
 
-    from_address = settings.email_from_address
-    from_name = settings.email_from_name
-
-    if from_name:
-        from_value = f"{from_name} <{from_address}>"
-    else:
-        from_value = from_address
+    sender = {"email": settings.email_from_address}
+    if settings.email_from_name:
+        sender["name"] = settings.email_from_name
 
     payload = {
-        "from": from_value,
-        "to": [to],
+        "sender": sender,
+        "to": [{"email": to}],
         "subject": subject,
-        "text": text,
-        "html": html_body or _html(subject, text),
+        "htmlContent": html_body or _html(subject, text),
     }
 
     request = urllib.request.Request(
-        RESEND_API_URL,
+        BREVO_API_URL,
         data=json.dumps(payload).encode("utf-8"),
         headers={
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "User-Agent": "IP-SAKTI-Sahayak/1.0",
+            "api-key": api_key,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "IP-SAKTI-Sahayak/1.0",
         },
         method="POST",
     )
@@ -107,14 +102,10 @@ def _send_resend(
         timeout = getattr(settings, "smtp_timeout_seconds", 10)
 
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            response_body = response.read().decode("utf-8", errors="replace")
+            response.read().decode("utf-8", errors="replace")
 
         _record(to, subject, text, template)
-
-        logger.info(
-            f"[email:{template}] sent to={to} via Resend"
-        )
-
+        logger.info(f"[email:{template}] sent to={to} via Brevo")
         return True
 
     except urllib.error.HTTPError as exc:
@@ -124,20 +115,20 @@ def _send_resend(
             error_body = str(exc)
 
         logger.error(
-            f"[email:{template}] Resend failed for {to}: "
+            f"[email:{template}] Brevo failed for {to}: "
             f"HTTP {exc.code} - {error_body}"
         )
         return False
 
     except urllib.error.URLError as exc:
         logger.error(
-            f"[email:{template}] Resend connection failed for {to}: {exc}"
+            f"[email:{template}] Brevo connection failed for {to}: {exc}"
         )
         return False
 
     except Exception as exc:
         logger.error(
-            f"[email:{template}] Resend failed for {to}: {exc}"
+            f"[email:{template}] Brevo failed for {to}: {exc}"
         )
         return False
 
@@ -170,8 +161,8 @@ def send_email(
 
         return True
 
-    if backend == "resend":
-        return _send_resend(
+    if backend == "brevo":
+        return _send_brevo(
             to,
             subject,
             text,
