@@ -244,15 +244,9 @@ async def _handle_query(db, query: str, conversation_id: str | None, language: s
         latency_ms=rag_result.get("retrieval_metadata", {}).get("latency_ms"),
     )
 
-    if escalation.recommended:
-        db[EXPERT_ESCALATIONS_COLLECTION].insert_one(new_expert_escalation(
-            id=f"esc-{uuid.uuid4().hex[:10]}",
-            conversation_id=conv["_id"],
-            recommended=True,
-            reason=escalation.reason,
-            case_summary=escalation.case_summary,
-            user_id=user_id,
-        ))
+    # A low-confidence result is only a recommendation. The actual expert
+    # consultation record is created after the user chooses an expert type
+    # through POST /api/expert-escalations/request.
 
     return {
         "conversation_id": conv["_id"],

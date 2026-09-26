@@ -33,6 +33,13 @@ interface ExpertAdvisoryViewProps {
 export const ExpertAdvisoryView: React.FC<ExpertAdvisoryViewProps> = ({ onOpenCitation }) => {
   const { queries, pendingCount, resolvedCount, resolveQuery, refreshQueries } = useExpertAdvisory();
   const { currentUser } = useAuth();
+  const expertTypeLabel = currentUser?.expert_type === 'ayurveda'
+    ? 'Ayurveda Expert'
+    : currentUser?.expert_type === 'legal'
+      ? 'Legal / IP Expert'
+      : currentUser?.expert_type === 'regulatory'
+        ? 'Regulatory Affairs Expert'
+        : 'Expert Advisor';
 
   const [selectedQueryId, setSelectedQueryId] = useState<string>(() => {
     return queries[0]?.id || '';
@@ -202,7 +209,7 @@ export const ExpertAdvisoryView: React.FC<ExpertAdvisoryViewProps> = ({ onOpenCi
   };
 
   return (
-    <div className="w-full bg-slate-50 min-h-[calc(100vh-4rem)] p-3 sm:p-5 lg:p-6">
+    <div className="w-full bg-slate-50 min-h-[calc(100vh-4rem)] p-3 sm:p-5 lg:p-6 border-x-2 border-slate-200">
       <div className="max-w-7xl mx-auto space-y-4">
         {/* Success Toast Banner */}
         {successToast && (
@@ -222,23 +229,23 @@ export const ExpertAdvisoryView: React.FC<ExpertAdvisoryViewProps> = ({ onOpenCi
         )}
 
         {/* Legal Advisor Console Header */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs">
+        <div className="bg-white border-2 border-slate-300 rounded-2xl p-4 sm:p-6 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1.5 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300">
                   <Scale className="w-3.5 h-3.5 text-emerald-800" />
-                  Legal Advisor Console
+                  {expertTypeLabel} Console
                 </span>
                 <span className="text-xs text-slate-500 font-medium">
-                  Authoritative Statutory Dispute Resolution
+                  Assigned consultation queue
                 </span>
               </div>
               <h1 className="text-xl sm:text-2xl font-serif font-bold text-slate-900">
-                Low-Confidence Inquiries & Legal Advisory Queue
+                Low-Confidence Inquiries & Expert Guidance Queue
               </h1>
               <p className="text-xs sm:text-sm text-slate-600 max-w-3xl leading-relaxed">
-                As an IPR Legal Advisor, review queries flagged with low AI confidence or statutory ambiguity submitted by AYUSH Practitioners, Researchers, and Organizations. Provide verified legal commentary, statutory clause interpretations, and actionable filing directives.
+                Review queries redirected to your expert category after low-confidence AI responses. Provide domain-specific guidance and actionable next steps based on the query and authoritative sources.
               </p>
             </div>
 
@@ -354,7 +361,7 @@ export const ExpertAdvisoryView: React.FC<ExpertAdvisoryViewProps> = ({ onOpenCi
                 </p>
               </div>
             ) : (
-              <div className="space-y-2.5 max-h-[750px] overflow-y-auto pr-1">
+              <div className="space-y-2.5 pr-1">
                 {filteredQueries.map(q => {
                   const isSelected = selectedQuery?.id === q.id;
                   const isPending = q.status !== 'resolved';

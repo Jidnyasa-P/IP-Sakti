@@ -42,6 +42,7 @@ export type ActiveTab =
   | "ipr"
   | "tk"
   | "research"
+  | "helpdesk"
   | "workspace"
   | "admin"
   | "login"
@@ -111,6 +112,11 @@ export const Header: React.FC<HeaderProps> = ({
       id: "research" as ActiveTab,
       label: t("nav.research", "Research"),
       icon: BookOpen,
+    },
+    {
+      id: "helpdesk" as ActiveTab,
+      label: "HelpDesk",
+      icon: HelpCircle,
     },
     {
       id: "workspace" as ActiveTab,

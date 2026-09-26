@@ -73,6 +73,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   const [products, setProducts] = useState<ProductAnalysisResult[]>([]);
   const [savedResearch, setSavedResearch] = useState<any[]>([]);
   const [grievances, setGrievances] = useState<Grievance[]>([]);
+  const [expertGuidance, setExpertGuidance] = useState<any[]>([]);
   const [grievanceModalOpen, setGrievanceModalOpen] = useState(false);
   const [grievanceSubmitting, setGrievanceSubmitting] = useState(false);
   const [grievanceError, setGrievanceError] = useState<string | null>(null);
@@ -90,7 +91,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   // messages, which looks identical to a broken/frozen page. Now shows an
   // actual spinner instead.
   const [isLoading, setIsLoading] = useState(true);
-  const [activeSubTab, setActiveSubTab] = useState<'conversations' | 'products' | 'bookmarks' | 'notifications' | 'grievances'>('conversations');
+  const [activeSubTab, setActiveSubTab] = useState<'conversations' | 'products' | 'bookmarks' | 'notifications' | 'expert' | 'grievances'>('conversations');
 
   useEffect(() => {
     if (userId) loadWorkspaceData();
@@ -99,17 +100,19 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
       setProducts([]);
       setSavedResearch([]);
       setGrievances([]);
+      setExpertGuidance([]);
     }
   }, [userId]);
 
   const loadWorkspaceData = async () => {
     setIsLoading(true);
     try {
-      const [convRes, prodRes, savedRes, grievanceRes] = await Promise.all([
+      const [convRes, prodRes, savedRes, grievanceRes, expertRes] = await Promise.all([
         authFetch('/api/conversations').catch(() => null),
         authFetch('/api/products').catch(() => null),
         authFetch('/api/workspace/saved-research').catch(() => null),
         authFetch('/api/workspace/grievances').catch(() => null),
+        authFetch('/api/expert-escalations/mine').catch(() => null),
       ]);
 
       const convData =
@@ -128,11 +131,16 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
         grievanceRes && grievanceRes.ok && grievanceRes.headers.get('content-type')?.includes('application/json')
           ? await grievanceRes.json()
           : [];
+      const expertData =
+        expertRes && expertRes.ok && expertRes.headers.get('content-type')?.includes('application/json')
+          ? await expertRes.json()
+          : [];
 
       setConversations(Array.isArray(convData) ? convData : []);
       setProducts(Array.isArray(prodData) ? prodData : []);
       setSavedResearch(Array.isArray(savedData) ? savedData : []);
       setGrievances(Array.isArray(grievanceData) ? grievanceData : []);
+      setExpertGuidance(Array.isArray(expertData) ? expertData : []);
     } catch (e) {
       console.warn('Failed to load workspace data:', e);
     } finally {
@@ -585,6 +593,22 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                   </button>
                 </div>
               ))
+            )}
+          </div>
+        )}
+
+        {activeSubTab === 'expert' && (
+          <div className="space-y-4">
+            <div className="bg-white border-2 border-slate-300 rounded-2xl p-5 shadow-sm"><h2 className="text-base font-bold text-slate-900">Expert Guidance</h2><p className="text-xs text-slate-500 mt-1">Track queries you have redirected to a matching expert and see who has been contacted.</p></div>
+            {expertGuidance.length === 0 ? (
+              <div className="bg-white border-2 border-slate-300 rounded-2xl p-10 text-center"><Sparkles className="w-8 h-8 mx-auto text-slate-300" /><h3 className="mt-3 text-sm font-semibold text-slate-800">No expert guidance requests yet</h3><p className="mt-1 text-xs text-slate-500">When you redirect a low-confidence query to an expert, the request and its status will appear here.</p></div>
+            ) : (
+              <div className="space-y-3">{expertGuidance.map((item) => (
+                <div key={item.id} className="bg-white border-2 border-slate-300 rounded-2xl p-5 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700">{item.expert_type_label || 'Expert Guidance'}</span><span className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold ${item.status === 'resolved' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>{item.status === 'assigned' ? 'Assigned' : item.status === 'resolved' ? 'Resolved' : 'Pending'}</span></div><h3 className="text-sm font-semibold text-slate-900 mt-2">{item.query || item.case_summary}</h3></div><span className="text-[10px] text-slate-400 whitespace-nowrap">{item.created_at ? new Date(item.created_at).toLocaleString() : ''}</span></div>
+                  <div className="mt-4 grid sm:grid-cols-2 gap-3"><div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] uppercase tracking-wide font-semibold text-slate-500">Expert contacted</p><p className="text-xs font-bold text-slate-900 mt-1">{item.assigned_expert_name || 'Matching expert'}</p><p className="text-[11px] text-slate-500 mt-0.5">{item.expert_type_label || 'Expert consultation'}</p></div><div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] uppercase tracking-wide font-semibold text-slate-500">Request status</p><p className="text-xs font-bold text-emerald-800 mt-1">{item.status === 'assigned' ? 'Expert has been informed' : item.status}</p>{item.reason && <p className="text-[10px] text-slate-500 mt-1">{item.reason}</p>}</div></div>
+                </div>
+              ))}</div>
             )}
           </div>
         )}

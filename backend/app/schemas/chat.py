@@ -30,6 +30,13 @@ class ChatRequest(BaseModel):
         return self.jurisdiction or self.target_market
 
 
+class ExpertEscalationRequest(BaseModel):
+    conversation_id: str
+    query: Optional[str] = None
+    reason: str = "Low-confidence AI response"
+    expert_type: str
+
+
 class QueryRequest(BaseModel):
     query: str
     conversation_id: Optional[str] = None
@@ -76,18 +83,6 @@ class TranslateRequest(BaseModel):
     target_language: str
     strings: Optional[dict[str, str]] = None
     text: Optional[str] = None
-
-
-class ExpertEscalationRequest(BaseModel):
-    conversation_id: Optional[str] = None
-    query: str
-    reason: Optional[str] = None
-    # Which kind of expert the user picked from the low-confidence redirect
-    # options (e.g. "ayurveda", "legal", "ip_patent"). Optional/free-form so
-    # the frontend's list of expert categories can change without a schema
-    # change here.
-    expert_type: Optional[str] = None
-
 
 
 class GrievanceCreateRequest(BaseModel):

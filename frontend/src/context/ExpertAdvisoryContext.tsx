@@ -1,27 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { LowConfidenceQuery, ExpertReview } from '../types';
 import { INITIAL_LOW_CONFIDENCE_QUERIES } from '../data/lowConfidenceQueries';
+import { authFetch } from '../components/auth/authStorage';
+import { useAuth } from './AuthContext';
 
-// ---------------------------------------------------------------------------
-// CHANGED: this module used to call `/api/expert/flagged-queries` on every
-// single app load, for every user (logged in or not) -- that route has
-// never existed on the backend (which has `/api/expert-escalations`
-// instead, with a completely different record shape: conversation_id/
-// recommended/reason/case_summary vs. this module's inquirer_name/topic/
-// ai_response/status='pending_review'). That mismatch is a real, separate
-// data-model reconciliation (Expert Advisory dashboard vs. the backend's
-// expert-escalation records) -- not something to paper over by guessing a
-// field mapping and pushing possibly-wrong shapes into React state (that's
-// exactly the kind of unvalidated-shape bug that caused the earlier
-// blank-page crash in ProductAnalyzerView/TraditionalKnowledgeView/
-// IPRNavigatorView).
-//
-// Until that reconciliation is actually done, this context runs in
-// local-storage-only mode (which is what it already fell back to on every
-// failed request anyway) -- no network calls, no 404s, same UI behavior.
-// See README's "honest gaps" section.
-// ---------------------------------------------------------------------------
-const SERVER_SYNC_ENABLED = false;
+// Server-backed expert queue. The previous local-storage-only mode meant
+// expert users could never see consultations submitted by real users.
+const SERVER_SYNC_ENABLED = true;
 
 const STORAGE_KEY = 'ipsakti_expert_flagged_queries_v2';
 
@@ -39,6 +24,8 @@ interface ExpertAdvisoryContextType {
 const ExpertAdvisoryContext = createContext<ExpertAdvisoryContextType | undefined>(undefined);
 
 export const ExpertAdvisoryProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { isLoggedIn, currentUser } = useAuth();
+  const isExpert = isLoggedIn && currentUser?.roles?.includes('Expert');
   const [queries, setQueries] = useState<LowConfidenceQuery[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -60,35 +47,47 @@ export const ExpertAdvisoryProvider: React.FC<{ children: ReactNode }> = ({ chil
 
   // Sync to local storage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !isExpert) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(queries));
       } catch (e) {}
     }
   }, [queries]);
 
-  // Fetch from server on mount
+  // Fetch the authenticated expert's assigned consultations from the backend.
   const refreshQueries = async () => {
-    if (!SERVER_SYNC_ENABLED) return; // see file-level note
+    if (!SERVER_SYNC_ENABLED || !isExpert) return;
     try {
       setIsLoading(true);
-      const res = await fetch('/api/expert/flagged-queries');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setQueries(data);
-        }
-      }
+      const res = await authFetch('/api/expert-escalations');
+      if (!res.ok) throw new Error(`Expert queue request failed (${res.status})`);
+      const data = await res.json();
+      const mapped: LowConfidenceQuery[] = (Array.isArray(data) ? data : []).map((item: any) => ({
+        id: item.id,
+        conversation_id: item.conversation_id,
+        inquirer_name: item.requester_name || 'Sahayak User',
+        inquirer_role: 'Practitioner',
+        topic: item.expert_type_label || 'Expert Consultation',
+        query: item.query || item.case_summary || '',
+        created_at: item.created_at || new Date().toISOString(),
+        jurisdiction: 'india',
+        ai_response: {
+          content: 'This query was redirected by the user for expert guidance.',
+          confidence: { level: 'Low', score: 0, reasons: item.reason ? [item.reason] : [] },
+        },
+        status: item.status === 'resolved' ? 'resolved' : item.status === 'assigned' ? 'in_review' : 'pending_review',
+      }));
+      setQueries(mapped);
     } catch (e) {
-      console.warn('Could not fetch expert flagged queries from server, using local storage cache', e);
+      console.warn('Could not load assigned expert consultations:', e);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    refreshQueries();
-  }, []);
+    if (isExpert) refreshQueries();
+  }, [isExpert, currentUser?.id]);
 
   const pendingCount = queries.filter(q => q.status !== 'resolved').length;
   const resolvedCount = queries.filter(q => q.status === 'resolved').length;
@@ -107,15 +106,15 @@ export const ExpertAdvisoryProvider: React.FC<{ children: ReactNode }> = ({ chil
       })
     );
 
-    if (!SERVER_SYNC_ENABLED) return; // see file-level note
+    if (!SERVER_SYNC_ENABLED || !isExpert) return;
     try {
-      await fetch(`/api/expert/flagged-queries/${id}/resolve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expert_review: review })
+      const res = await authFetch(`/api/expert-escalations/${encodeURIComponent(id)}?status=resolved`, {
+        method: 'PATCH',
       });
+      if (!res.ok) throw new Error(`Status update failed (${res.status})`);
+      await refreshQueries();
     } catch (e) {
-      console.warn('Server update for expert resolve failed, cached locally', e);
+      console.warn('Server update for expert resolve failed:', e);
     }
   };
 

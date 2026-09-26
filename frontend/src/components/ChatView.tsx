@@ -468,6 +468,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   // Which low-confidence message's "choose an expert" picker is currently
   // open (its list of expert-type buttons), keyed by message id.
   const [expertPickerOpenMsgId, setExpertPickerOpenMsgId] = useState<string | null>(null);
+  const [expertConfirmation, setExpertConfirmation] = useState<any | null>(null);
 
   const EXPERT_TYPES: { id: string; label: string }[] = [
     { id: "ayurveda", label: "Ayurveda Expert" },
@@ -974,25 +975,22 @@ export const ChatView: React.FC<ChatViewProps> = ({
     if (!activeConvId || !msg.confidence || expertRequestingMsgId === msg.id) return;
     setExpertRequestingMsgId(msg.id);
     try {
-      const res = await authFetch("/api/expert-escalation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          conversation_id: activeConvId,
-          query: messages.find((m) => m.role === "user")?.content || "Low-confidence consultation",
-          reason: `Confidence score below 80% (${Math.round((msg.confidence.score <= 1 ? msg.confidence.score * 100 : msg.confidence.score))}%).`,
-          expert_type: expertType,
-        }),
-      });
-      if (res.ok) {
-        setExpertRequestedMsgIds((prev) => new Set(prev).add(msg.id));
-        setExpertPickerOpenMsgId(null);
+      const messageIndex = messages.findIndex((m) => m.id === msg.id);
+      let relatedQuery = '';
+      for (let i = messageIndex - 1; i >= 0; i -= 1) {
+        if (messages[i].role === 'user') { relatedQuery = messages[i].content || messages[i].answer || ''; break; }
       }
+      const res = await authFetch('/api/expert-escalations/request', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: activeConvId, query: relatedQuery, reason: `Confidence score below 80% (${Math.round((msg.confidence.score <= 1 ? msg.confidence.score * 100 : msg.confidence.score))}%).`, expert_type: expertType }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.detail || 'The expert consultation request could not be submitted.');
+      setExpertRequestedMsgIds((prev) => new Set(prev).add(msg.id));
+      setExpertPickerOpenMsgId(null); setExpertConfirmation(data);
     } catch (err) {
-      console.warn("Expert review request failed:", err);
-    } finally {
-      setExpertRequestingMsgId(null);
-    }
+      setGrievanceNotice(err instanceof Error ? err.message : 'The expert consultation request could not be submitted.');
+    } finally { setExpertRequestingMsgId(null); }
   };
 
   const raiseGrievance = (msg: StructuredChatMessage) => {
