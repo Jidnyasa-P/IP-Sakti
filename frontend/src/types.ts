@@ -379,6 +379,22 @@ export interface LowConfidenceQuery {
 
 
 
+
+export interface ExpertEscalation {
+  id: string;
+  conversation_id?: string | null;
+  user_id?: string | null;
+  query: string;
+  reason?: string | null;
+  case_summary?: string | null;
+  expert_type?: string | null;
+  status: 'pending' | 'assigned' | 'resolved' | string;
+  assigned_expert_id?: string | null;
+  assigned_expert_name?: string | null;
+  assigned_expert_email?: string | null;
+  created_at?: string | null;
+}
+
 export interface Grievance {
   id: string;
   user_id: string;

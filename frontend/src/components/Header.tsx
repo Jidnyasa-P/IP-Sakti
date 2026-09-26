@@ -126,11 +126,13 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   const expertNavItems = [
+    { id: "landing" as ActiveTab, label: "Home", icon: Home },
+    { id: "helpdesk" as ActiveTab, label: "HelpDesk", icon: HelpCircle },
     {
       id: "expert" as ActiveTab,
-      label: "Low-Confidence Legal Queries",
+      label: "Expert Dashboard",
       icon: Scale,
-      badge: pendingCount > 0 ? `${pendingCount} Flagged` : undefined,
+      badge: pendingCount > 0 ? `${pendingCount} Pending` : undefined,
     },
   ];
 
@@ -175,7 +177,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Logo & Brand */}
       <div
         id="brand-logo-btn"
-        onClick={() => handleNavClick(isExpert ? "expert" : "landing")}
+        onClick={() => handleNavClick("landing")}
         className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none min-w-0 shrink-0"
       >
         <div className="w-9 h-9 sm:w-10 sm:h-10 min-w-[2.25rem] sm:min-w-[2.5rem] aspect-square flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
@@ -435,7 +437,13 @@ export const Header: React.FC<HeaderProps> = ({
                     type="button"
                     onClick={() => {
                       setNotificationOpen(false);
-                      setActiveTab("workspace");
+                      if (isExpert) {
+                        setActiveTab("expert");
+                        window.setTimeout(() => window.dispatchEvent(new CustomEvent("ipsakti:open-expert-notifications")), 0);
+                      } else {
+                        setActiveTab("workspace");
+                        window.setTimeout(() => window.dispatchEvent(new CustomEvent("ipsakti:open-workspace-notifications")), 0);
+                      }
                     }}
                     className="w-full text-center text-xs font-semibold text-emerald-800 hover:text-emerald-950 transition-colors"
                   >
@@ -795,21 +803,19 @@ export const Header: React.FC<HeaderProps> = ({
                 {isExpert ? "Legal Advisor Navigation" : "Navigation Modules"}
               </div>
 
-              {/* Home - Hidden for Expert */}
-              {!isExpert && (
-                <button
-                  type="button"
-                  onClick={() => handleNavClick("landing")}
-                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors ${
-                    activeTab === "landing"
-                      ? "bg-slate-900 text-white"
-                      : "text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  <Home className="w-5 h-5" />
-                  <span>Overview & Portal Home</span>
-                </button>
-              )}
+              {/* Home */}
+              <button
+                type="button"
+                onClick={() => handleNavClick("landing")}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors ${
+                  activeTab === "landing"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                <Home className="w-5 h-5" />
+                <span>Overview & Portal Home</span>
+              </button>
 
               {/* How to Use Walkthrough Option */}
               {onOpenWalkthrough && (

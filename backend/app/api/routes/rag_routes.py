@@ -67,10 +67,25 @@ def expert_escalation(body: ExpertEscalationRequest, current_user: dict = Depend
         jurisdiction_coverage_available=True,
         user_requested=True,
     )
-    record_id = f"esc-{uuid.uuid4().hex[:10]}"
     if body.expert_type not in {"ayurveda", "legal", "regulatory"}:
         raise HTTPException(status_code=400, detail="Please choose a valid expert type.")
 
+    expert_label = {
+        "ayurveda": "Ayurveda Expert",
+        "legal": "Legal / IP Expert",
+        "regulatory": "Regulatory Affairs Expert",
+    }[body.expert_type]
+
+    # Route to one verified expert of the selected type. The assignment is
+    # persisted so the expert console can show only cases actually assigned
+    # to that expert.
+    matching_expert = db["users"].find_one({
+        "roles": "Expert",
+        "expert_type": body.expert_type,
+        "email_verified": True,
+    }, sort=[("last_login_at", -1), ("created_at", 1)])
+
+    record_id = f"esc-{uuid.uuid4().hex[:10]}"
     record = new_expert_escalation(
         id=record_id,
         conversation_id=body.conversation_id,
@@ -79,25 +94,43 @@ def expert_escalation(body: ExpertEscalationRequest, current_user: dict = Depend
         case_summary=decision.case_summary or body.query[:200],
         expert_type=body.expert_type,
         user_id=current_user["id"],
+        query=body.query,
+        assigned_expert_id=matching_expert.get("_id") if matching_expert else None,
+        assigned_expert_name=matching_expert.get("name") if matching_expert else None,
+        assigned_expert_email=matching_expert.get("email") if matching_expert else None,
+        status="assigned" if matching_expert else "pending",
     )
     db[EXPERT_ESCALATIONS_COLLECTION].insert_one(record)
 
-    expert_label = {"ayurveda": "Ayurveda", "legal": "Legal / IP", "regulatory": "Regulatory Affairs"}[body.expert_type]
-    email_service.send_expert_request_to_user(current_user["email"], current_user["name"], expert_label)
+    # Always confirm submission to the requester. If an eligible expert exists,
+    # notify that expert as well.
+    email_service.send_expert_request_to_user(
+        current_user["email"], current_user["name"], expert_label
+    )
 
-    matching_experts = db["users"].find({
-        "roles": "Expert",
-        "expert_type": body.expert_type,
-        "email_verified": True,
-    })
-    notified = 0
-    for expert in matching_experts:
-        if expert.get("email") == current_user.get("email"):
-            continue
-        if email_service.send_expert_request_to_expert(
-            expert["email"], expert.get("name", "Expert"), current_user["name"], expert_label, body.query
-        ):
-            notified += 1
+    expert_notified = False
+    if matching_expert and matching_expert.get("email") != current_user.get("email"):
+        expert_notified = email_service.send_expert_request_to_expert(
+            matching_expert["email"],
+            matching_expert.get("name", "Expert"),
+            current_user["name"],
+            expert_label,
+            body.query,
+        )
 
     expert_escalation_service.notify_real_service(record_id)
-    return {"success": True, "escalation_id": record_id, "status": record["status"], "matching_experts_notified": notified}
+    return {
+        "success": True,
+        "escalation_id": record_id,
+        "status": record["status"],
+        "expert_type": body.expert_type,
+        "expert_type_label": expert_label,
+        "expert_found": bool(matching_expert),
+        "expert_notified": expert_notified,
+        "expert": ({
+            "id": matching_expert.get("_id"),
+            "name": matching_expert.get("name", "Expert"),
+            "email": matching_expert.get("email"),
+            "type": expert_label,
+        } if matching_expert else None),
+    }

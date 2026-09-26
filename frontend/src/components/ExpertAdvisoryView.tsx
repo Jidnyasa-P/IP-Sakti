@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Scale,
   AlertTriangle,
@@ -20,11 +20,14 @@ import {
   HelpCircle,
   Award,
   RefreshCw,
-  Plus
+  Plus,
+  Bell,
+  X
 } from 'lucide-react';
 import { LowConfidenceQuery, ExpertReview, UserRole, Citation } from '../types';
 import { useExpertAdvisory } from '../context/ExpertAdvisoryContext';
 import { useAuth } from '../context/AuthContext';
+import { authFetch } from './auth/authStorage';
 
 interface ExpertAdvisoryViewProps {
   onOpenCitation?: (citation: Citation) => void;
@@ -33,13 +36,6 @@ interface ExpertAdvisoryViewProps {
 export const ExpertAdvisoryView: React.FC<ExpertAdvisoryViewProps> = ({ onOpenCitation }) => {
   const { queries, pendingCount, resolvedCount, resolveQuery, refreshQueries } = useExpertAdvisory();
   const { currentUser } = useAuth();
-  const expertTypeLabel = currentUser?.expert_type === 'ayurveda'
-    ? 'Ayurveda Expert'
-    : currentUser?.expert_type === 'legal'
-      ? 'Legal / IP Expert'
-      : currentUser?.expert_type === 'regulatory'
-        ? 'Regulatory Affairs Expert'
-        : 'Expert Advisor';
 
   const [selectedQueryId, setSelectedQueryId] = useState<string>(() => {
     return queries[0]?.id || '';
@@ -57,8 +53,65 @@ export const ExpertAdvisoryView: React.FC<ExpertAdvisoryViewProps> = ({ onOpenCi
   const [actionableGuidance, setActionableGuidance] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [expertSection, setExpertSection] = useState<'queue' | 'workspace'>('queue');
+  const [workspaceTab, setWorkspaceTab] = useState<'notifications' | 'grievances'>('notifications');
+  const [expertGrievances, setExpertGrievances] = useState<any[]>([]);
+  const [grievanceOpen, setGrievanceOpen] = useState(false);
+  const [grievanceSubmitting, setGrievanceSubmitting] = useState(false);
+  const [grievanceForm, setGrievanceForm] = useState({ subject: '', description: '' });
 
   const selectedQuery = queries.find(q => q.id === selectedQueryId) || queries[0];
+
+  useEffect(() => {
+    const openNotifications = () => {
+      setExpertSection('workspace');
+      setWorkspaceTab('notifications');
+    };
+    const openGrievances = () => {
+      setExpertSection('workspace');
+      setWorkspaceTab('grievances');
+    };
+    window.addEventListener('ipsakti:open-expert-notifications', openNotifications);
+    window.addEventListener('ipsakti:open-expert-grievances', openGrievances);
+    return () => {
+      window.removeEventListener('ipsakti:open-expert-notifications', openNotifications);
+      window.removeEventListener('ipsakti:open-expert-grievances', openGrievances);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (expertSection !== 'workspace') return;
+    authFetch('/api/workspace/grievances')
+      .then(async (res) => (res.ok ? res.json() : []))
+      .then((data) => setExpertGrievances(Array.isArray(data) ? data : []))
+      .catch(() => setExpertGrievances([]));
+  }, [expertSection]);
+
+  const submitExpertGrievance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!grievanceForm.subject.trim() || !grievanceForm.description.trim()) return;
+    setGrievanceSubmitting(true);
+    try {
+      const res = await authFetch('/api/workspace/grievances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: 'Expert dashboard',
+          subject: grievanceForm.subject.trim(),
+          description: grievanceForm.description.trim(),
+        }),
+      });
+      if (!res.ok) throw new Error('Unable to submit grievance.');
+      const created = await res.json();
+      setExpertGrievances((prev) => [created, ...prev]);
+      setGrievanceForm({ subject: '', description: '' });
+      setGrievanceOpen(false);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Unable to submit grievance.');
+    } finally {
+      setGrievanceSubmitting(false);
+    }
+  };
 
   // Initialize draft when switching queries
   const handleSelectQuery = (q: LowConfidenceQuery) => {
@@ -208,9 +261,90 @@ export const ExpertAdvisoryView: React.FC<ExpertAdvisoryViewProps> = ({ onOpenCi
     }
   };
 
+  const expertTypeName = ({ ayurveda: 'Ayurveda Expert', legal: 'Legal / IP Expert', regulatory: 'Regulatory Affairs Expert' } as Record<string, string>)[currentUser?.expert_type || ''] || 'Expert';
+
   return (
-    <div className="w-full bg-slate-50 min-h-[calc(100vh-4rem)] p-3 sm:p-5 lg:p-6 border-x-2 border-slate-200">
+    <div className="w-full bg-slate-50 min-h-[calc(100vh-4rem)] p-3 sm:p-5 lg:p-6">
       <div className="max-w-7xl mx-auto space-y-4">
+        <div className="bg-white border border-slate-300 rounded-2xl p-2 shadow-sm flex flex-wrap gap-2">
+          <button type="button" onClick={() => setExpertSection('queue')} className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors ${expertSection === 'queue' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+            Low-Confidence Queries
+          </button>
+          <button type="button" onClick={() => setExpertSection('workspace')} className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors ${expertSection === 'workspace' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+            My Workspace
+          </button>
+        </div>
+
+        {expertSection === 'workspace' ? (
+          <div className="space-y-4">
+            <div className="bg-white border border-slate-300 rounded-2xl p-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-700">Expert Workspace</p>
+                  <h1 className="text-xl font-serif font-bold text-slate-900 mt-1">My Workspace</h1>
+                  <p className="text-xs text-slate-500 mt-1">Manage your notifications and grievances.</p>
+                </div>
+                <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-200">{expertTypeName}</span>
+              </div>
+            </div>
+
+            <div className="flex border-b border-slate-300 gap-5 overflow-x-auto">
+              <button type="button" onClick={() => setWorkspaceTab('notifications')} className={`pb-3 text-xs font-semibold border-b-2 ${workspaceTab === 'notifications' ? 'border-emerald-700 text-slate-900' : 'border-transparent text-slate-500'}`}>My Notifications ({queries.length})</button>
+              <button type="button" onClick={() => setWorkspaceTab('grievances')} className={`pb-3 text-xs font-semibold border-b-2 ${workspaceTab === 'grievances' ? 'border-emerald-700 text-slate-900' : 'border-transparent text-slate-500'}`}>My Grievances ({expertGrievances.length})</button>
+            </div>
+
+            {workspaceTab === 'notifications' && (
+              <div className="space-y-3">
+                {queries.length === 0 ? (
+                  <div className="py-14 text-center bg-white border border-slate-300 rounded-2xl">
+                    <Bell className="w-8 h-8 mx-auto text-slate-300 mb-3" />
+                    <p className="text-sm font-semibold text-slate-700">No notifications yet.</p>
+                    <p className="text-xs text-slate-400 mt-1">Queries assigned to you will appear here.</p>
+                  </div>
+                ) : queries.map((q) => (
+                  <button key={q.id} type="button" onClick={() => { setExpertSection('queue'); handleSelectQuery(q); }} className="w-full text-left bg-white border border-slate-300 rounded-2xl p-5 shadow-sm hover:border-emerald-400 transition-colors">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-700">New expert consultation</p>
+                        <p className="text-sm font-semibold text-slate-900 mt-1">{q.query}</p>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-[10px] font-semibold border ${q.status === 'resolved' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>{q.status === 'resolved' ? 'Resolved' : 'Pending'}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-3">{q.created_at ? new Date(q.created_at).toLocaleString() : ''}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {workspaceTab === 'grievances' && (
+              <div className="space-y-4">
+                <div className="bg-white border border-slate-300 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div><h2 className="text-sm font-bold text-slate-900">My Grievances</h2><p className="text-xs text-slate-500 mt-1">View grievances you have submitted as an expert.</p></div>
+                  <button type="button" onClick={() => setGrievanceOpen(true)} className="px-4 py-2.5 rounded-xl bg-emerald-800 text-white text-xs font-semibold hover:bg-emerald-900">Raise a Grievance</button>
+                </div>
+                {expertGrievances.length === 0 ? (
+                  <div className="py-14 text-center bg-white border border-slate-300 rounded-2xl text-sm text-slate-500">No grievances have been submitted yet.</div>
+                ) : expertGrievances.map((g) => (
+                  <div key={g.id} className="bg-white border border-slate-300 rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] uppercase tracking-wider font-bold text-slate-500">{g.category}</p><h3 className="text-sm font-semibold text-slate-900 mt-1">{g.subject}</h3></div><span className="text-[10px] px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-semibold">{g.status}</span></div>
+                    <p className="text-xs text-slate-600 mt-3 whitespace-pre-wrap">{g.description}</p>
+                  </div>
+                ))}
+                {grievanceOpen && (
+                  <div className="fixed inset-0 z-[90] bg-slate-950/45 flex items-center justify-center p-4">
+                    <form onSubmit={submitExpertGrievance} className="w-full max-w-lg bg-white rounded-2xl border border-slate-300 shadow-2xl p-5 space-y-4">
+                      <div className="flex items-center justify-between"><h2 className="text-base font-bold text-slate-900">Raise a Grievance</h2><button type="button" onClick={() => setGrievanceOpen(false)} className="p-2 text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button></div>
+                      <input required value={grievanceForm.subject} onChange={(e) => setGrievanceForm({ ...grievanceForm, subject: e.target.value })} placeholder="Subject" className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm" />
+                      <textarea required rows={5} value={grievanceForm.description} onChange={(e) => setGrievanceForm({ ...grievanceForm, description: e.target.value })} placeholder="Describe your grievance" className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm resize-y" />
+                      <div className="flex justify-end gap-2"><button type="button" onClick={() => setGrievanceOpen(false)} className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold">Cancel</button><button type="submit" disabled={grievanceSubmitting} className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold disabled:opacity-60">{grievanceSubmitting ? 'Submitting...' : 'Submit Grievance'}</button></div>
+                    </form>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
         {/* Success Toast Banner */}
         {successToast && (
           <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs font-medium text-emerald-950 flex items-center justify-between shadow-xs animate-in fade-in slide-in-from-top-2 duration-200">
@@ -229,23 +363,23 @@ export const ExpertAdvisoryView: React.FC<ExpertAdvisoryViewProps> = ({ onOpenCi
         )}
 
         {/* Legal Advisor Console Header */}
-        <div className="bg-white border-2 border-slate-300 rounded-2xl p-4 sm:p-6 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1.5 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300">
                   <Scale className="w-3.5 h-3.5 text-emerald-800" />
-                  {expertTypeLabel} Console
+                  Legal Advisor Console
                 </span>
                 <span className="text-xs text-slate-500 font-medium">
-                  Assigned consultation queue
+                  Authoritative Statutory Dispute Resolution
                 </span>
               </div>
               <h1 className="text-xl sm:text-2xl font-serif font-bold text-slate-900">
-                Low-Confidence Inquiries & Expert Guidance Queue
+                Low-Confidence Inquiries & Legal Advisory Queue
               </h1>
               <p className="text-xs sm:text-sm text-slate-600 max-w-3xl leading-relaxed">
-                Review queries redirected to your expert category after low-confidence AI responses. Provide domain-specific guidance and actionable next steps based on the query and authoritative sources.
+                As an IPR Legal Advisor, review queries flagged with low AI confidence or statutory ambiguity submitted by AYUSH Practitioners, Researchers, and Organizations. Provide verified legal commentary, statutory clause interpretations, and actionable filing directives.
               </p>
             </div>
 
@@ -361,7 +495,7 @@ export const ExpertAdvisoryView: React.FC<ExpertAdvisoryViewProps> = ({ onOpenCi
                 </p>
               </div>
             ) : (
-              <div className="space-y-2.5 pr-1">
+              <div className="space-y-2.5 max-h-[750px] overflow-y-auto pr-1">
                 {filteredQueries.map(q => {
                   const isSelected = selectedQuery?.id === q.id;
                   const isPending = q.status !== 'resolved';
@@ -777,6 +911,8 @@ export const ExpertAdvisoryView: React.FC<ExpertAdvisoryViewProps> = ({ onOpenCi
             )}
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

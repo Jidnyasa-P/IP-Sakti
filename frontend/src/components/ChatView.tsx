@@ -468,7 +468,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
   // Which low-confidence message's "choose an expert" picker is currently
   // open (its list of expert-type buttons), keyed by message id.
   const [expertPickerOpenMsgId, setExpertPickerOpenMsgId] = useState<string | null>(null);
-  const [expertConfirmation, setExpertConfirmation] = useState<any | null>(null);
+  const [expertContactInfo, setExpertContactInfo] = useState<{
+    expert?: { name?: string; email?: string; type?: string } | null;
+    expertTypeLabel: string;
+    status: string;
+    expertNotified: boolean;
+  } | null>(null);
 
   const EXPERT_TYPES: { id: string; label: string }[] = [
     { id: "ayurveda", label: "Ayurveda Expert" },
@@ -975,22 +980,39 @@ export const ChatView: React.FC<ChatViewProps> = ({
     if (!activeConvId || !msg.confidence || expertRequestingMsgId === msg.id) return;
     setExpertRequestingMsgId(msg.id);
     try {
-      const messageIndex = messages.findIndex((m) => m.id === msg.id);
-      let relatedQuery = '';
-      for (let i = messageIndex - 1; i >= 0; i -= 1) {
-        if (messages[i].role === 'user') { relatedQuery = messages[i].content || messages[i].answer || ''; break; }
-      }
-      const res = await authFetch('/api/expert-escalations/request', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation_id: activeConvId, query: relatedQuery, reason: `Confidence score below 80% (${Math.round((msg.confidence.score <= 1 ? msg.confidence.score * 100 : msg.confidence.score))}%).`, expert_type: expertType }),
+      const res = await authFetch("/api/expert-escalation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversation_id: activeConvId,
+          query: (() => {
+            const messageIndex = messages.findIndex((m) => m.id === msg.id);
+            for (let i = messageIndex - 1; i >= 0; i -= 1) {
+              if (messages[i].role === "user") return messages[i].content || messages[i].answer || "Low-confidence consultation";
+            }
+            return "Low-confidence consultation";
+          })(),
+          reason: `Confidence score below 80% (${Math.round((msg.confidence.score <= 1 ? msg.confidence.score * 100 : msg.confidence.score))}%).`,
+          expert_type: expertType,
+        }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.detail || 'The expert consultation request could not be submitted.');
+      if (!res.ok) {
+        throw new Error(data?.detail || "The expert consultation request could not be submitted.");
+      }
       setExpertRequestedMsgIds((prev) => new Set(prev).add(msg.id));
-      setExpertPickerOpenMsgId(null); setExpertConfirmation(data);
+      setExpertPickerOpenMsgId(null);
+      setExpertContactInfo({
+        expert: data?.expert || null,
+        expertTypeLabel: data?.expert_type_label || expertType,
+        status: data?.status || "pending",
+        expertNotified: Boolean(data?.expert_notified),
+      });
     } catch (err) {
-      setGrievanceNotice(err instanceof Error ? err.message : 'The expert consultation request could not be submitted.');
-    } finally { setExpertRequestingMsgId(null); }
+      console.warn("Expert review request failed:", err);
+    } finally {
+      setExpertRequestingMsgId(null);
+    }
   };
 
   const raiseGrievance = (msg: StructuredChatMessage) => {
@@ -1584,6 +1606,44 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   return (
     <div className="flex h-[calc(100dvh-4rem)] min-h-0 overflow-hidden bg-slate-50 relative border border-slate-300">
+      {expertContactInfo && (
+        <div className="fixed inset-0 z-[90] bg-slate-950/45 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white border border-slate-300 shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-700">Expert Guidance</p>
+                <h2 className="text-lg font-bold text-slate-900 mt-1">Expert consultation submitted</h2>
+              </div>
+              <button type="button" onClick={() => setExpertContactInfo(null)} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" aria-label="Close">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Selected expert type</p>
+                <p className="text-sm font-semibold text-slate-900 mt-1">{expertContactInfo.expertTypeLabel}</p>
+              </div>
+              {expertContactInfo.expert ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="text-[10px] uppercase tracking-wider font-semibold text-emerald-800">{expertContactInfo.expertNotified ? "Expert informed" : "Expert assigned"}</p>
+                  <p className="text-sm font-bold text-emerald-950 mt-1">{expertContactInfo.expert.name || "Assigned expert"}</p>
+                  {expertContactInfo.expert.email && <p className="text-xs text-emerald-800 mt-0.5">{expertContactInfo.expert.email}</p>}
+                  <p className="text-xs text-emerald-800 mt-2">{expertContactInfo.expertNotified ? "The selected expert has been informed." : "The request has been assigned, but the notification could not be confirmed."} Track the request in My Workspace → Expert Guidance.</p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  Your request has been recorded, but no verified expert of this type is currently available. You can track the request in My Workspace → Expert Guidance.
+                </div>
+              )}
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Status</span>
+                <span className="px-2 py-1 rounded-full bg-white border border-slate-300 font-semibold text-slate-700 capitalize">{expertContactInfo.status}</span>
+              </div>
+              <button type="button" onClick={() => setExpertContactInfo(null)} className="w-full rounded-xl bg-slate-900 hover:bg-slate-800 text-white py-2.5 text-sm font-semibold">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Sidebar Overlay for Mobile */}
       {sidebarOpen && (
         <div

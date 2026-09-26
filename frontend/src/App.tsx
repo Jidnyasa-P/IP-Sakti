@@ -7,12 +7,12 @@ import { IPRNavigatorView } from "./components/IPRNavigatorView";
 import { TraditionalKnowledgeView } from "./components/TraditionalKnowledgeView";
 import { ResearchView } from "./components/ResearchView";
 import { WorkspaceView } from "./components/WorkspaceView";
+import { HelpDeskView } from "./components/HelpDeskView";
 import { AdminView } from "./components/AdminView";
 import { LoginView } from "./components/LoginView";
 import { RegisterView } from "./components/RegisterView";
 import { ProfileView } from "./components/ProfileView";
 import { ExpertAdvisoryView } from "./components/ExpertAdvisoryView";
-import { HelpDeskView } from "./components/HelpDeskView";
 import { CitationModal } from "./components/CitationModal";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { GuidedTour } from "./components/GuidedTour";
@@ -153,6 +153,9 @@ function AppContent() {
           />
         );
       }
+      if (activeTab === "helpdesk") {
+        return <HelpDeskView setActiveTab={setActiveTab} onRaiseGrievance={() => { setActiveTab("expert"); window.setTimeout(() => window.dispatchEvent(new CustomEvent("ipsakti:open-expert-grievances")), 0); }} onOpenLegal={(doc) => setLegalDocument(doc)} />;
+      }
       if (activeTab === "profile") {
         return <ProfileView setActiveTab={setActiveTab} />;
       }
@@ -204,7 +207,7 @@ function AppContent() {
           <ResearchView onOpenCitation={(cite) => setActiveCitation(cite)} />
         );
       case "helpdesk":
-        return <HelpDeskView setActiveTab={setActiveTab} onRaiseGrievance={() => handleRaiseGrievance({})} />;
+        return <HelpDeskView setActiveTab={setActiveTab} onRaiseGrievance={() => handleRaiseGrievance({})} onOpenLegal={(doc) => setLegalDocument(doc)} />;
       case "workspace":
         return (
           <WorkspaceView
@@ -267,18 +270,18 @@ function AppContent() {
       <LegalPolicyModal document={legalDocument} onClose={() => setLegalDocument(null)} />
 
       {/* Persistent Official Portals Footer */}
-      <footer className="w-full bg-slate-950 dark:bg-black border-t-2 border-slate-800 py-8 mt-auto mb-14 lg:mb-0 transition-colors">
+      <footer className="w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-7 mt-auto mb-14 lg:mb-0 transition-colors">
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
             <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 flex items-center justify-center shrink-0">
               <img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="w-full h-full object-contain" />
             </div>
-            <span className="font-serif font-bold text-white text-sm">
+            <span className="font-serif font-bold text-slate-800 dark:text-slate-200 text-sm">
               {t("brand.name", "IP-SAKTI")} {t("brand.badge", "Sahayak")}
             </span>
-            <span className="text-slate-600">|</span>
-            <span className="truncate text-slate-400 text-xs">
+            <span className="text-slate-400 dark:text-slate-600">|</span>
+            <span className="truncate">
               {t(
                 "footer.brand_subtitle",
                 "AYUSH & Traditional Knowledge IPR Research Platform",
@@ -287,25 +290,25 @@ function AppContent() {
           </div>
 
           {/* Official Statutory Portal Links — URLs are resolved from manifest-backed document metadata. */}
-            <div className="flex flex-wrap items-center justify-center lg:justify-end gap-x-6 gap-y-3 text-xs text-slate-200">
+            <div className="flex flex-wrap items-center justify-center lg:justify-end gap-x-5 gap-y-2 text-[11px]">
               {officialPortalLinks.map((link) => (
                 <a
                   key={link.id}
                   href={link.url}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-slate-200 hover:text-white hover:underline flex items-center gap-1"
+                  className="hover:text-slate-800 dark:hover:text-slate-200 hover:underline flex items-center gap-1"
                 >
                   <span>{link.label}</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
               ))}
-              <span className="hidden lg:inline text-slate-700">|</span>
-              <button type="button" onClick={() => setLegalDocument("terms")} className="font-semibold text-white hover:text-emerald-300 hover:underline">Terms & Conditions</button>
-              <button type="button" onClick={() => setLegalDocument("privacy")} className="font-semibold text-white hover:text-emerald-300 hover:underline">Privacy Policy</button>
+              <span className="hidden lg:inline text-slate-300 dark:text-slate-700">|</span>
+              <button type="button" onClick={() => setLegalDocument("terms")} className="font-semibold hover:text-emerald-700 dark:hover:text-emerald-400 hover:underline">Terms & Conditions</button>
+              <button type="button" onClick={() => setLegalDocument("privacy")} className="font-semibold hover:text-emerald-700 dark:hover:text-emerald-400 hover:underline">Privacy Policy</button>
             </div>
           </div>
-          <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-slate-800 pt-4 text-[10px] text-slate-400">
+          <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-4 text-[10px] text-slate-400 dark:text-slate-500">
             <span>AI-assisted research and decision support • Verify important information against current official sources.</span>
             <span>© {new Date().getFullYear()} IP-SAKTI Sahayak</span>
           </div>

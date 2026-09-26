@@ -15,8 +15,7 @@ def new_expert_escalation(
     status: str = "pending",
     expert_type: str | None = None,
     user_id: str | None = None,
-    requester_name: str | None = None,
-    requester_email: str | None = None,
+    query: str | None = None,
     assigned_expert_id: str | None = None,
     assigned_expert_name: str | None = None,
     assigned_expert_email: str | None = None,
@@ -28,12 +27,11 @@ def new_expert_escalation(
         "recommended": recommended,
         "reason": reason,
         "case_summary": case_summary,
-        "expert_type": expert_type,  # e.g. "ayurveda" | "legal" | "regulatory"
-        "requester_name": requester_name,
-        "requester_email": requester_email,
+        "query": query,
+        "expert_type": expert_type,
         "assigned_expert_id": assigned_expert_id,
         "assigned_expert_name": assigned_expert_name,
-        "assigned_expert_email": assigned_expert_email,
+        "assigned_expert_email": assigned_expert_email,  # e.g. "ayurveda" | "legal" | "ip_patent"
         "status": status,  # pending | assigned | resolved
         "created_at": datetime.now(timezone.utc),
     }
