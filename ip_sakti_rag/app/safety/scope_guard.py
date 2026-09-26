@@ -86,6 +86,15 @@ def check_scope(query: str, jurisdiction: str | None) -> ScopeCheckResult:
     if classification is None:
         return _degraded_jurisdiction_only_check(query, jurisdiction)
 
+    # Explicit jurisdiction wording in the user's query is authoritative for the
+    # India/International toggle. This prevents an LLM classification edge case
+    # from silently sending an explicitly Indian or international query through
+    # the wrong jurisdiction filter. Comparative queries containing both remain
+    # neutral and are handled by the existing UI mismatch guard.
+    explicit_scope = _explicit_jurisdiction_scope(query)
+    if explicit_scope:
+        classification["jurisdiction_scope"] = explicit_scope
+
     if classification.get("prompt_injection"):
         return ScopeCheckResult(
             allowed=False,
@@ -203,10 +212,24 @@ _INDIA_TERMS = re.compile(
     re.IGNORECASE,
 )
 _INTERNATIONAL_TERMS = re.compile(
-    r"\b(pct|patent\s*cooperation\s*treaty|wipo|uspto|epo|european\s*patent\s*office|"
-    r"jpo|ukipo|nagoya\s*protocol|\bcbd\b|trips|foreign\s*patent|national\s*phase)\b",
+    r"\b(international|internationally|global|overseas|foreign|pct|patent\s*cooperation\s*treaty|"
+    r"wipo|uspto|epo|european\s*patent\s*office|jpo|ukipo|nagoya\s*protocol|\bcbd\b|"
+    r"trips|foreign\s*patent|national\s*phase)\b",
     re.IGNORECASE,
 )
+
+
+def _explicit_jurisdiction_scope(query: str) -> str | None:
+    """Return a deterministic scope when the user explicitly names a jurisdiction."""
+    is_india = bool(_INDIA_TERMS.search(query))
+    is_international = bool(_INTERNATIONAL_TERMS.search(query))
+    if is_india and is_international:
+        return "both_or_neutral"
+    if is_india:
+        return "india_only"
+    if is_international:
+        return "international_only"
+    return None
 
 
 def _degraded_jurisdiction_only_check(query: str, jurisdiction: str) -> ScopeCheckResult:

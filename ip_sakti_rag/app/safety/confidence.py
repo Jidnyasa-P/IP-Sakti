@@ -14,13 +14,13 @@ from app.schemas import ConfidenceLevel, ConfidenceMetric
 # The raw fused retrieval score only has to clear fairly low bars (see the
 # confidence_*_threshold settings, e.g. 0.45 for "High") to be classified into
 # a given level -- it was never itself a meaningful "confidence percentage",
-# even though it was being shown to users and compared against a 70%/80%
+# even though it was being shown to users and compared against the 80%
 # expert-escalation cutoff as if it were one. That mismatch is what made a
 # well-cited "High" answer show up at ~50% and get redirected to an expert
 # anyway. Each level is now rescaled into a fixed 0-1 band that means what it
-# says: High -> 0.80-1.00, Moderate -> 0.70-0.79 (still no expert redirect),
-# Low -> 0.40-0.69, Insufficient evidence -> 0.05-0.39 (both redirect, since
-# expert_escalation_service escalates anything below 0.70).
+# says: High -> 0.80-1.00 (no expert redirect), Moderate -> 0.70-0.79
+# (expert redirect because it is below 80%), Low -> 0.40-0.69, and
+# Insufficient evidence -> 0.05-0.39.
 _SCORE_BANDS: dict[ConfidenceLevel, tuple[float, float]] = {
     "High": (0.80, 1.00),
     "Moderate": (0.70, 0.79),

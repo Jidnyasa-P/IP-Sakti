@@ -24,7 +24,7 @@ def decide_abstention(
     """
     needs_clarification = chunk_count == 0 and confidence.score < settings.abstain_below_score
     # Expert redirection is driven purely by the (rescaled, percentage-
-    # meaningful) confidence score: >=70% never redirects, <70% always does.
+    # meaningful) confidence score: >=80% never redirects, <80% always does.
     # This used to also force a redirect for high-risk intents or any
     # cross-border query regardless of how strong the retrieved evidence
     # was, which made a well-cited "High confidence" answer get redirected

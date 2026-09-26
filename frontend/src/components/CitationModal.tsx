@@ -143,10 +143,10 @@ export const CitationModal: React.FC<CitationModalProps> = ({ citation, onClose 
                   target="_blank"
                   rel="noreferrer noopener"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-xs shadow-2xs transition-colors"
-                  title="Visit the official source recorded in manifest.json"
+                  title="Open the official link"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Official Source from Manifest</span>
+                  <span>Official link</span>
                 </a>
               )}
             </div>

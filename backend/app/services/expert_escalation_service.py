@@ -32,9 +32,9 @@ def evaluate_escalation(
     reasons = []
     if user_requested:
         reasons.append("User explicitly requested expert consultation.")
-    if confidence_level in LOW_CONFIDENCE_LEVELS or (confidence_score is not None and confidence_score < 0.70):
-        if confidence_score is not None and confidence_score < 0.70:
-            reasons.append(f"Confidence score is below 70% ({confidence_score:.0%}).")
+    if confidence_level in LOW_CONFIDENCE_LEVELS or (confidence_score is not None and confidence_score < 0.80):
+        if confidence_score is not None and confidence_score < 0.80:
+            reasons.append(f"Confidence score is below 80% ({confidence_score:.0%}).")
         else:
             reasons.append(f"Retrieval confidence is '{confidence_level}'.")
     if has_conflicts:
