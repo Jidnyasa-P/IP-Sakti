@@ -114,12 +114,16 @@ export const LandingView: React.FC<LandingViewProps> = ({
   return (
     <div className="w-full overflow-hidden">
       {/* Hero */}
-      <section className="relative isolate px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 lg:pt-16 pb-14 sm:pb-20">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.15),transparent_32%),radial-gradient(circle_at_15%_45%,rgba(20,184,166,0.10),transparent_28%)]" />
-        <div className="absolute top-8 right-[-5rem] -z-10 h-48 w-48 rounded-full bg-emerald-200/30 blur-3xl dark:bg-emerald-900/20" />
-        <div className="absolute bottom-0 left-[-4rem] -z-10 h-40 w-40 rounded-full bg-teal-200/30 blur-3xl dark:bg-teal-900/20" />
+      <section className="relative isolate overflow-hidden px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 lg:pt-16 pb-14 sm:pb-20 min-h-[620px] flex items-center">
+        <div
+          className="absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/landing-section-1-knowledge.png')" }}
+          aria-hidden="true"
+        />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-white/86 via-white/52 to-white/10 dark:from-slate-950/90 dark:via-slate-950/58 dark:to-slate-950/12" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-white/10 via-transparent to-white/30 dark:from-slate-950/10 dark:to-slate-950/30" />
 
-        <div className="max-w-6xl mx-auto grid lg:grid-cols-[1.15fr_0.85fr] gap-10 lg:gap-14 items-center">
+        <div className="max-w-6xl mx-auto w-full">
           <div className="text-center lg:text-left">
             <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold tracking-wide shadow-sm dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-200">
               <ShieldCheck className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
@@ -130,14 +134,14 @@ export const LandingView: React.FC<LandingViewProps> = ({
               IP-SAKTI <span className="text-emerald-700 dark:text-emerald-400">Sahayak</span>
             </h1>
 
-            <p className="mt-5 max-w-2xl mx-auto lg:mx-0 text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed">
+            <p className="mt-5 max-w-[35rem] mx-auto lg:mx-0 text-base sm:text-lg text-slate-700 dark:text-slate-200 leading-relaxed">
               {t(
                 'landing.hero_subtitle',
                 'AI-powered assistance for AYUSH, intellectual property, traditional knowledge and regulatory research.'
               )}
             </p>
 
-            <p className="mt-4 max-w-xl mx-auto lg:mx-0 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="mt-4 max-w-[28rem] mx-auto lg:mx-0 text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
               One place to explore regulations, understand product pathways, research intellectual property and work with authoritative knowledge sources.
             </p>
 
@@ -209,54 +213,17 @@ export const LandingView: React.FC<LandingViewProps> = ({
             )}
           </div>
 
-          {/* Visual portal summary */}
-          <div className="relative max-w-md w-full mx-auto lg:ml-auto">
-            <div className="absolute -inset-3 rounded-[2rem] bg-gradient-to-br from-emerald-300/30 via-transparent to-teal-300/20 blur-xl" />
-            <div className="relative rounded-[2rem] border border-emerald-200/80 dark:border-emerald-800/70 bg-white/85 dark:bg-slate-900/90 backdrop-blur-xl p-5 sm:p-6 shadow-2xl shadow-emerald-900/10">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.18em] font-bold text-emerald-700 dark:text-emerald-400">Sahayak Portal</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">Your IP & AYUSH research workspace</p>
-                </div>
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 flex items-center justify-center">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {[
-                  ['Ask', 'Regulatory and IPR questions', Sparkles],
-                  ['Analyze', 'Classify and assess products', FlaskConical],
-                  ['Navigate', 'Explore protection pathways', Compass],
-                  ['Research', 'Search authoritative sources', BookOpen],
-                ].map(([title, desc, Icon]) => {
-                  const CapabilityIcon = Icon as React.ElementType;
-                  return (
-                    <div key={title as string} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-                      <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 flex items-center justify-center shrink-0">
-                        <CapabilityIcon className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{title as string}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">{desc as string}</p>
-                      </div>
-                      <ArrowRight className="w-4 h-4 ml-auto text-slate-400 shrink-0" />
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-5 flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                <Globe2 className="w-3.5 h-3.5 text-emerald-700" />
-                India & international jurisdiction-aware research
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
       {/* Capabilities */}
-      <section className="px-4 sm:px-6 lg:px-8 py-12 sm:py-16 bg-white/70 dark:bg-slate-900/40 border-y border-slate-300 dark:border-slate-700">
+      <section className="relative isolate overflow-hidden px-4 sm:px-6 lg:px-8 py-12 sm:py-16 border-y border-slate-300 dark:border-slate-700">
+        <div
+          className="absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/landing-section-2-science.png')" }}
+          aria-hidden="true"
+        />
+        <div className="absolute inset-0 -z-10 bg-white/62 dark:bg-slate-950/68" />
         <div className="max-w-6xl mx-auto">
           <div className="max-w-2xl mb-8">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">Explore the platform</p>
@@ -271,14 +238,14 @@ export const LandingView: React.FC<LandingViewProps> = ({
                   key={item.title}
                   type="button"
                   onClick={() => handleActionClick(item.id)}
-                  className="group text-left p-5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/70 hover:border-emerald-400 dark:hover:border-emerald-600 hover:-translate-y-1 transition-all shadow-sm hover:shadow-lg"
+                  className="group text-left p-5 rounded-2xl bg-white/94 dark:bg-slate-900/94 border border-emerald-200 dark:border-emerald-900/70 hover:border-emerald-400 dark:hover:border-emerald-600 hover:-translate-y-1 transition-all shadow-sm hover:shadow-lg"
                 >
                   <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/50">
                     <Icon className="w-5 h-5" />
                   </div>
                   <div className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 tracking-wider uppercase mb-1">{item.tag}</div>
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{item.title}</h3>
-                  <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{item.description}</p>
+                  <p className="mt-1.5 text-sm text-slate-800 dark:text-slate-100 leading-relaxed">{item.description}</p>
                   <span className="mt-5 inline-flex items-center text-xs font-semibold text-emerald-800 dark:text-emerald-400">
                     {isLoggedIn ? 'Open module' : 'Sign in to explore'}
                     <ArrowRight className="w-3.5 h-3.5 ml-1.5 group-hover:translate-x-1 transition-transform" />
@@ -291,12 +258,18 @@ export const LandingView: React.FC<LandingViewProps> = ({
       </section>
 
       {/* FAQs */}
-      <section id="faqs" className="px-4 sm:px-6 lg:px-8 py-14 sm:py-20 bg-slate-50/80 dark:bg-slate-950/40 border-y border-slate-300 dark:border-slate-700">
+      <section id="faqs" className="relative isolate overflow-hidden px-4 sm:px-6 lg:px-8 py-14 sm:py-20 border-y border-slate-300 dark:border-slate-700">
+        <div
+          className="absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/landing-section-3-ip.png')" }}
+          aria-hidden="true"
+        />
+        <div className="absolute inset-0 -z-10 bg-white/64 dark:bg-slate-950/70" />
         <div className="max-w-4xl mx-auto">
           <div className="max-w-2xl mb-8">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">Frequently Asked Questions</p>
             <h2 className="mt-2 text-3xl sm:text-4xl font-serif font-semibold text-slate-950 dark:text-white">Common questions about IP-SAKTI Sahayak</h2>
-            <p className="mt-3 text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">Find quick answers about the assistant, jurisdiction modes, expert consultation and the information you provide.</p>
+            <p className="mt-3 text-sm sm:text-base text-slate-800 dark:text-slate-100 leading-relaxed">Find quick answers about the assistant, jurisdiction modes, expert consultation and the information you provide.</p>
           </div>
 
           <div className="space-y-3">
@@ -342,7 +315,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                     <ChevronDown className={`w-4 h-4 shrink-0 text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                   </button>
                   {isOpen && (
-                    <div className="border-t border-slate-200 dark:border-slate-700 px-4 sm:px-5 py-4 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                    <div className="border-t border-slate-200 dark:border-slate-700 px-4 sm:px-5 py-4 text-sm leading-relaxed text-slate-800 dark:text-slate-100">
                       {faq.answer}
                     </div>
                   )}
@@ -354,7 +327,13 @@ export const LandingView: React.FC<LandingViewProps> = ({
       </section>
 
       {/* About Us */}
-      <section id="about-us" className="px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
+      <section id="about-us" className="relative isolate overflow-hidden px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
+        <div
+          className="absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/landing-section-4-global.png')" }}
+          aria-hidden="true"
+        />
+        <div className="absolute inset-0 -z-10 bg-white/64 dark:bg-slate-950/70" />
         <div className="max-w-6xl mx-auto grid lg:grid-cols-[0.8fr_1.2fr] gap-8 lg:gap-14 items-start">
           <div>
             <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 flex items-center justify-center">
@@ -364,28 +343,28 @@ export const LandingView: React.FC<LandingViewProps> = ({
             <h2 className="mt-2 text-3xl sm:text-4xl font-serif font-semibold text-slate-950 dark:text-white">Making complex IP & AYUSH information easier to navigate.</h2>
           </div>
 
-          <div className="space-y-5 text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
-            <p>
+          <div className="space-y-5 text-sm sm:text-base text-slate-900 dark:text-slate-100 leading-relaxed">
+            <p className="font-bold text-emerald-900 dark:text-emerald-300">
               IP-SAKTI Sahayak is a decision-support platform designed for AYUSH innovators, researchers, practitioners, startups and institutions working with intellectual property and regulatory questions.
             </p>
-            <p>
+            <p className="font-bold text-emerald-900 dark:text-emerald-300">
               The platform brings together AI-assisted question answering, product analysis, IPR navigation, traditional-knowledge research and statutory information in one workspace. Its goal is to reduce the friction between discovering relevant information and understanding how that information applies to a real-world idea or product.
             </p>
             <div className="grid sm:grid-cols-3 gap-3 pt-2">
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <Scale className="w-5 h-5 text-emerald-700 mb-2" />
                 <p className="text-sm font-semibold text-slate-900 dark:text-white">Source-aware</p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Designed around authoritative knowledge.</p>
+                <p className="mt-1 text-xs text-slate-700 dark:text-slate-200">Designed around authoritative knowledge.</p>
               </div>
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <Globe2 className="w-5 h-5 text-emerald-700 mb-2" />
                 <p className="text-sm font-semibold text-slate-900 dark:text-white">Multilingual</p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Built for accessible research across languages.</p>
+                <p className="mt-1 text-xs text-slate-700 dark:text-slate-200">Built for accessible research across languages.</p>
               </div>
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <FileText className="w-5 h-5 text-emerald-700 mb-2" />
                 <p className="text-sm font-semibold text-slate-900 dark:text-white">Decision support</p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Helps users investigate before they act.</p>
+                <p className="mt-1 text-xs text-slate-700 dark:text-slate-200">Helps users investigate before they act.</p>
               </div>
             </div>
           </div>

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, ExternalLink, Landmark } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 
 export interface OfficialPortalLink {
   id: string;
@@ -11,31 +11,22 @@ interface OfficialPartnersCarouselProps {
   links: OfficialPortalLink[];
 }
 
-const FALLBACK_LOGO = "https://www.google.com/s2/favicons?domain=example.com&sz=128";
-
-function hostnameFor(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return "official portal";
-  }
-}
-
-function logoFor(url: string): string {
-  const host = hostnameFor(url);
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`;
-}
+/** Official partner links taken directly from the supplied manifest.json. */
+const MANIFEST_PARTNERS: OfficialPortalLink[] = [
+  { id: "ip-india", label: "IP India", url: "https://ipindia.gov.in/resource/patents-resources-act" },
+  { id: "ppvfra", label: "PPV&FR Authority", url: "https://plantauthority.gov.in/compendium-varieties-registered-under-ppvfr-act-2001" },
+  { id: "nba", label: "National Biodiversity Authority", url: "https://www.nbaindia.nic.in/acts-and-rules/acts" },
+  { id: "cdsco", label: "CDSCO", url: "https://cdsco.gov.in/opencms/opencms/en/Acts-and-rules/Drugs-and-Cosmetics-Act/" },
+  { id: "fssai", label: "FSSAI", url: "https://fssai.gov.in/food-law/regulations" },
+  { id: "wipo", label: "WIPO", url: "https://www.wipo.int/pct/en/" },
+  { id: "india-code", label: "India Code", url: "https://indiacode.gov.in/act/a0e67f19-8e2e-4ba2-bde4-6354e5ff7dee/sections" },
+  { id: "meity", label: "MeitY", url: "https://www.meity.gov.in/documents/act-and-policies?page=2" },
+  { id: "cbd", label: "Convention on Biological Diversity", url: "https://www.cbd.int/abs/" },
+];
 
 export const OfficialPartnersCarousel: React.FC<OfficialPartnersCarouselProps> = ({ links }) => {
-  const partners = useMemo(() => {
-    const seenHosts = new Set<string>();
-    return links.filter((link) => {
-      const host = hostnameFor(link.url);
-      if (seenHosts.has(host)) return false;
-      seenHosts.add(host);
-      return Boolean(link.url);
-    });
-  }, [links]);
+  const partners = MANIFEST_PARTNERS;
+
 
   const [startIndex, setStartIndex] = useState(0);
   const [visibleCount, setVisibleCount] = useState(5);
@@ -49,6 +40,7 @@ export const OfficialPartnersCarousel: React.FC<OfficialPartnersCarouselProps> =
       else if (window.innerWidth < 1280) setVisibleCount(3);
       else setVisibleCount(5);
     };
+
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
@@ -58,10 +50,11 @@ export const OfficialPartnersCarousel: React.FC<OfficialPartnersCarouselProps> =
     const measure = () => {
       const width = viewportRef.current?.clientWidth || 0;
       if (!width) return;
-      const gap = 12;
+      const gap = 14;
       const cardWidth = (width - gap * (visibleCount - 1)) / visibleCount;
       setStepPx(cardWidth + gap);
     };
+
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
@@ -74,48 +67,63 @@ export const OfficialPartnersCarousel: React.FC<OfficialPartnersCarouselProps> =
 
   useEffect(() => {
     if (partners.length <= visibleCount) return;
+
     const timer = window.setInterval(() => {
       setStartIndex((current) => {
         const maxStart = Math.max(0, partners.length - visibleCount);
         return current >= maxStart ? 0 : current + 1;
       });
     }, 3200);
+
     return () => window.clearInterval(timer);
   }, [partners.length, visibleCount]);
 
-  if (partners.length === 0) return null;
-
-  const gapPx = 12;
+  const gapPx = 14;
   const cardWidth = `calc((100% - ${(visibleCount - 1) * gapPx}px) / ${visibleCount})`;
 
+  const goPrevious = () => {
+    setStartIndex((current) => {
+      const maxStart = Math.max(0, partners.length - visibleCount);
+      return current <= 0 ? maxStart : current - 1;
+    });
+  };
+
+  const goNext = () => {
+    setStartIndex((current) => {
+      const maxStart = Math.max(0, partners.length - visibleCount);
+      return current >= maxStart ? 0 : current + 1;
+    });
+  };
+
   return (
-    <section className="w-full bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 py-5 sm:py-6" aria-label="Official partner and source portals">
+    <section
+      className="w-full bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 py-4 sm:py-5"
+      aria-label="Official partner organizations"
+    >
       <div className="w-full max-w-[1800px] mx-auto px-3 sm:px-5 lg:px-8">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.16em] text-emerald-800 dark:text-emerald-400">Official Sources</p>
-            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5">Verified portals referenced by IP-SAKTI</p>
-          </div>
-          <div className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400">
-            <Landmark className="w-3.5 h-3.5" />
-            Government & international knowledge portals
-          </div>
+        <div className="mb-3 text-center">
+          <p className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+            Official Knowledge Partners
+          </p>
         </div>
 
         <div className="relative">
           <button
             type="button"
-            onClick={() => setStartIndex((current) => current <= 0 ? Math.max(0, partners.length - visibleCount) : current - 1)}
-            aria-label="Previous official source"
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-9 w-9 sm:h-11 sm:w-11 rounded-lg bg-blue-800 hover:bg-blue-900 text-white shadow-md flex items-center justify-center transition-colors"
+            onClick={goPrevious}
+            aria-label="Previous partner"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-blue-800 hover:bg-blue-900 text-white shadow-md flex items-center justify-center transition-colors"
           >
             <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
 
-          <div ref={viewportRef} className="mx-11 sm:mx-14 overflow-hidden">
+          <div ref={viewportRef} className="mx-12 sm:mx-16 overflow-hidden">
             <div
               className="flex items-stretch transition-transform duration-700 ease-in-out will-change-transform"
-              style={{ gap: `${gapPx}px`, transform: `translateX(-${startIndex * stepPx}px)` }}
+              style={{
+                gap: `${gapPx}px`,
+                transform: `translateX(-${startIndex * stepPx}px)`,
+              }}
             >
               {partners.map((partner) => (
                 <a
@@ -123,26 +131,19 @@ export const OfficialPartnersCarousel: React.FC<OfficialPartnersCarouselProps> =
                   href={partner.url}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="shrink-0 min-w-0 h-24 sm:h-28 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 rounded-lg px-4 flex items-center justify-center gap-3 hover:border-emerald-400 hover:shadow-md transition-all"
+                  className="shrink-0 min-h-28 sm:min-h-32 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 flex flex-col items-center justify-center gap-2 px-4 py-4 hover:border-emerald-400 hover:shadow-md transition-all"
                   style={{ width: cardWidth }}
-                  title={`Open ${partner.label}`}
+                  title={`Official link — ${partner.label}`}
+                  aria-label={`Open official link for ${partner.label}`}
                 >
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-md bg-white flex items-center justify-center shrink-0 border border-slate-100 overflow-hidden">
-                    <img
-                      src={logoFor(partner.url)}
-                      alt={`${partner.label} logo`}
-                      className="w-10 h-10 sm:w-12 sm:h-12 object-contain"
-                      loading="lazy"
-                      onError={(event) => {
-                        event.currentTarget.src = FALLBACK_LOGO;
-                      }}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 leading-snug line-clamp-2">{partner.label}</p>
-                    <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 truncate">{hostnameFor(partner.url)}</p>
-                  </div>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="text-center text-sm sm:text-base font-semibold leading-tight text-slate-800 dark:text-slate-100">
+                    {partner.label}
+                  </span>
+
+                  <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                    Official link
+                    <ExternalLink className="h-3 w-3" />
+                  </span>
                 </a>
               ))}
             </div>
@@ -150,12 +151,9 @@ export const OfficialPartnersCarousel: React.FC<OfficialPartnersCarouselProps> =
 
           <button
             type="button"
-            onClick={() => setStartIndex((current) => {
-              const maxStart = Math.max(0, partners.length - visibleCount);
-              return current >= maxStart ? 0 : current + 1;
-            })}
-            aria-label="Next official source"
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-9 w-9 sm:h-11 sm:w-11 rounded-lg bg-blue-800 hover:bg-blue-900 text-white shadow-md flex items-center justify-center transition-colors"
+            onClick={goNext}
+            aria-label="Next partner"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-blue-800 hover:bg-blue-900 text-white shadow-md flex items-center justify-center transition-colors"
           >
             <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>

@@ -18,7 +18,6 @@ import { CitationModal } from "./components/CitationModal";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { GuidedTour } from "./components/GuidedTour";
 import { Citation, normalizeRole } from "./types";
-import { ExternalLink } from "lucide-react";
 import { LegalPolicyModal, LegalDocument } from "./components/LegalPolicyModal";
 import { LanguageProvider, useTranslation } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -56,23 +55,44 @@ function AppContent() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/official-links")
-      .then(async (res) => (res.ok ? res.json() : { links: [] }))
-      .then((data) => {
-        if (!active) return;
+    let retryTimer: number | undefined;
+
+    const loadOfficialLinks = async (attempt = 0) => {
+      try {
+        const res = await fetch(`/api/official-links?ts=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`official-links request failed: ${res.status}`);
+        const data = await res.json();
         const links = Array.isArray(data?.links) ? data.links : [];
-        setOfficialPortalLinks(links.map((item: { id?: string; label?: string; url?: string }) => ({
-          id: String(item.id || item.url || "official"),
-          label: String(item.label || "Official Source"),
-          url: String(item.url || ""),
-        })).filter((item: { url: string }) => item.url));
-      })
-      .catch(() => {
-        if (active) setOfficialPortalLinks([]);
-      });
+        const normalized = links
+          .map((item: { id?: string; label?: string; url?: string }) => ({
+            id: String(item.id || item.url || "official"),
+            label: String(item.label || "Official Source"),
+            url: String(item.url || "").trim(),
+          }))
+          .filter((item: { url: string }) => item.url);
+
+        if (!active) return;
+        setOfficialPortalLinks(normalized);
+
+        // The RAG service may be waking from sleep on Render. Retry when the
+        // first request succeeds but returns no manifest-backed links yet.
+        if (normalized.length === 0 && attempt < 3) {
+          retryTimer = window.setTimeout(() => loadOfficialLinks(attempt + 1), 2500);
+        }
+      } catch {
+        if (!active) return;
+        setOfficialPortalLinks([]);
+        if (attempt < 3) {
+          retryTimer = window.setTimeout(() => loadOfficialLinks(attempt + 1), 2500);
+        }
+      }
+    };
+
+    loadOfficialLinks();
 
     return () => {
       active = false;
+      if (retryTimer) window.clearTimeout(retryTimer);
     };
   }, []);
 
@@ -234,7 +254,7 @@ function AppContent() {
       />
 
       {/* Main Viewport Container */}
-      <div className="flex-1 w-full min-w-0 pt-14 xl:pt-24 pb-20 xl:pb-0">
+      <div className={`flex-1 w-full min-w-0 ${activeTab === "landing" ? "pt-0" : "pt-14 xl:pt-24"} pb-20 xl:pb-0`}>
         <ErrorBoundary key={activeTab} onReset={() => setActiveTab("landing")}>
           <main className="w-full max-w-[1800px] mx-auto min-w-0">
             {renderCurrentView()}
@@ -261,71 +281,48 @@ function AppContent() {
 
       <OfficialPartnersCarousel links={officialPortalLinks} />
 
-      {/* Government-style footer: dark, accessible, source-linked and responsive. */}
-      <footer className="w-full bg-slate-950 text-slate-200 border-t border-slate-800 mt-auto mb-14 lg:mb-0">
-        <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-9 sm:py-11">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr_1.4fr] gap-8 lg:gap-10">
-            <div className="min-w-0">
-              <div className="flex items-start gap-3">
-                <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-white p-1.5 shrink-0">
-                  <img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="w-full h-full object-contain" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="font-serif font-bold text-white text-lg">IP-SAKTI Sahayak</h2>
-                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mt-1">AYUSH & Traditional Knowledge IPR Research Platform</p>
-                </div>
-              </div>
-              <p className="mt-5 text-xs sm:text-sm text-slate-400 leading-relaxed max-w-xl">AI-assisted research and decision support. Verify important information against current official sources before taking legal, regulatory or policy action.</p>
+      {/* Persistent Official Portals Footer */}
+      <footer className="w-full bg-slate-950 dark:bg-black border-t-2 border-slate-800 py-8 mt-auto mb-14 lg:mb-0 transition-colors">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+            <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 flex items-center justify-center shrink-0">
+              <img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="w-full h-full object-contain" />
             </div>
-
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white mb-4">Useful Links</h3>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                {[
-                  ["Home", "landing"],
-                  ["Sahayak AI", "chat"],
-                  ["Product Analyzer", "product"],
-                  ["IPR Navigator", "ipr"],
-                  ["TK & ABS", "tk"],
-                  ["Research", "research"],
-                  ["HelpDesk", "helpdesk"],
-                  ...(isLoggedIn ? [["My Workspace", "workspace"]] : []),
-                ].map(([label, tab]) => (
-                  <button key={tab} type="button" onClick={() => setActiveTab(tab as ActiveTab)} className="text-left text-slate-300 hover:text-white hover:underline transition-colors">{label}</button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white mb-4">Website Policies & Support</h3>
-              <div className="flex flex-col gap-2 text-sm">
-                <button type="button" onClick={() => setLegalDocument("terms")} className="text-left text-slate-300 hover:text-white hover:underline">Terms & Conditions</button>
-                <button type="button" onClick={() => setLegalDocument("privacy")} className="text-left text-slate-300 hover:text-white hover:underline">Privacy Policy</button>
-                <button type="button" onClick={() => setActiveTab("helpdesk")} className="text-left text-slate-300 hover:text-white hover:underline">Feedback & Contact</button>
-                <button type="button" onClick={() => setActiveTab("helpdesk")} className="text-left text-slate-300 hover:text-white hover:underline">Help / FAQs</button>
-              </div>
-            </div>
-
-            <div className="min-w-0">
-              <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white mb-4">Official Links</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 max-h-48 overflow-y-auto pr-1">
-                {officialPortalLinks.map((link) => (
-                  <a key={`${link.id}-${link.url}`} href={link.url} target="_blank" rel="noreferrer noopener" className="text-slate-300 hover:text-white hover:underline flex items-center gap-1 min-w-0">
-                    <span className="truncate text-sm">{link.label}</span>
-                    <ExternalLink className="w-3 h-3 shrink-0" />
-                  </a>
-                ))}
-                {officialPortalLinks.length === 0 && <span className="text-slate-500 text-xs">Loading official links…</span>}
-              </div>
-            </div>
+            <span className="font-serif font-bold text-white text-sm">
+              {t("brand.name", "IP-SAKTI")} {t("brand.badge", "Sahayak")}
+            </span>
+            <span className="text-slate-600">|</span>
+            <span className="truncate text-slate-400 text-xs">
+              {t(
+                "footer.brand_subtitle",
+                "AYUSH & Traditional Knowledge IPR Research Platform",
+              )}
+            </span>
           </div>
 
-          <div className="mt-8 pt-5 border-t border-slate-800 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 text-[11px] text-slate-400">
-            <span>Official source links are resolved from the application's source registry.</span>
-            <div className="flex flex-wrap gap-x-5 gap-y-1">
-              <span>© {new Date().getFullYear()} IP-SAKTI Sahayak</span>
-              <span>Last updated: {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</span>
+          {/* Official Statutory Portal Links — URLs are resolved from manifest-backed document metadata. */}
+            <div className="flex flex-wrap items-center justify-center lg:justify-end gap-x-6 gap-y-3 text-xs text-slate-200">
+              {officialPortalLinks.map((link) => (
+                <a
+                  key={link.id}
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-slate-200 hover:text-white hover:underline flex items-center gap-1"
+                >
+                  <span>{link.label}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              ))}
+              <span className="hidden lg:inline text-slate-700">|</span>
+              <button type="button" onClick={() => setLegalDocument("terms")} className="font-semibold text-white hover:text-emerald-300 hover:underline">Terms & Conditions</button>
+              <button type="button" onClick={() => setLegalDocument("privacy")} className="font-semibold text-white hover:text-emerald-300 hover:underline">Privacy Policy</button>
             </div>
+          </div>
+          <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-slate-800 pt-4 text-[10px] text-slate-400">
+            <span>AI-assisted research and decision support • Verify important information against current official sources.</span>
+            <span>© {new Date().getFullYear()} IP-SAKTI Sahayak</span>
           </div>
         </div>
       </footer>
