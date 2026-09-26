@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import get_settings
 from app.core.logging import logger
 from app.database.session import init_db
-from app.api.routes import health, chat, rag_routes, products, misc_routes, auth, experts
+from app.api.routes import health, chat, rag_routes, products, misc_routes, auth, experts, notifications
 
 settings = get_settings()
 
@@ -77,6 +77,7 @@ app.include_router(rag_routes.router, tags=["rag"])
 app.include_router(products.router, tags=["products"])
 app.include_router(misc_routes.router, tags=["misc"])
 app.include_router(experts.router, tags=["experts"])
+app.include_router(notifications.router, tags=["notifications"])
 
 
 @app.get("/")

@@ -13,6 +13,7 @@ import { LoginView } from "./components/LoginView";
 import { RegisterView } from "./components/RegisterView";
 import { ProfileView } from "./components/ProfileView";
 import { ExpertAdvisoryView } from "./components/ExpertAdvisoryView";
+import { OfficialPartnersCarousel } from "./components/OfficialPartnersCarousel";
 import { CitationModal } from "./components/CitationModal";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { GuidedTour } from "./components/GuidedTour";
@@ -21,9 +22,9 @@ import { ExternalLink } from "lucide-react";
 import { LegalPolicyModal, LegalDocument } from "./components/LegalPolicyModal";
 import { LanguageProvider, useTranslation } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { NotificationProvider } from "./context/NotificationContext";
 import { ExpertAdvisoryProvider } from "./context/ExpertAdvisoryContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import { authFetch } from "./components/auth/authStorage";
 
 const TOUR_STORAGE_KEY = "ipsakti_guided_tour_status";
 
@@ -55,36 +56,25 @@ function AppContent() {
 
   useEffect(() => {
     let active = true;
-    if (!isLoggedIn) {
-      setOfficialPortalLinks([]);
-      return () => { active = false; };
-    }
+    fetch("/api/official-links")
+      .then(async (res) => (res.ok ? res.json() : { links: [] }))
+      .then((data) => {
+        if (!active) return;
+        const links = Array.isArray(data?.links) ? data.links : [];
+        setOfficialPortalLinks(links.map((item: { id?: string; label?: string; url?: string }) => ({
+          id: String(item.id || item.url || "official"),
+          label: String(item.label || "Official Source"),
+          url: String(item.url || ""),
+        })).filter((item: { url: string }) => item.url));
+      })
+      .catch(() => {
+        if (active) setOfficialPortalLinks([]);
+      });
 
-    const manifestDocuments = [
-      { id: "DOC-PATENTS-ACT-1970", label: "IP India (CGPDTM)" },
-      { id: "DOC-DRUGS-RULES-1945", label: "CDSCO / ASU Rules" },
-      { id: "DOC-BD-AMENDMENT-ACT-2023", label: "National Biodiversity Authority (NBA)" },
-      { id: "DOC-WIPO-PCT", label: "WIPO" },
-    ];
-
-    Promise.all(
-      manifestDocuments.map(async (item) => {
-        try {
-          const res = await authFetch(`/api/documents/${encodeURIComponent(item.id)}`);
-          if (!res.ok) return null;
-          const data = await res.json();
-          const url = data?.metadata?.url;
-          return url ? { ...item, url: String(url) } : null;
-        } catch {
-          return null;
-        }
-      }),
-    ).then((links) => {
-      if (active) setOfficialPortalLinks(links.filter(Boolean) as { id: string; label: string; url: string }[]);
-    });
-
-    return () => { active = false; };
-  }, [isLoggedIn]);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // First-time visitor guided tour auto-discovery state
   // The site always opens directly on the Home/Landing page.
@@ -269,48 +259,73 @@ function AppContent() {
 
       <LegalPolicyModal document={legalDocument} onClose={() => setLegalDocument(null)} />
 
-      {/* Persistent Official Portals Footer */}
-      <footer className="w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-7 mt-auto mb-14 lg:mb-0 transition-colors">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-            <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 flex items-center justify-center shrink-0">
-              <img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="w-full h-full object-contain" />
+      <OfficialPartnersCarousel links={officialPortalLinks} />
+
+      {/* Government-style footer: dark, accessible, source-linked and responsive. */}
+      <footer className="w-full bg-slate-950 text-slate-200 border-t border-slate-800 mt-auto mb-14 lg:mb-0">
+        <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-9 sm:py-11">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr_1.4fr] gap-8 lg:gap-10">
+            <div className="min-w-0">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-white p-1.5 shrink-0">
+                  <img src="/ip-sakti-logo.png" alt="IP-SAKTI logo" className="w-full h-full object-contain" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-serif font-bold text-white text-lg">IP-SAKTI Sahayak</h2>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mt-1">AYUSH & Traditional Knowledge IPR Research Platform</p>
+                </div>
+              </div>
+              <p className="mt-5 text-xs sm:text-sm text-slate-400 leading-relaxed max-w-xl">AI-assisted research and decision support. Verify important information against current official sources before taking legal, regulatory or policy action.</p>
             </div>
-            <span className="font-serif font-bold text-slate-800 dark:text-slate-200 text-sm">
-              {t("brand.name", "IP-SAKTI")} {t("brand.badge", "Sahayak")}
-            </span>
-            <span className="text-slate-400 dark:text-slate-600">|</span>
-            <span className="truncate">
-              {t(
-                "footer.brand_subtitle",
-                "AYUSH & Traditional Knowledge IPR Research Platform",
-              )}
-            </span>
+
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white mb-4">Useful Links</h3>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                {[
+                  ["Home", "landing"],
+                  ["Sahayak AI", "chat"],
+                  ["Product Analyzer", "product"],
+                  ["IPR Navigator", "ipr"],
+                  ["TK & ABS", "tk"],
+                  ["Research", "research"],
+                  ["HelpDesk", "helpdesk"],
+                  ...(isLoggedIn ? [["My Workspace", "workspace"]] : []),
+                ].map(([label, tab]) => (
+                  <button key={tab} type="button" onClick={() => setActiveTab(tab as ActiveTab)} className="text-left text-slate-300 hover:text-white hover:underline transition-colors">{label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white mb-4">Website Policies & Support</h3>
+              <div className="flex flex-col gap-2 text-sm">
+                <button type="button" onClick={() => setLegalDocument("terms")} className="text-left text-slate-300 hover:text-white hover:underline">Terms & Conditions</button>
+                <button type="button" onClick={() => setLegalDocument("privacy")} className="text-left text-slate-300 hover:text-white hover:underline">Privacy Policy</button>
+                <button type="button" onClick={() => setActiveTab("helpdesk")} className="text-left text-slate-300 hover:text-white hover:underline">Feedback & Contact</button>
+                <button type="button" onClick={() => setActiveTab("helpdesk")} className="text-left text-slate-300 hover:text-white hover:underline">Help / FAQs</button>
+              </div>
+            </div>
+
+            <div className="min-w-0">
+              <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white mb-4">Official Links</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 max-h-48 overflow-y-auto pr-1">
+                {officialPortalLinks.map((link) => (
+                  <a key={`${link.id}-${link.url}`} href={link.url} target="_blank" rel="noreferrer noopener" className="text-slate-300 hover:text-white hover:underline flex items-center gap-1 min-w-0">
+                    <span className="truncate text-sm">{link.label}</span>
+                    <ExternalLink className="w-3 h-3 shrink-0" />
+                  </a>
+                ))}
+                {officialPortalLinks.length === 0 && <span className="text-slate-500 text-xs">Loading official links…</span>}
+              </div>
+            </div>
           </div>
 
-          {/* Official Statutory Portal Links — URLs are resolved from manifest-backed document metadata. */}
-            <div className="flex flex-wrap items-center justify-center lg:justify-end gap-x-5 gap-y-2 text-[11px]">
-              {officialPortalLinks.map((link) => (
-                <a
-                  key={link.id}
-                  href={link.url}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="hover:text-slate-800 dark:hover:text-slate-200 hover:underline flex items-center gap-1"
-                >
-                  <span>{link.label}</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              ))}
-              <span className="hidden lg:inline text-slate-300 dark:text-slate-700">|</span>
-              <button type="button" onClick={() => setLegalDocument("terms")} className="font-semibold hover:text-emerald-700 dark:hover:text-emerald-400 hover:underline">Terms & Conditions</button>
-              <button type="button" onClick={() => setLegalDocument("privacy")} className="font-semibold hover:text-emerald-700 dark:hover:text-emerald-400 hover:underline">Privacy Policy</button>
+          <div className="mt-8 pt-5 border-t border-slate-800 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 text-[11px] text-slate-400">
+            <span>Official source links are resolved from the application's source registry.</span>
+            <div className="flex flex-wrap gap-x-5 gap-y-1">
+              <span>© {new Date().getFullYear()} IP-SAKTI Sahayak</span>
+              <span>Last updated: {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</span>
             </div>
-          </div>
-          <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-4 text-[10px] text-slate-400 dark:text-slate-500">
-            <span>AI-assisted research and decision support • Verify important information against current official sources.</span>
-            <span>© {new Date().getFullYear()} IP-SAKTI Sahayak</span>
           </div>
         </div>
       </footer>
@@ -323,9 +338,11 @@ export default function App() {
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-          <ExpertAdvisoryProvider>
-            <AppContent />
-          </ExpertAdvisoryProvider>
+          <NotificationProvider>
+            <ExpertAdvisoryProvider>
+              <AppContent />
+            </ExpertAdvisoryProvider>
+          </NotificationProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>

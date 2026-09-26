@@ -25,6 +25,7 @@ import { DisclaimerBanner } from "./DisclaimerBanner";
 import { useTranslation } from "../context/LanguageContext";
 import { authFetch } from "./auth/authStorage";
 import { useAuth } from "../context/AuthContext";
+import { useNotifications } from "../context/NotificationContext";
 
 const LOCAL_STORAGE_CONVS_KEY = "ipsakti_sahayak_conversations_v2";
 const LOCAL_STORAGE_ACTIVE_KEY = "ipsakti_sahayak_active_conv_id_v2";
@@ -89,6 +90,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
 }) => {
   const { t } = useTranslation();
   const { currentUser } = useAuth();
+  const { notifications, unreadCount, markRead, markAllRead, refreshNotifications } = useNotifications();
   const userId = currentUser?.id;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [products, setProducts] = useState<ProductAnalysisResult[]>([]);
@@ -122,7 +124,10 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   >("conversations");
 
   useEffect(() => {
-    if (userId) loadWorkspaceData();
+    if (userId) {
+      loadWorkspaceData();
+      void refreshNotifications();
+    }
     else {
       setConversations([]);
       setProducts([]);
@@ -550,7 +555,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
         >
           <Bell className="w-4 h-4" />
 
-          <span>Notifications ({expertGuidance.length})</span>
+          <span>Notifications ({unreadCount})</span>
         </button>
         <button
           type="button"
@@ -816,222 +821,54 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
           </div>
         )}
 
-        {activeSubTab === "expertGuidance" && (
+        {activeSubTab === "notifications" && (
           <div className="space-y-4">
             <div className="bg-white border border-slate-300 rounded-2xl p-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-                  <UserRoundCheck className="w-5 h-5 text-emerald-700" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-slate-900">
-                    Expert Guidance
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Track queries you redirected to a selected expert and their
-                    current status.
-                  </p>
-                </div>
-              </div>
-            </div>
-            {expertGuidance.length === 0 ? (
-              <div className="py-14 text-center text-sm text-slate-500 bg-white border border-slate-300 rounded-2xl">
-                <UserRoundCheck className="w-8 h-8 mx-auto text-slate-300 mb-3" />
-                <p className="font-semibold text-slate-700">
-                  No expert guidance requests yet.
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  When you redirect a low-confidence query to an expert, it will
-                  appear here.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {expertGuidance.map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-white border border-slate-300 rounded-2xl p-5 shadow-sm"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700">
-                            {item.expert_type || "Expert"}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${item.status === "resolved" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : item.status === "assigned" ? "bg-blue-50 text-blue-800 border-blue-200" : "bg-amber-50 text-amber-800 border-amber-200"}`}
-                          >
-                            {item.status}
-                          </span>
-                        </div>
-                        <h3 className="text-sm font-semibold text-slate-900 mt-2">
-                          {item.assigned_expert_name ||
-                            "Expert assignment pending"}
-                        </h3>
-                        {item.assigned_expert_email && (
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {item.assigned_expert_email}
-                          </p>
-                        )}
-                      </div>
-                      <span className="text-[10px] text-slate-400 whitespace-nowrap">
-                        {item.created_at
-                          ? new Date(item.created_at).toLocaleString()
-                          : ""}
-                      </span>
-                    </div>
-                    <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
-                        Redirected query
-                      </p>
-                      <p className="text-xs text-slate-800 mt-1 whitespace-pre-wrap">
-                        {item.query}
-                      </p>
-                    </div>
-                    {item.reason && (
-                      <p className="text-xs text-slate-500 mt-3">
-                        <span className="font-semibold text-slate-700">
-                          Reason:
-                        </span>{" "}
-                        {item.reason}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeSubTab === "notifications" && (
-          <div className="mt-6">
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-              {/* Header */}
-              <div className="px-5 py-4 border-b border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
                     <Bell className="w-5 h-5 text-emerald-700" />
                   </div>
-
                   <div>
-                    <h2 className="text-base font-bold text-slate-900">
-                      Notifications
-                    </h2>
-
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Stay updated with your latest notifications
-                    </p>
+                    <h2 className="text-base font-bold text-slate-900">Notifications</h2>
+                    <p className="text-xs text-slate-500 mt-1">The same account notifications shown by the navbar bell.</p>
                   </div>
                 </div>
+                <button type="button" onClick={() => void markAllRead()} disabled={unreadCount === 0} className="self-start sm:self-auto text-xs font-semibold px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:border-emerald-300 hover:text-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed">Mark all as read</button>
               </div>
+            </div>
 
-              {/* Notifications List */}
-              <div className="divide-y divide-slate-100">
-                {/* Notification 1 */}
-                <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
-                  <div className="flex gap-3">
-                    <span className="w-2 h-2 mt-1.5 rounded-full bg-emerald-600 shrink-0" />
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-slate-900">
-                        Welcome to IP-SAKTI Sahayak
-                      </h3>
-
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        Your account has been successfully created.
-                      </p>
-
-                      <p className="text-[10px] text-slate-400 mt-2">
-                        Just now
-                      </p>
-                    </div>
-                  </div>
+            <div className="bg-white border border-slate-300 rounded-2xl overflow-hidden shadow-sm">
+              {notifications.length === 0 ? (
+                <div className="py-14 text-center text-sm text-slate-500">
+                  <Bell className="w-8 h-8 mx-auto text-slate-300 mb-3" />
+                  <p className="font-semibold text-slate-700">No notifications yet.</p>
+                  <p className="text-xs text-slate-400 mt-1">Account, expert-guidance and grievance updates will appear here.</p>
                 </div>
-
-                {/* Notification 2 */}
-                <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
-                  <div className="flex gap-3">
-                    <span className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 shrink-0" />
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-slate-900">
-                        New guidance available
-                      </h3>
-
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        New information is available for your recent query.
-                      </p>
-
-                      <p className="text-[10px] text-slate-400 mt-2">
-                        10 minutes ago
-                      </p>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {notifications.map((item) => (
+                    <div key={item.id} className={`px-4 sm:px-5 py-4 ${item.is_read ? "bg-white" : "bg-emerald-50/60"}`}>
+                      <div className="flex gap-3">
+                        <span className={`w-2.5 h-2.5 mt-1.5 rounded-full shrink-0 ${item.is_read ? "bg-slate-300" : item.severity === "warning" ? "bg-amber-500" : item.severity === "error" ? "bg-rose-500" : "bg-emerald-600"}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className={`text-sm ${item.is_read ? "font-medium text-slate-800" : "font-bold text-slate-900"}`}>{item.title}</h3>
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide ${item.is_read ? "bg-slate-100 text-slate-500" : "bg-emerald-100 text-emerald-800"}`}>{item.is_read ? "Read" : "Unread"}</span>
+                              </div>
+                              <p className="text-xs text-slate-600 mt-1 leading-relaxed">{item.message}</p>
+                            </div>
+                            <span className="text-[10px] text-slate-400 whitespace-nowrap">{item.created_at ? new Date(item.created_at).toLocaleString() : ""}</span>
+                          </div>
+                          {!item.is_read && <button type="button" onClick={() => void markRead(item.id)} className="mt-3 text-[11px] font-semibold text-emerald-800 hover:underline">Mark as read</button>}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-
-                {/* Notification 3 */}
-                <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
-                  <div className="flex gap-3">
-                    <span className="w-2 h-2 mt-1.5 rounded-full bg-amber-500 shrink-0" />
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-slate-900">
-                        System update
-                      </h3>
-
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        IP-SAKTI Sahayak has received a new system update.
-                      </p>
-
-                      <p className="text-[10px] text-slate-400 mt-2">
-                        1 hour ago
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Notification 4 */}
-                <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
-                  <div className="flex gap-3">
-                    <span className="w-2 h-2 mt-1.5 rounded-full bg-purple-500 shrink-0" />
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-slate-900">
-                        Expert guidance request updated
-                      </h3>
-
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        Your expert guidance request has been updated.
-                      </p>
-
-                      <p className="text-[10px] text-slate-400 mt-2">
-                        2 hours ago
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Notification 5 */}
-                <div className="px-5 py-4 hover:bg-slate-50 transition-colors">
-                  <div className="flex gap-3">
-                    <span className="w-2 h-2 mt-1.5 rounded-full bg-orange-500 shrink-0" />
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-slate-900">
-                        New FAQ available
-                      </h3>
-
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        New frequently asked questions have been added.
-                      </p>
-
-                      <p className="text-[10px] text-slate-400 mt-2">
-                        Yesterday
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         )}

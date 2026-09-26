@@ -41,6 +41,7 @@ COLLECTION_INDEXES = {
     "grievances": [("user_id", {}), ("created_at", {}), ("status", {})],
     "email_otps": [("email", {}), ("purpose", {}), ("created_at", {})],
     "audit_logs": [("conversation_id", {}), ("created_at", {})],
+    "notifications": [("user_id", {}), ("created_at", {}), ("is_read", {})],
     "user_ingested_documents": [("status", {}), ("created_at", {})],
 }
 

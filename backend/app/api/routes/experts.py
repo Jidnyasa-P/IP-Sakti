@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_user, require_role
 from app.database.session import get_db
 from app.models.expert_escalation import COLLECTION
-from app.services import email_service
+from app.services import email_service, notification_service
 
 router = APIRouter(prefix="/api/expert-escalations")
 
@@ -64,4 +64,10 @@ def update_escalation_status(escalation_id: str, status: str, current_user: dict
     requester = db["users"].find_one({"_id": doc.get("user_id")})
     if requester:
         email_service.send_escalation_update(requester["email"], requester.get("name", "User"), status)
+        notification_service.notify(
+            db, requester["_id"], "escalation_update", "Expert guidance updated",
+            f"Your expert guidance request is now marked as {status}.",
+            data={"escalation_id": escalation_id, "status": status},
+            severity="success" if status == "resolved" else "info",
+        )
     return _to_dict(doc)

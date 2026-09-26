@@ -9,7 +9,7 @@ from app.schemas.chat import SaveResearchRequest, TranslateRequest, GrievanceCre
 from app.translation.translation_service import get_translation_provider
 import app.rag_client as rag_client
 from app.core.config import get_settings
-from app.services import email_service
+from app.services import email_service, notification_service
 
 router = APIRouter()
 
@@ -135,6 +135,12 @@ def create_grievance(
     )
     db[GRIEVANCE_COLLECTION].insert_one(record)
     email_service.send_grievance_confirmation(current_user["email"], current_user["name"], record["subject"])
+    notification_service.notify(
+        db, current_user["id"], "grievance", "Grievance submitted",
+        f"Your grievance '{record["subject"]}' has been submitted successfully.",
+        data={"grievance_id": record["_id"]},
+        severity="info",
+    )
     return grievance_to_dict(record)
 
 
@@ -145,6 +151,47 @@ def delete_grievance(grievance_id: str, current_user: dict = Depends(get_current
         raise HTTPException(status_code=404, detail="Grievance not found.")
     db[GRIEVANCE_COLLECTION].delete_one({"_id": grievance_id, "user_id": current_user["id"]})
     return {"success": True, "deleted_id": grievance_id}
+
+
+@router.get("/api/official-links")
+async def official_links():
+    """Return unique official source links directly from the RAG manifest-backed registry."""
+    try:
+        docs = await rag_client.list_documents()
+    except Exception:
+        return {"links": []}
+
+    links = []
+    seen_urls = set()
+    for doc in docs:
+        url = str(doc.get("url") or "").strip()
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        try:
+            host = url.split("//", 1)[1].split("/", 1)[0].lower().removeprefix("www.")
+        except Exception:
+            host = ""
+        partner_labels = {
+            "ipindia.gov.in": "IP India (CGPDTM)",
+            "plantauthority.gov.in": "PPV&FR Authority",
+            "wipo.int": "WIPO",
+            "nbaindia.nic.in": "National Biodiversity Authority",
+            "cdsco.gov.in": "CDSCO",
+            "fssai.gov.in": "FSSAI",
+            "meity.gov.in": "MeitY",
+            "cbd.int": "CBD Secretariat",
+            "indiacode.gov.in": "India Code",
+        }
+        label = partner_labels.get(host) or doc.get("source") or doc.get("authority") or doc.get("title") or "Official Source"
+        links.append({
+            "id": str(doc.get("id") or len(links) + 1),
+            "label": str(label),
+            "url": url,
+            "title": str(doc.get("title") or ""),
+        })
+
+    return {"links": links}
 
 
 @router.get("/api/resources")

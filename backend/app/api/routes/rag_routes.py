@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from app.api.deps import get_current_user
 from app.database.session import get_db
 from app.schemas.chat import SearchRequest, ExpertEscalationRequest
-from app.services import expert_escalation_service, email_service
+from app.services import expert_escalation_service, email_service, notification_service
 from app.models.expert_escalation import COLLECTION as EXPERT_ESCALATIONS_COLLECTION, new_expert_escalation
 import app.rag_client as rag_client
 
@@ -107,6 +107,12 @@ def expert_escalation(body: ExpertEscalationRequest, current_user: dict = Depend
     email_service.send_expert_request_to_user(
         current_user["email"], current_user["name"], expert_label
     )
+    notification_service.notify(
+        db, current_user["id"], "expert_request", "Expert guidance request submitted",
+        f"Your request for a {expert_label} has been submitted. You will see assignment or status updates here.",
+        data={"escalation_id": record_id, "expert_type": body.expert_type},
+        severity="info",
+    )
 
     expert_notified = False
     if matching_expert and matching_expert.get("email") != current_user.get("email"):
@@ -116,6 +122,12 @@ def expert_escalation(body: ExpertEscalationRequest, current_user: dict = Depend
             current_user["name"],
             expert_label,
             body.query,
+        )
+        notification_service.notify(
+            db, matching_expert["_id"], "expert_request", "New expert consultation request",
+            f"A new {expert_label} consultation request from {current_user["name"]} has been assigned to you.",
+            data={"escalation_id": record_id, "expert_type": body.expert_type},
+            severity="warning",
         )
 
     expert_escalation_service.notify_real_service(record_id)

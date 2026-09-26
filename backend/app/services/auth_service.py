@@ -12,7 +12,7 @@ from fastapi import HTTPException
 from app.core.config import get_settings
 from app.core.security import hash_password, verify_password
 from app.models.user import ALLOWED_ROLES, COLLECTION, new_user, to_dict
-from app.services import email_service
+from app.services import email_service, notification_service
 
 EXPERT_TYPES = {
     "ayurveda": "Ayurveda Expert",
@@ -179,6 +179,11 @@ def authenticate_user(db, email: str, password: str) -> dict:
     db[COLLECTION].update_one({"_id": user_doc["_id"]}, {"$set": {"last_login_at": now, "updated_at": now}})
     user_doc["last_login_at"] = now
     email_service.send_login_alert(user_doc["email"], user_doc["name"])
+    notification_service.notify(
+        db, user_doc["_id"], "login", "New sign-in",
+        "A sign-in to your IP-SAKTI Sahayak account was completed. If this was not you, change your password immediately.",
+        severity="info",
+    )
     return to_dict(user_doc)
 
 
@@ -235,6 +240,16 @@ def verify_email(db, email: str, otp: str) -> dict:
 
     email_service.send_welcome(user_doc["email"], user_doc["name"])
     email_service.send_email_verified(user_doc["email"], user_doc["name"])
+    notification_service.notify(
+        db, user_doc["_id"], "welcome", "Welcome to IP-SAKTI Sahayak",
+        "Your account has been created successfully.",
+        severity="success",
+    )
+    notification_service.notify(
+        db, user_doc["_id"], "email_verified", "Email verified",
+        "Your IP-SAKTI Sahayak email has been verified successfully. You can now sign in.",
+        severity="success",
+    )
     return to_dict(user_doc)
 
 
@@ -403,7 +418,7 @@ def delete_account_with_otp(db, user_id: str, otp: str) -> str:
     _consume_security_otp(db, user_doc, otp, "delete_account")
     # Remove account-owned application data as part of permanent deletion.
     conversation_ids = [row.get("_id") for row in db["conversations"].find({"user_id": user_id}, {"_id": 1})]
-    for collection in ("conversations", "product_analyses", "tk_abs_analyses", "saved_research", "grievances", "audit_logs"):
+    for collection in ("conversations", "product_analyses", "tk_abs_analyses", "saved_research", "grievances", "audit_logs", "notifications"):
         db[collection].delete_many({"user_id": user_id})
     if conversation_ids:
         db["chat_messages"].delete_many({"conversation_id": {"$in": conversation_ids}})

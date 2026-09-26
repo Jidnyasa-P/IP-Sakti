@@ -33,6 +33,7 @@ import { useTranslation } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import { useExpertAdvisory } from "../context/ExpertAdvisoryContext";
 import { useTheme } from "../context/ThemeContext";
+import { useNotifications } from "../context/NotificationContext";
 import { Bell} from "lucide-react";
 
 export type ActiveTab =
@@ -76,8 +77,8 @@ export const Header: React.FC<HeaderProps> = ({
   const { currentUser, isLoggedIn, logout } = useAuth();
   const { pendingCount } = useExpertAdvisory();
   const { theme, toggleTheme, isDark } = useTheme();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
   const [notificationOpen, setNotificationOpen] = useState(false);
-  const [allNotificationsOpen, setAllNotificationsOpen] = useState(false);
 
   // Normalize role check for Expert
   const isExpert =
@@ -311,127 +312,67 @@ export const Header: React.FC<HeaderProps> = ({
 
         {isLoggedIn && (
           <div className="relative shrink-0">
-
             <button
               type="button"
               id="notification-bell-btn"
-              onClick={() => setNotificationOpen(!notificationOpen)}
-              aria-label="Notifications"
+              onClick={() => setNotificationOpen((open) => !open)}
+              aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
               aria-expanded={notificationOpen}
               title="Notifications"
-              className={`relative flex items-center justify-center p-1.5 sm:p-2 rounded-lg border transition-all cursor-pointer shrink-0 ${
-                notificationOpen
-                  ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                  : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900"
-              }`}
+              className={`relative flex items-center justify-center p-1.5 sm:p-2 rounded-lg border transition-all cursor-pointer shrink-0 ${notificationOpen ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900"}`}
             >
               <Bell className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-
-              {/* Unread notification indicator */}
-              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500 ring-2 ring-white" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-red-600 text-white text-[8px] font-bold leading-[15px] text-center ring-2 ring-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </button>
 
-            {/* Notification Dropdown */}
             {notificationOpen && (
-              <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-1.5rem)] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-1">
-
-                {/* Header */}
+              <div className="absolute right-0 mt-2 w-[23rem] max-w-[calc(100vw-1.5rem)] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Notifications
-                    </h3>
-
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Your latest updates
-                    </p>
+                    <h3 className="text-sm font-semibold text-slate-900">Notifications</h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Account and service updates</p>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setNotificationOpen(false)}
-                    aria-label="Close notifications"
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button type="button" onClick={() => markAllRead()} disabled={unreadCount === 0} className="text-[10px] font-semibold text-emerald-800 disabled:text-slate-300 hover:underline disabled:no-underline px-2 py-1">Mark all read</button>
+                    <button type="button" onClick={() => setNotificationOpen(false)} aria-label="Close notifications" className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Recent Notifications */}
-                <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
-
-                  <button
-                    type="button"
-                    className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
-                  >
-                    <div className="flex gap-3">
-                      <span className="w-2 h-2 mt-1.5 rounded-full bg-emerald-600 shrink-0" />
-
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-slate-900">
-                          Welcome to IP-SAKTI Sahayak
-                        </p>
-
-                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                          Your account has been successfully created.
-                        </p>
-
-                        <span className="text-[10px] text-slate-400 mt-1 block">
-                          Just now
-                        </span>
-                      </div>
+                <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-10 text-center">
+                      <Bell className="w-7 h-7 mx-auto text-slate-300 mb-2" />
+                      <p className="text-xs font-semibold text-slate-700">No notifications yet.</p>
+                      <p className="text-[11px] text-slate-400 mt-1">New account, expert and grievance updates will appear here.</p>
                     </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
-                  >
-                    <div className="flex gap-3">
-                      <span className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 shrink-0" />
-
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-slate-900">
-                          New guidance available
-                        </p>
-
-                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                          New information is available for your recent query.
-                        </p>
-
-                        <span className="text-[10px] text-slate-400 mt-1 block">
-                          10 minutes ago
-                        </span>
+                  ) : notifications.slice(0, 8).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => markRead(item.id)}
+                      className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${item.is_read ? "bg-white" : "bg-emerald-50/50"}`}
+                    >
+                      <div className="flex gap-3">
+                        <span className={`w-2 h-2 mt-1.5 rounded-full shrink-0 ${item.is_read ? "bg-slate-300" : item.severity === "warning" ? "bg-amber-500" : item.severity === "error" ? "bg-rose-500" : "bg-emerald-600"}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className={`text-xs ${item.is_read ? "font-medium text-slate-800" : "font-bold text-slate-900"}`}>{item.title}</p>
+                            {!item.is_read && <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[8px] font-bold uppercase">Unread</span>}
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{item.message}</p>
+                          <span className="text-[10px] text-slate-400 mt-1 block">{item.created_at ? new Date(item.created_at).toLocaleString() : ""}</span>
+                        </div>
                       </div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
-                  >
-                    <div className="flex gap-3">
-                      <span className="w-2 h-2 mt-1.5 rounded-full bg-amber-500 shrink-0" />
-
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-slate-900">
-                          System update
-                        </p>
-
-                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                          IP-SAKTI Sahayak has received a new system update.
-                        </p>
-
-                        <span className="text-[10px] text-slate-400 mt-1 block">
-                          1 hour ago
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-
+                    </button>
+                  ))}
                 </div>
 
-                {/* Footer */}
                 <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50">
                   <button
                     type="button"
@@ -450,7 +391,6 @@ export const Header: React.FC<HeaderProps> = ({
                     View all notifications
                   </button>
                 </div>
-
               </div>
             )}
           </div>
