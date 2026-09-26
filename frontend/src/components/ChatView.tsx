@@ -537,28 +537,32 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
     setConversations(cleaned);
     if (typeof window !== "undefined") {
-      try {
-        // Keep a compatibility snapshot for an offline refresh, but never
-        // use it as the authoritative source when the backend is reachable.
-        localStorage.setItem(storageKey(LOCAL_STORAGE_CONVS_KEY), JSON.stringify(cleaned));
-        if (newActiveId) {
-          localStorage.setItem(storageKey(LOCAL_STORAGE_ACTIVE_KEY), newActiveId);
-          if (isInternational) {
-            localStorage.setItem(storageKey(LOCAL_STORAGE_ACTIVE_INTL_KEY), newActiveId);
+      // localStorage is synchronous. Serializing a conversation containing
+      // citations and multiple long answers can block the main thread exactly
+      // when the user is waiting for a response. Keep the React state update
+      // immediate and move the offline-cache write off the current event turn.
+      const snapshot = cleaned;
+      const activeId = newActiveId;
+      const intl = isInternational;
+      window.setTimeout(() => {
+        try {
+          // Keep a compatibility snapshot for an offline refresh, but never
+          // use it as the authoritative source when the backend is reachable.
+          localStorage.setItem(storageKey(LOCAL_STORAGE_CONVS_KEY), JSON.stringify(snapshot));
+          if (activeId) {
+            localStorage.setItem(storageKey(LOCAL_STORAGE_ACTIVE_KEY), activeId);
+            localStorage.setItem(
+              storageKey(intl ? LOCAL_STORAGE_ACTIVE_INTL_KEY : LOCAL_STORAGE_ACTIVE_INDIA_KEY),
+              activeId,
+            );
           } else {
-            localStorage.setItem(storageKey(LOCAL_STORAGE_ACTIVE_INDIA_KEY), newActiveId);
+            localStorage.removeItem(storageKey(LOCAL_STORAGE_ACTIVE_KEY));
+            localStorage.removeItem(
+              storageKey(intl ? LOCAL_STORAGE_ACTIVE_INTL_KEY : LOCAL_STORAGE_ACTIVE_INDIA_KEY),
+            );
           }
-        } else {
-          localStorage.removeItem(storageKey(LOCAL_STORAGE_ACTIVE_KEY));
-          localStorage.removeItem(
-            storageKey(
-              isInternational
-                ? LOCAL_STORAGE_ACTIVE_INTL_KEY
-                : LOCAL_STORAGE_ACTIVE_INDIA_KEY,
-            ),
-          );
-        }
-      } catch (e) {}
+        } catch (e) {}
+      }, 0);
     }
   };
 
@@ -976,7 +980,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         body: JSON.stringify({
           conversation_id: activeConvId,
           query: messages.find((m) => m.role === "user")?.content || "Low-confidence consultation",
-          reason: `Confidence score below 70% (${Math.round((msg.confidence.score <= 1 ? msg.confidence.score * 100 : msg.confidence.score))}%).`,
+          reason: `Confidence score below 80% (${Math.round((msg.confidence.score <= 1 ? msg.confidence.score * 100 : msg.confidence.score))}%).`,
           expert_type: expertType,
         }),
       });
@@ -1013,7 +1017,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     const node = messagesScrollRef.current;
     if (!node) return;
     requestAnimationFrame(() => {
-      node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
+      node.scrollTo({ top: node.scrollHeight, behavior: "auto" });
       // Keep following the same user-submitted turn until its answer is
       // finished, but never enable automatic scrolling merely by mounting
       // the chat or switching sections.
@@ -1234,6 +1238,61 @@ export const ChatView: React.FC<ChatViewProps> = ({
     let assistantMsg: StructuredChatMessage | null = null;
 
     const requestConversationId = targetConvId;
+    let serverReconciled = false;
+    let serverPollTimer: ReturnType<typeof setTimeout> | null = null;
+    let serverPollAttempts = 0;
+    const stopServerPolling = () => {
+      if (serverPollTimer !== null) {
+        clearTimeout(serverPollTimer);
+        serverPollTimer = null;
+      }
+    };
+
+    // The backend persists a completed answer before the POST response is
+    // necessarily delivered back to this tab. Poll the same conversation
+    // while the request is in flight so a slow/stalled POST response cannot
+    // leave the visible chat waiting. This also explains why switching tabs
+    // previously appeared to make the answer arrive instantly: remounting
+    // ChatView fetched the already-persisted conversation again.
+    const pollForCompletedAnswer = async () => {
+      if (serverReconciled || serverPollAttempts >= 20 || deletedConversationIdsRef.current.has(requestConversationId)) {
+        stopServerPolling();
+        return;
+      }
+      serverPollAttempts += 1;
+      try {
+        const res = await authFetch(`/api/conversations/${encodeURIComponent(requestConversationId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          const serverMessages = Array.isArray(data?.messages) ? data.messages : [];
+          const lastUserIndex = [...serverMessages].map((m: StructuredChatMessage) => m.role).lastIndexOf("user");
+          const lastAssistant =
+            lastUserIndex >= 0
+              ? [...serverMessages.slice(lastUserIndex + 1)].reverse().find((m: StructuredChatMessage) => m.role === "assistant" && (m.answer || m.content))
+              : undefined;
+          const latestUser = lastUserIndex >= 0 ? serverMessages[lastUserIndex] : undefined;
+
+          if (latestUser?.content === textToSend && lastAssistant) {
+            const reconciledMessages = serverMessages.map((m: StructuredChatMessage) =>
+              m.id === lastAssistant.id && selectedAttachment?.name
+                ? { ...m, attachment_name: selectedAttachment.name }
+                : m,
+            );
+            serverReconciled = true;
+            stopServerPolling();
+            setMessages(reconciledMessages);
+            setStreamingText("");
+            setLoading(false);
+          }
+        }
+      } catch {
+        // Keep polling through transient network/backend delays.
+      }
+      if (!serverReconciled && serverPollAttempts < 20) {
+        serverPollTimer = setTimeout(pollForCompletedAnswer, 1500);
+      }
+    };
+    serverPollTimer = setTimeout(pollForCompletedAnswer, 1200);
 
     // NOTE: there is no POST /api/chat/stream route on the backend (chat.py
     // only implements /api/chat and /api/query, both non-streaming) -- an
@@ -1243,6 +1302,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
     // (streamingText/setStreamingText are left in place for a future real
     // streaming endpoint -- see README's "honest gaps" section.)
     let requestFailed = false;
+    let responseAttachmentUsed = false;
+    let responseAttachmentName: string | undefined;
     {
       try {
         const syncRes = await authFetch("/api/chat", {
@@ -1259,17 +1320,23 @@ export const ChatView: React.FC<ChatViewProps> = ({
         });
         if (syncRes.ok) {
           const syncData = await syncRes.json();
+          responseAttachmentUsed = Boolean(syncData?.attachment_used);
+          responseAttachmentName = syncData?.attachment_name ? String(syncData.attachment_name) : undefined;
           if (selectedAttachment) {
             setSelectedAttachment(null);
             setAttachmentContext("");
             setAttachmentError(null);
           }
           if (deletedConversationIdsRef.current.has(requestConversationId)) {
+            stopServerPolling();
             setLoading(false);
             setStreamingText("");
             return;
           }
           assistantMsg = syncData.message || syncData;
+          if (assistantMsg && selectedAttachment?.name && responseAttachmentUsed) {
+            assistantMsg.attachment_name = responseAttachmentName || selectedAttachment.name;
+          }
 
           // The backend is authoritative for the persisted conversation ID.
           // Rebind the local draft/messages to that ID before any grievance or
@@ -1304,10 +1371,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 explanation: blockedText,
               });
               setInputValue(textToSend);
+              stopServerPolling();
               setLoading(false);
               setStreamingText("");
               return;
             }
+          }
+          if (assistantMsg?.content) {
+            stopServerPolling();
           }
         } else {
           requestFailed = true;
@@ -1332,6 +1403,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
     // misleading, not a harmless demo fallback -- removed entirely. A
     // failed request now surfaces as an honest, clearly-labeled error with
     // no citations and no confidence score, never as a fabricated answer.
+    if (serverReconciled && (!assistantMsg || !assistantMsg.content)) {
+      setStreamingText("");
+      setLoading(false);
+      return;
+    }
+
     if (!assistantMsg || !assistantMsg.content) {
       assistantMsg = {
         id: `msg-a-${Date.now()}`,
@@ -1375,7 +1452,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       jurisdiction: currentJur,
       scope_blocked: assistantMsg.scope_blocked,
       expert_escalation: assistantMsg.expert_escalation,
-      attachment_name: syncData.attachment_used ? syncData.attachment_name : undefined,
+      attachment_name: responseAttachmentUsed ? responseAttachmentName : undefined,
     };
 
     const finalMessages = [...canonicalUserMessages, finalAssistantMsg];
@@ -1508,7 +1585,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   );
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] min-h-0 overflow-hidden bg-slate-50 relative">
+    <div className="flex h-[calc(100dvh-4rem)] min-h-0 overflow-hidden bg-slate-50 relative border border-slate-300">
       {/* Sidebar Overlay for Mobile */}
       {sidebarOpen && (
         <div
@@ -1523,10 +1600,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
           sidebarOpen
             ? "w-72 translate-x-0"
             : "w-0 -translate-x-full lg:translate-x-0 lg:w-72"
-        } fixed lg:static inset-y-0 left-0 z-40 lg:z-auto shrink-0 bg-white border-r border-slate-200 transition-all duration-300 flex flex-col overflow-hidden h-full shadow-lg lg:shadow-none`}
+        } fixed lg:static inset-y-0 left-0 z-40 lg:z-auto shrink-0 bg-white border-r border-slate-300 transition-all duration-300 flex flex-col overflow-hidden h-full shadow-lg lg:shadow-none`}
       >
         {/* Sidebar Header */}
-        <div className="p-3.5 border-b border-slate-200 space-y-2.5">
+        <div className="p-3.5 border-b border-slate-300 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               Jurisdiction History
@@ -1552,7 +1629,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <span>🇮🇳 Indian</span>
+              <span>Indian</span>
               <span className="text-[9px] px-1 rounded bg-slate-200 text-slate-700">
                 {
                   conversations.filter(
@@ -1570,7 +1647,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <span>🌐 Intl</span>
+              <span>International</span>
               <span className="text-[9px] px-1 rounded bg-slate-200 text-slate-700">
                 {
                   conversations.filter(
@@ -1675,9 +1752,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
       </aside>
 
       {/* Main Assistant Chat Canvas */}
-      <main className="flex-1 min-w-0 min-h-0 flex flex-col h-full overflow-hidden bg-white">
+      <main className="flex-1 min-w-0 min-h-0 flex flex-col h-full overflow-hidden bg-white border-l border-slate-300">
         {/* Chat Header Toolbar with the Sahayak Jurisdiction Toggle */}
-        <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-slate-200 bg-white flex items-center justify-between gap-2 sm:gap-4">
+        <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-slate-300 bg-white flex items-center justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               type="button"
@@ -1699,7 +1776,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       : "bg-emerald-50 text-emerald-800 border border-emerald-200"
                   }`}
                 >
-                  {isInternational ? "🌐 International" : "🇮🇳 Indian"}
+                  {isInternational ? "International" : "Indian"}
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 hidden md:block truncate">
@@ -1732,7 +1809,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     : "text-slate-500 hover:text-slate-800"
                 }`}
               >
-                🇮🇳 Indian{" "}
+                Indian{" "}
                 <span className="text-[10px] font-bold uppercase opacity-80">
                   (OFF)
                 </span>
@@ -1776,7 +1853,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     : "text-slate-500 hover:text-slate-800"
                 }`}
               >
-                🌐 International{" "}
+                International{" "}
                 <span className="text-[10px] font-bold uppercase opacity-80">
                   (ON)
                 </span>
@@ -1809,7 +1886,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               localStorage.setItem(storageKey(`ipsakti_sahayak_scroll_${activeConvId}`), String(node.scrollTop));
             } catch {}
           }}
-          className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-5 scroll-smooth"
+          className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-5"
         >
           {messages.length === 0 ? (
             /* Empty State with Suggested Research Questions */
@@ -1965,7 +2042,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       {msg.confidence && (() => {
                         const rawScore = msg.confidence.score;
                         const score = rawScore <= 1 ? rawScore * 100 : rawScore;
-                        if (score >= 70) return null;
+                        if (score >= 80) return null;
                         const requested = expertRequestedMsgIds.has(msg.id);
                         const pickerOpen = expertPickerOpenMsgId === msg.id;
                         return (
@@ -1975,7 +2052,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                               <div>
                                 <p className="text-xs font-semibold text-amber-900">Low confidence — expert review recommended</p>
                                 <p className="text-[11px] leading-relaxed text-amber-800 mt-0.5">
-                                  The confidence score is below 70%. Choose how you'd like to proceed: get this reviewed by a qualified expert, or raise a grievance.
+                                  The confidence score is below 80%. Choose how you'd like to proceed: get this reviewed by a qualified expert, or raise a grievance.
                                 </p>
                               </div>
                             </div>
@@ -2155,7 +2232,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                                   {/* Single action to open the popup with both links */}
                                   <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                                     <span className="text-[10px] text-slate-400 font-medium">
-                                      Official Reference
+                                      Official link
                                     </span>
                                     <span
                                       className={`inline-flex items-center gap-1 font-semibold text-xs group-hover:underline ${
@@ -2294,7 +2371,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
 
         {/* Input Bar Section */}
-        <div className="p-3 sm:p-4 border-t border-slate-200 bg-white space-y-2.5">
+        <div className="p-3 sm:p-4 border-t border-slate-300 bg-white space-y-2.5">
           {/* Query Relevance Scope Warning Banner */}
           {relevanceWarning && (
             <div
@@ -2440,7 +2517,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
             >
               <span>
-                🇮🇳 Switch to India / Domestic Mode & Submit
+                Switch to Indian Mode & Submit
               </span>
               <CornerDownRight className="w-3.5 h-3.5" />
             </button>
@@ -2456,7 +2533,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
             >
               <span>
-                🌐 Switch to International Mode & Submit
+                Switch to International Mode & Submit
               </span>
               <CornerDownRight className="w-3.5 h-3.5" />
             </button>

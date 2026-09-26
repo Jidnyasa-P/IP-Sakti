@@ -35,6 +35,12 @@ interface RegisterViewProps {
 
 const REGISTER_LANGUAGES = SUPPORTED_LANGUAGES;
 
+const EXPERT_TYPES: { id: string; label: string }[] = [
+  { id: "ayurveda", label: "Ayurveda Expert" },
+  { id: "legal", label: "Legal / IP Expert" },
+  { id: "regulatory", label: "Regulatory Affairs Expert" },
+];
+
 const passwordChecks = [
   {
     key: "length",
@@ -78,6 +84,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
   ]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [preferredLanguage, setPreferredLanguage] = useState<Language>("en");
+  const [expertType, setExpertType] = useState<string>("");
   const [expertCertificate, setExpertCertificate] =
     useState<Partial<ExpertCertificateData> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -162,6 +169,10 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
     }
 
     if (isExpertSelected) {
+      if (!expertType) {
+        setError("Please select the type of expert you are registering as.");
+        return;
+      }
       if (!expertCertificate?.fileName) {
         setError(
           "Mandatory Proof Required: You must upload a verified certificate file (PDF, PNG, JPG) to register with the Expert role.",
@@ -208,6 +219,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
       preferred_language: preferredLanguage,
       password,
       expertCertificate: certPayload,
+      expert_type: isExpertSelected ? expertType : undefined,
     });
 
     if (result.success) {
@@ -502,6 +514,38 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ setActiveTab }) => {
                   )}
                 </div>
               </div>
+
+              {isExpertSelected && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+                  <div className="mb-3">
+                    <label className="block text-xs font-semibold text-slate-800">
+                      Expert type <span className="font-normal text-slate-500">(select one)</span>
+                    </label>
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                      This selection is used to route low-confidence consultation requests to the corresponding expert category.
+                    </p>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {EXPERT_TYPES.map((expert) => {
+                      const selected = expertType === expert.id;
+                      return (
+                        <button
+                          key={expert.id}
+                          type="button"
+                          onClick={() => setExpertType(expert.id)}
+                          className={`rounded-lg border px-3 py-2.5 text-left text-xs font-semibold transition-colors ${
+                            selected
+                              ? "border-emerald-600 bg-white text-emerald-900 shadow-sm"
+                              : "border-slate-300 bg-white text-slate-700 hover:border-emerald-400 hover:bg-emerald-50"
+                          }`}
+                        >
+                          {expert.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>

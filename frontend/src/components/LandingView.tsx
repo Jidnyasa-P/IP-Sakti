@@ -17,6 +17,7 @@ import {
   Mail,
   FileText,
   AlertTriangle,
+  ChevronDown,
 } from 'lucide-react';
 import { ActiveTab } from './Header';
 import { DisclaimerBanner } from './DisclaimerBanner';
@@ -41,6 +42,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
   const [contactSent, setContactSent] = useState(false);
   const [contactError, setContactError] = useState<string | null>(null);
   const [contactSending, setContactSending] = useState(false);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
   const handleActionClick = (targetTab: ActiveTab) => {
     if (isLoggedIn) {
@@ -254,7 +256,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
       </section>
 
       {/* Capabilities */}
-      <section className="px-4 sm:px-6 lg:px-8 py-12 sm:py-16 bg-white/70 dark:bg-slate-900/40 border-y border-slate-200/70 dark:border-slate-800">
+      <section className="px-4 sm:px-6 lg:px-8 py-12 sm:py-16 bg-white/70 dark:bg-slate-900/40 border-y border-slate-300 dark:border-slate-700">
         <div className="max-w-6xl mx-auto">
           <div className="max-w-2xl mb-8">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">Explore the platform</p>
@@ -282,6 +284,69 @@ export const LandingView: React.FC<LandingViewProps> = ({
                     <ArrowRight className="w-3.5 h-3.5 ml-1.5 group-hover:translate-x-1 transition-transform" />
                   </span>
                 </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQs */}
+      <section id="faqs" className="px-4 sm:px-6 lg:px-8 py-14 sm:py-20 bg-slate-50/80 dark:bg-slate-950/40 border-y border-slate-300 dark:border-slate-700">
+        <div className="max-w-4xl mx-auto">
+          <div className="max-w-2xl mb-8">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">Frequently Asked Questions</p>
+            <h2 className="mt-2 text-3xl sm:text-4xl font-serif font-semibold text-slate-950 dark:text-white">Common questions about IP-SAKTI Sahayak</h2>
+            <p className="mt-3 text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">Find quick answers about the assistant, jurisdiction modes, expert consultation and the information you provide.</p>
+          </div>
+
+          <div className="space-y-3">
+            {[
+              {
+                question: "What can I ask IP-SAKTI Sahayak?",
+                answer: "You can ask about intellectual property, AYUSH regulations, traditional knowledge, biodiversity and related regulatory research. The assistant uses the selected jurisdiction and available authoritative sources to support its response.",
+              },
+              {
+                question: "What is the difference between Indian and International jurisdiction?",
+                answer: "Indian jurisdiction focuses on Indian statutes, authorities and requirements. International jurisdiction focuses on relevant global frameworks, treaties and foreign intellectual-property or regulatory contexts. Select the mode that matches your question.",
+              },
+              {
+                question: "Can I upload a document or image with my question?",
+                answer: "Yes. Supported documents can be read for relevant text, while supported images can be analyzed for readable text and other material details. The extracted attachment context can then be considered with your question.",
+              },
+              {
+                question: "What happens when an answer has low confidence?",
+                answer: "The chat can offer expert consultation for low-confidence cases. You can choose an Ayurveda Expert, Legal / IP Expert or Regulatory Affairs Expert so the request is routed according to the selected expert type.",
+              },
+              {
+                question: "Is the answer a legal opinion or a substitute for professional advice?",
+                answer: "No. IP-SAKTI Sahayak is a decision-support and research tool. Its responses should be checked against the cited sources and, where appropriate, reviewed by a qualified legal, regulatory or domain professional.",
+              },
+              {
+                question: "Does the platform support multiple languages?",
+                answer: "Yes. The interface and supported language workflow are designed for multilingual access, with the available language options shown in the application.",
+              },
+            ].map((faq, index) => {
+              const isOpen = openFaqIndex === index;
+              return (
+                <div key={faq.question} className="rounded-xl border border-slate-300 bg-white dark:bg-slate-900 dark:border-slate-700 shadow-sm overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaqIndex(isOpen ? null : index)}
+                    className="w-full flex items-center justify-between gap-4 px-4 sm:px-5 py-4 text-left"
+                    aria-expanded={isOpen}
+                  >
+                    <span className="flex items-center gap-3 text-sm font-semibold text-slate-900 dark:text-white">
+                      <HelpCircle className="w-4 h-4 shrink-0 text-emerald-700 dark:text-emerald-400" />
+                      {faq.question}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 shrink-0 text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {isOpen && (
+                    <div className="border-t border-slate-200 dark:border-slate-700 px-4 sm:px-5 py-4 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                      {faq.answer}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -341,7 +406,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
             </p>
           </div>
 
-          <form onSubmit={handleContactSubmit} className="rounded-2xl bg-white dark:bg-slate-900 p-5 sm:p-7 text-slate-900 dark:text-white shadow-2xl">
+          <form onSubmit={handleContactSubmit} className="rounded-2xl bg-white dark:bg-slate-900 p-5 sm:p-7 text-slate-900 dark:text-white shadow-2xl border border-slate-300 dark:border-slate-700">
             <div className="grid sm:grid-cols-2 gap-4">
               <label className="text-sm font-medium">
                 Name
